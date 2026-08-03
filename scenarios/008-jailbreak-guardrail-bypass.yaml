@@ -1,0 +1,89 @@
+schema_version: 1
+id: 008
+slug: jailbreak-guardrail-bypass
+title: Jailbreak / guardrail bypass
+one_liner: An attacker crafts a message that talks the AI past its safety rules ('jailbreak'), getting
+  it to produce banned content or unlock actions it was told not to take.
+status: draft
+classification:
+  primary_layer_component: Model / App
+  ai_infrastructure_layer: L2 · Model
+  evidence: seen-in-the-wild
+  priority: NOW
+  priority_rationale:
+  - Guardrail bypasses are attempted constantly and succeed regularly.
+  - 'The consequences are immediate: harmful output, brand damage, and safety failures.'
+  - We do not currently record when a guardrail fires or when it is defeated.
+framework_mapping:
+  baseline: '2026.07'
+  attack: []
+  atlas: []
+  owasp_llm:
+  - LLM01:2025
+  owasp_agentic: []
+  mapping_confidence: editorial
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
+    2026.07 identifiers before this record is published: ATLAS: LLM Jailbreak | Layers L2 Model / L4 App'
+attack_path:
+- step: 1
+  layer: App
+  text: Attacker submits a crafted prompt to evade safety rules (role-play, obfuscation, many-shot)
+- step: 2
+  layer: Model
+  text: The guardrail / safety layer fails to block it
+- step: 3
+  layer: Model
+  text: The model produces disallowed output or unlocks a restricted capability
+- step: 4
+  layer: Various
+  text: Harmful content, policy violation, or an unlocked action
+telemetry:
+- step: 1
+  signal: Prompt content (jailbreak patterns)
+  emitted_at: AI gateway · guardrail input scan
+  coverage: Collectable
+  detection_opportunity: Known jailbreak signatures; obfuscation; many-shot
+- step: 2
+  signal: Guardrail decision (allow / block / refusal)
+  emitted_at: L2 guardrail / LLM firewall
+  coverage: Blind
+  detection_opportunity: Refusal-then-comply; guardrail bypass; anomalous allow
+- step: 3
+  signal: Model output (disallowed content)
+  emitted_at: AI gateway output · output guardrail
+  coverage: Collectable
+  detection_opportunity: Output-policy classifier; disallowed-content detection
+- step: 4
+  signal: Unlocked action (if agent)
+  emitted_at: Tool-call logs · Identity
+  coverage: Collectable
+  detection_opportunity: A restricted capability invoked right after a jailbreak
+- step: 5
+  signal: Refusal-rate / bypass trend
+  emitted_at: Guardrail metrics
+  coverage: Collectable
+  detection_opportunity: Spike in bypass attempts; drop in refusals
+  kind: control
+commentary:
+  already_see: Safety filters that scan both the prompt and the answer are the front-line control; the
+    AI-specific gap is simply recording the filter's own decisions as data (step 2).
+  blind: 'Near-term: log every safety-filter decision and refusal rate (2, 5) and classify risky output
+    (3). Subtle bypasses that look like a normal ''allowed'' answer stay hard.'
+  how_detect: 'Treat the safety filter as a sensor, not just a gate: log every allow / block, watch for
+    spikes in bypass attempts, and connect a jailbreak-style prompt to a banned answer or an unlocked
+    action.'
+scaled_up: An automated tool defeats our guardrails at scale to mass-produce disallowed content or unlocks
+  a dangerous capability on an agent we assumed was safely fenced off.
+incidents:
+- dan-and-countless-jailbreak-families
+- bing-sydney
+- ongoing-jailbreak-arms-race
+- def-con-generative-red-team-findings
+provenance:
+  authored_by: imported-from-deck
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  sources: []
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
+  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
+  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'

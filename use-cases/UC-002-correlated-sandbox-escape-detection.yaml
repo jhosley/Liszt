@@ -1,0 +1,71 @@
+# UC-002 · Correlated sandbox escape detection
+#
+# Companion to published scenario 021. That record claims working detections on
+# steps 2, 4 and 6. This use case is the answer to the question those claims
+# raise: who receives the signal, what arrives with it, and what they do next.
+# The validator warns when a published scenario carries a detection score with
+# no use case behind it; this record is what closes that warning honestly.
+
+id: UC-002
+title: Correlated sandbox escape detection
+status: proposed
+
+covers:
+  - scenario: "021"
+    steps: [2, 4, 6]
+
+trigger:
+  signal: Code execution detection in a data processing worker
+  source: endpoint detection on the worker fleet, process telemetry index
+  # The strongest single signal in the chain (detection 3), so it leads.
+
+composes:
+  - signal: Unexpected egress from a sandboxed workload
+    source: network firewall traffic logs and proxy transaction logs, egress index
+    role: scoping
+    # Answers how far back this goes: was the sandbox already talking out
+    # before the worker detection fired.
+  - signal: Outbound transfer to public web services from inside the cluster
+    source: proxy transaction logs and data loss prevention verdicts, proxy index
+    role: corroboration
+    # Answers whether anything has already left. This is the difference
+    # between an intrusion in progress and a completed exfiltration.
+
+pipeline:
+  strategy: collect-centrally
+  destination: central analytics platform, correlation index
+  owner: detection engineering
+
+outcome:
+  kind: alert
+  autonomy: notify
+  consumer: security operations and incident response
+  action: >
+    The operator receives one case holding the worker detection, the egress
+    history of the sandbox that produced it, and any outbound transfers already
+    recorded, instead of three alerts in three queues. First decision is
+    containment of the worker and the sandbox, informed by whether the transfer
+    corroboration is present.
+
+# promotion: not present, and must stay absent while autonomy is notify.
+# If this graduates to assisted or autonomous, the promotion block with the
+# measured evidence goes here, and the validator will refuse the record
+# without it.
+
+limits: >
+  This use case starts from the worker detection. A compromise that never
+  reaches code execution on a worker, or one the endpoint agent misses, never
+  triggers it. The egress and transfer signals only scope and corroborate;
+  on their own they raise nothing here. Steps of the scenario that emit no
+  signal at all remain invisible to it, and it says nothing about intent:
+  a true positive still needs a human to judge severity.
+
+notes: >
+  Drafted as the companion to the published reference scenario so the library
+  demonstrates a scenario and its use case as a pair. Step choices follow the
+  three rows of scenario 021 that carry a detection score of one or higher.
+  The sources here restate those rows at category level; the exact named
+  systems live on the scenario's telemetry rows and stay authoritative there.
+
+provenance:
+  authored_by: "<analyst>"

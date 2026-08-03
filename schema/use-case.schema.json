@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.internal/liszt/schema/use-case.schema.json",
+  "title": "Operational Use Case",
+  "description": "Canonical record for one operational use case: how signals compose into a decision, who receives the result, and what it is allowed to do on its own. The scenario record says what evidence should exist and whether it does; this record says what gets done with that evidence. Use cases are separate records, not blocks inside a scenario, because one use case can serve several scenarios and copies are how libraries rot. They also carry their own lifecycle, which moves on a different clock from scenario review.",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "status",
+    "covers",
+    "trigger",
+    "composes",
+    "pipeline",
+    "outcome",
+    "limits",
+    "provenance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^UC-\\d{3}$",
+      "description": "Use case number with the UC prefix, so it can never be mistaken for a scenario id. Immutable once assigned. Never reused, even after retirement."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 90,
+      "description": "Name the decision this use case makes, not the tool that makes it. 'Correlated prompt injection with data movement' names a decision; 'guardrail alerting' names a product feature."
+    },
+    "status": {
+      "enum": [
+        "proposed",
+        "built",
+        "tuned",
+        "retired"
+      ],
+      "description": "The use case lifecycle, separate from scenario status because it moves on an engineering clock, not a review clock. proposed: written down, nothing runs yet. built: it runs. tuned: logic and thresholds have been adjusted against live volume. retired: kept in the repo forever, excluded from current reporting. A use case is born proposed and earns each later stage; it does not skip."
+    },
+    "covers": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Which attack behavior this use case serves: each entry names a scenario and the attack path steps whose telemetry rows this use case actually consumes. This is the join to the scenario library and the validator enforces both ends, the scenario must exist and every step must be inside its attack path. A use case that covers nothing answers no recorded behavior and has no reason to exist; a detection claim in a scenario that no use case covers is a signal firing into a queue nobody has promised to watch.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario",
+          "steps"
+        ],
+        "properties": {
+          "scenario": {
+            "type": "string",
+            "pattern": "^[0-9]{3}$",
+            "description": "Zero-padded scenario id, exactly as it appears in the scenario record. Quoted, or the YAML parser strips the leading zeros."
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "description": "The attack path steps whose telemetry rows feed this use case. List only the steps whose rows it actually reads; padding the list makes coverage reporting lie. The validator checks each number against the named scenario's real attack path."
+          }
+        }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signal",
+        "source"
+      ],
+      "description": "The one signal that starts this use case. One trigger by design: if two different signals can start it, that is two use cases, and merging them hides which one actually fired when the numbers are read later.",
+      "properties": {
+        "signal": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 80,
+          "description": "What fires. A noun phrase, worded as closely as possible to the scenario telemetry row it answers, so a person can read the join without a lookup table."
+        },
+        "source": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 160,
+          "description": "The EXACT named system the trigger comes from, same doctrine as the scenario telemetry source field: the log, index, table, topic or endpoint by name, for example 'model guardrail service decision log'. A trigger with no named source cannot be wired up, and a use case that cannot be wired up is a wish."
+        }
+      }
+    },
+    "composes": {
+      "type": "array",
+      "description": "The other evidence this use case pulls once the trigger fires. May be empty: a single signal use case that goes straight to its consumer writes an empty list, which records the composition question as answered, not skipped. Each entry carries a role so a reader knows why the evidence is there: enrichment adds the context an operator would otherwise fetch by hand, corroboration is an independent second signal that raises or lowers confidence in the trigger, and scoping establishes reach, meaning which other runs, identities or systems the same condition touches.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "signal",
+          "source",
+          "role"
+        ],
+        "properties": {
+          "signal": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 80,
+            "description": "The composed evidence, as a noun phrase, worded to match the scenario telemetry rows it answers."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 160,
+            "description": "The exact named system this evidence comes from, same doctrine as the trigger source. Composed evidence nobody can point at will silently be absent the day the use case fires."
+          },
+          "role": {
+            "enum": [
+              "enrichment",
+              "corroboration",
+              "scoping"
+            ],
+            "description": "Why this evidence is pulled. enrichment: context that saves the operator a manual fetch but changes no verdict. corroboration: an independent signal that changes the confidence of the verdict. scoping: evidence of reach, used to size the event rather than confirm it. Recording the role is what lets a reviewer ask the right question of each item: an enrichment that is missing costs minutes, a corroboration that is missing costs the verdict."
+          }
+        }
+      }
+    },
+    "pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "destination",
+        "owner"
+      ],
+      "description": "How the evidence is delivered to where the decision is made, and who owns making that happen.",
+      "properties": {
+        "strategy": {
+          "enum": [
+            "collect-centrally",
+            "instrument-at-source",
+            "evaluate-at-platform"
+          ],
+          "description": "The delivery decision, recorded so it can be queried later. collect-centrally: haul the data back and correlate it in the central analytics platform. instrument-at-source: the owning platform is tooled to emit a signal it does not emit today, and the decision is made downstream. evaluate-at-platform: the logic runs on the platform that already holds the data and only the verdict travels. The scenario record produces the evidence requirement; the choice between hauling data back, tooling the platform, and evaluating in place stays with the owner who has the budget and the context. This field is where that choice lands in writing, which is what makes questions answerable later that cannot be answered today, such as which platforms keep appearing as needing instrumentation."
+        },
+        "destination": {
+          "type": "string",
+          "minLength": 5,
+          "description": "Where the composed evidence or the verdict lands, named: the index, queue or store the decision is assembled in. Same doctrine as source fields; a destination nobody can point at cannot be provisioned."
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 3,
+          "description": "The team accountable for building and tuning this use case, as a role or team name, never a person. This is not the consumer; the builder and the customer are usually different teams, and conflating them is how tuning requests get lost."
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "autonomy",
+        "consumer",
+        "action"
+      ],
+      "description": "What the use case produces and who acts on it. kind and autonomy are two deliberately separate axes: kind describes the artifact, autonomy describes who acts. Kept apart because collapsing them hides failure modes; an accurate alert nobody triages looks like coverage on one axis and is invisible on the other.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "alert",
+            "report",
+            "trend",
+            "dashboard",
+            "enrichment",
+            "response"
+          ],
+          "description": "The artifact produced. alert: an event pushed into a queue for action. report: a periodic written product. trend: a measured series watched for movement. dashboard: an always-on view someone consults. enrichment: context attached to another use case's output. response: a specified machine action. This field never says who acts; that is autonomy's job. The split earns its keep at tuning time: a detection that is accurate but always resolves with no action required has the wrong kind, not the wrong logic, and should probably become a trend or a report instead of an alert."
+        },
+        "autonomy": {
+          "enum": [
+            "notify",
+            "assisted",
+            "autonomous"
+          ],
+          "description": "Who acts. A ladder that is earned in order, never a menu. notify: an operator is told and takes the action. assisted: automation gathers what the investigation is known to need and hands the operator a ready case. autonomous: a bounded action runs first and is reported for review after. Because the gate between assisted and autonomous is a measured rate, autonomy cannot be declared; it has to be demonstrated with data collected while the use case ran at a lower level, and the promotion block is where that demonstration is recorded."
+        },
+        "consumer": {
+          "type": "string",
+          "minLength": 3,
+          "description": "Who receives the outcome, as a role or team, never a named person. An outcome with no named customer is a signal firing into a queue nobody triages, which is the exact failure this record exists to prevent."
+        },
+        "action": {
+          "type": "string",
+          "minLength": 20,
+          "description": "What is done with the outcome: the operator's expected next move, or for autonomy above notify the bounded set of actions that runs. Write the action that happens, not the aspiration; 'investigate' is not an action, it is a hope."
+        }
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "evidence",
+        "blast_radius",
+        "reversible",
+        "approved_by",
+        "approved",
+        "review",
+        "disable"
+      ],
+      "description": "The authorization to run above notify. REQUIRED whenever outcome.autonomy is assisted or autonomous; the validator enforces that, this schema documents it. This is the record that gets pulled the first time an automated action does something it should not have, and the question that day will be how anyone decided it was safe. So it holds the evidence snapshot, the named approval, the review loop and the off switch, not a summary of good intentions.",
+      "properties": {
+        "from": {
+          "enum": [
+            "notify",
+            "assisted"
+          ],
+          "description": "The level this use case ran at while the evidence below was collected. Promotion moves one rung at a time: evidence for assisted is collected at notify, evidence for autonomous is collected at assisted. A use case cannot skip a rung, because the evidence for the skipped rung would not exist."
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "true_positive_rate",
+            "window",
+            "volume"
+          ],
+          "description": "The measured record behind the promotion, collected while the use case actually ran at the lower level, never projected. This snapshot is what was true on the approval date; the operations platform keeps the running history it was taken from.",
+          "properties": {
+            "true_positive_rate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "The share of fires over the window that were real. This is the first gate: accuracy says the detection is real. It says nothing about whether the response is automatable; that is what action_consistency measures."
+            },
+            "window": {
+              "type": "string",
+              "minLength": 3,
+              "description": "The measurement period the rate was taken over, for example '90 days ending 2026-07-31'. A rate with no window is not a measurement, it is a claim."
+            },
+            "volume": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "How many fires the rate was measured across. A perfect rate over three fires is an anecdote; the approver needs the denominator to judge the numerator."
+            }
+          }
+        },
+        "action_consistency": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "The second gate, and the one a true positive rate cannot show. Accuracy says the detection is real; consistency says the response is deterministic: the share of true positives that received the same operator response. Only both together justify autonomy. A use case that fires four hundred times, is always real, and gets a different response each time is not an automation candidate, because the value the analyst adds there is judgment. Optional because it can only be measured where dispositions record the action taken; absence means it has not been measured, not that it passed."
+        },
+        "blast_radius": {
+          "type": "string",
+          "minLength": 10,
+          "description": "What the action can reach when it runs: the systems, identities and data inside the bounded action's reach, stated plainly, so the approver is signing for a known worst case rather than an implied one."
+        },
+        "reversible": {
+          "type": "boolean",
+          "description": "Whether the action can be undone after it runs. An irreversible autonomous action needs a far stronger case than a reversible one, and the reversal rate, meaning how often the action had to be undone, is the most important number to start recording from day one."
+        },
+        "approved_by": {
+          "type": "string",
+          "minLength": 3,
+          "description": "Who authorized running above notify. Accountability does not transfer to a tool or a metric; if nobody will put their name against the decision, the use case does not run above notify."
+        },
+        "approved": {
+          "type": "string",
+          "format": "date",
+          "description": "The date the approval was given. The evidence snapshot above is what was true on this date; it does not update itself, which is why a review mechanism is also required."
+        },
+        "review": {
+          "type": "string",
+          "minLength": 10,
+          "description": "The standing review loop once it runs above notify, for example: the operator on shift reviews what ran on its own at mid shift. Autonomy without a review loop is not delegation, it is abandonment."
+        },
+        "disable": {
+          "type": "string",
+          "minLength": 10,
+          "description": "How this use case gets turned off and who can do it. The off switch is part of the authorization, not an operational detail: an automation nobody can stop was never safe to start."
+        }
+      }
+    },
+    "limits": {
+      "type": "string",
+      "minLength": 30,
+      "description": "What this use case cannot tell you, stated rather than implied. Every use case has a blind side: the trigger can miss and produce nothing, the composed evidence can be absent, the correlation window can be too short. Write it down, because a use case with no stated blind spot will be trusted past its range, and the reader who over-trusts it will be the one who never saw this record."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Analyst working notes. Never rendered. Use freely: disagreements, open questions, why a covered step was included or left out."
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authored_by"
+      ],
+      "properties": {
+        "authored_by": {
+          "type": "string",
+          "description": "The human who produced this record. Accountability does not transfer to a tool; if nobody will put their name on it, it is not ready."
+        }
+      }
+    }
+  }
+}

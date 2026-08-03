@@ -1,0 +1,207 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# FRAMEWORK BASELINE  ·  2026.07
+#
+# Every scenario record names exactly one baseline. All framework IDs in that
+# record are expressed in THIS baseline's vocabulary. Never mix baselines
+# within a record, and never re-map a published record in place, cut a new
+# baseline and migrate deliberately (docs/03-framework-mapping.md § Migration).
+#
+# Why this file exists: year-over-year coverage metrics are only comparable if
+# the taxonomy underneath them is held still. Two of our four frameworks made
+# breaking changes in the last 18 months. Without pinning, a coverage "drop"
+# is indistinguishable from MITRE renaming a tactic.
+# ─────────────────────────────────────────────────────────────────────────────
+
+baseline: "2026.07"
+status: current            # current | superseded
+declared: 2026-07-31
+owner: "UNASSIGNED, the program lead must name an individual before the first migration"
+                           # named individual, not a team, someone has to do the migration
+review_due: 2027-04-30     # align to ATT&CK's April release
+
+frameworks:
+
+  attack:
+    name: MITRE ATT&CK (Enterprise)
+    version: "19.1"
+    spec_version: "3.3.0"            # x_mitre_attack_spec_version, verified against the pinned bundle
+    released: 2026-05-12             # v19.0 shipped 2026-04-28; 19.1 is the data-correction release
+    cadence: ~6 months, April and October
+    site: https://attack.mitre.org/
+    data: https://github.com/mitre-attack/attack-stix-data
+    pinned_artifact: enterprise-attack/enterprise-attack-19.1.json
+    pinned_url: https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack-19.1.json
+    taxii: https://attack-taxii.mitre.org/api/v21/attack-19.1
+    also_used:
+      - Cloud matrix (Office Suite, Identity Provider, SaaS, IaaS)
+      - Containers matrix
+    id_stability: >
+      Stable and never reused. Two retirement mechanisms, both retained in the bundle:
+      x_mitre_deprecated (no longer tracked) and revoked (replaced, with a revoked-by
+      relationship pointing source → replacement). v19.1 Enterprise carries 289 deprecated
+      and 157 revoked objects. Machine-readable changelog published per release.
+    breaking_changes_since_prior_baseline:
+      - >
+        v19 SPLIT the Defense Evasion tactic into "Stealth" and "Defense Impairment".
+        Enterprise now has 15 tactics. Any tactic-level coverage metric computed on
+        v18 or earlier does NOT compare cleanly.
+      - >
+        v18 RETIRED data sources (DSxxxx) and replaced them with data components
+        (DCxxxx), linked to techniques via new Detection Strategy (DETxxxx) and
+        Analytic (ANxxxx) objects. Precisely: 38 x-mitre-data-source objects still exist in
+        the v19.1 bundle but all 38 are x_mitre_deprecated. Our telemetry rows use DCxxxx.
+        Any DSxxxx reference in a record predates this baseline and must be migrated.
+    offline: Clone attack-stix-data (all versioned bundles), or build attack-website locally.
+
+  atlas:
+    name: MITRE ATLAS
+    version: "2026.07"               # content version
+    format_version: "6.0.0"          # decoupled from content version since 2026.05, record both
+    released: 2026-07-31
+    cadence: ~monthly, YYYY.MM
+    site: https://atlas.mitre.org/
+    data: https://github.com/mitre-atlas/atlas-data
+    pinned_artifact: dist/v6/ATLAS-2026.07.yaml
+    pinned_url: https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/v6/ATLAS-2026.07.yaml
+    contents_at_pin:
+      tactics: 16                    # AML.TA0000. AML.TA0015
+      techniques: 178                # 101 parents + 77 sub-techniques
+      mitigations: 37
+      case_studies: 68
+    id_stability: >
+      NO formal deprecation mechanism. The data schema has no deprecated/revoked field and
+      no revoked-by equivalent. Change tracking is GitHub release notes plus per-object
+      modified-date only. Objects do carry a stable uuid alongside the id.
+      CONSEQUENCE: we must diff consecutive releases ourselves on (id, modified-date).
+      Budget manual review at every migration. Do not chase the monthly cadence.
+    offline: Single YAML per release; full historical v6/ and legacy/ directories in repo.
+
+  owasp_llm:
+    name: OWASP Top 10 for LLM Applications
+    edition: "2025"
+    published: 2024-11-17
+    cadence: irregular, community-driven, no committed schedule
+    site: https://genai.owasp.org/llm-top-10/
+    pdf: https://owasp.org/www-project-top-10-for-large-language-model-applications/assets/PDF/OWASP-Top-10-for-LLMs-v2025.pdf
+    machine_readable: none            # markdown in the project repo is the closest thing
+    id_stability: >
+      IDs are EDITION-SCOPED and NOT stable across editions. Slots were reshuffled between
+      2023 and 2025. Always store edition-qualified (LLM03:2025). OWASP publishes no
+      complete old→new crosswalk, only "new" and "expanded" entries are documented.
+    ids:
+      LLM01: Prompt Injection
+      LLM02: Sensitive Information Disclosure
+      LLM03: Supply Chain
+      LLM04: Data and Model Poisoning
+      LLM05: Improper Output Handling
+      LLM06: Excessive Agency
+      LLM07: System Prompt Leakage
+      LLM08: Vector and Embedding Weaknesses
+      LLM09: Misinformation
+      LLM10: Unbounded Consumption
+
+  owasp_agentic:
+    name: OWASP Top 10 for Agentic Applications
+    edition: "2026"
+    published: 2025-12-09
+    site: https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/
+    machine_readable: none            # PDF only
+    id_prefix: ASI                    # Agentic Security Initiative, NOT AAI or AA
+    note: >
+      First edition, so no renumbering history yet. Distinct from the earlier
+      "Agentic AI. Threats and Mitigations" v1.0 (2025-02-17), which does not expose a
+      stable ID scheme, cite that document as prose, never as IDs.
+    ids:
+      ASI01: Agent Goal Hijack
+      ASI02: Tool Misuse and Exploitation
+      ASI03: Identity and Privilege Abuse
+      ASI04: Agentic Supply Chain Vulnerabilities
+      ASI05: Unexpected Code Execution (RCE)
+      ASI06: Memory & Context Poisoning
+      ASI07: Insecure Inter-Agent Communication
+      ASI08: Cascading Failures
+      ASI09: Human-Agent Trust Exploitation
+      ASI10: Rogue Agents
+
+  dettect:
+    name: DeTT&CT
+    version: "2.2.0"
+    version_date_caveat: >
+      GitHub renders the release date without a year. 21 January 2026 is INFERRED from the
+      ATT&CK v18 dependency, not read from a primary source. Verify before citing externally.
+    repo: https://github.com/rabobank-cdc/DeTTECT
+    wiki: https://github.com/rabobank-cdc/DeTTECT/wiki
+    targets_attack: "18"              # tagged release targets v18; master already sets 19.1
+    note: >
+      Defines no IDs of its own, it annotates ATT&CK technique IDs, so ID stability is
+      inherited. Fully offline by design; best air-gap story of the four.
+    scales:
+      visibility:                     # 0 to 4
+        0: None
+        1: Minimal
+        2: Medium
+        3: Good
+        4: Excellent
+      detection:                      # -1 to 5. Do NOT conflate with visibility.
+        -1: None
+        0: Forensics/context only
+        1: Basic
+        2: Fair
+        3: Good
+        4: Very good
+        5: Excellent
+      quality_dimensions:             # each 0 to 5
+        device_completeness: Is the required data available for all devices?
+        data_field_completeness: Does the data carry the required fields, and are they populated?
+        timeliness: When is data available, and how accurate are its timestamps?
+        consistency: How standardized are field names and types?
+        retention: How long is data stored versus the desired retention period?
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CROSSWALKS, read this before mapping anything
+# ─────────────────────────────────────────────────────────────────────────────
+
+crosswalks:
+  atlas_to_attack:
+    authoritative: partial
+    mechanism: >
+      An optional attack-reference field on ATLAS technique objects, meaning "adapted from".
+      37 of 178 ATLAS techniques (21%) carry one. 141 are ATLAS-specific with no ATT&CK
+      counterpart. The linkage is one-directional, there is no ATT&CK-side pointer back.
+      The atlas-to-stix tool can emit a combined bundle, but that is co-packaging, not
+      semantic mapping.
+    cite_as: "attack-reference fields in mitre-atlas/atlas-data"
+
+  owasp_to_mitre:
+    authoritative: none
+    note: >
+      Nothing authoritative exists from OWASP or MITRE, in either direction, for either
+      the LLM or the Agentic list. Every published mapping is third-party, community
+      repos, vendor blogs, personal posts. Do not cite any of them as authoritative.
+
+  our_position: >
+    Any ATLAS↔OWASP or ATT&CK↔OWASP mapping row this program publishes is OUR editorial
+    judgment. Every scenario record carries framework_mapping.mapping_confidence for
+    exactly this reason. Label it, version it, name an owner, and never imply upstream
+    endorsement. This is the single most important caveat in the mapping guide.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MIGRATION RULES
+# ─────────────────────────────────────────────────────────────────────────────
+
+migration:
+  cadence: annual, aligned to the ATT&CK April release
+  dual_report_period: one full reporting cycle
+  rules:
+    - Pin immutable artifacts, never floating pointers (enterprise-attack-19.1.json,
+      never enterprise-attack.json; ATLAS-2026.07.yaml, never ATLAS-latest.yaml).
+    - Vendor the pinned files into frameworks/pinned/ with checksums. This doubles as the
+      air-gapped copy.
+    - Record the FULL version tuple with every metric snapshot. ATT&CK version + spec
+      version, ATLAS content + format version, OWASP editions, DeTT&CT version and the
+      ATT&CK version it ran against.
+    - At every upgrade, publish one cycle of metrics against BOTH pins. This is what makes
+      a year-over-year delta attributable to our controls rather than framework churn.
+    - Automate ATT&CK ID migration by walking revoked-by relationships. Treat deprecated
+      objects as coverage-eligible-but-frozen so historical scores are not destroyed.
+    - ATLAS and both OWASP lists give us nothing automatable. Budget manual diff review.

@@ -1,0 +1,164 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# OPERATIONAL USE CASE TEMPLATE
+#
+# A use case explains how signals compose into a decision: what triggers it, what
+# other evidence gets pulled and in what role, how the evidence is delivered, what
+# it produces, who receives that, and what it is allowed to do on its own. The
+# scenario record says what evidence should exist; THIS record says what gets done
+# with it. Coverage says we can see it. A use case says we do something
+# intelligent with it. A program can reach high coverage where every detection is
+# a lone signal firing into a queue nobody triages, and the coverage number looks
+# fine the whole way down. This record is how that failure becomes visible.
+#
+# Copy this file to use-cases/UC-NNN-your-slug.yaml and replace every PLACEHOLDER.
+#
+# Two things this file cannot do for you:
+#   1. tools/validate.py SKIPS any file whose name starts with "_", so this
+#      template is never validated in place. To check a change you made here,
+#      copy it to use-cases/UC-999-scratch.yaml, validate, then delete the copy.
+#   2. The validator flags TBD, TODO, XXX and "[insert", not the word PLACEHOLDER.
+#      A half-finished record built from this template can pass the validator.
+#      You are the check. Grep for PLACEHOLDER before you hand it over.
+#
+# As shipped, this template produces exactly 1 error and 0 warnings: the covers
+# entry points at scenario '000', which does not exist. You clear it by pointing
+# at the real scenario this use case serves, which is the first piece of actual
+# work. If you see a second error, you introduced it.
+#
+# Read use-cases/UC-001-correlated-prompt-injection-with-data-movement.yaml first.
+# It is the worked example, built from the program's own teaching case. Copying a
+# good example beats reading a procedure.
+#
+# Field authority: schema/use-case.schema.json (structure, with a teaching
+# description on every field) and tools/validate.py (the cross-record checks:
+# covered scenarios must exist, covered steps must be real, and autonomy above
+# notify must carry a promotion block).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+id: UC-000                        # PLACEHOLDER. UC- prefix plus 3 digits, assigned by a HUMAN
+                                  # from the repo: take the next free number, never reuse one,
+                                  # not even from a retired use case. UC-000 is structurally
+                                  # valid, so the validator will NOT catch it. You must.
+
+title: PLACEHOLDER use case title # 8 to 90 chars. Name the DECISION this use case makes, not
+                                  # the tool that makes it. Mistake: "guardrail alerting". That
+                                  # names a product feature, not a decision.
+
+status: proposed                  # proposed | built | tuned | retired. Born proposed. 'built'
+                                  # means it actually runs; 'tuned' means the logic has been
+                                  # adjusted against live volume. Do not skip stages, each is a
+                                  # claim someone can check.
+
+covers:                           # At least one entry. Which scenarios, and which attack path
+                                  # steps, this use case serves. The validator checks that each
+                                  # scenario exists and each step is inside its attack path.
+  - scenario: '000'               # PLACEHOLDER. 3 digits, QUOTED, or YAML strips the zeros.
+    steps: [1]                    # Only the steps whose telemetry rows this use case actually
+                                  # reads. Open the scenario, read its telemetry table, and match
+                                  # rows to the signals below. Mistake: listing every step of the
+                                  # scenario to look thorough. Padding makes coverage reporting lie.
+
+trigger:                          # The ONE signal that starts this use case. If two different
+                                  # signals can start it, that is two use cases; merging them
+                                  # hides which one actually fired.
+  signal: PLACEHOLDER, the signal that starts this use case
+                                  # A noun phrase, worded like the scenario telemetry row it
+                                  # answers, so the join reads without a lookup table.
+  source: PLACEHOLDER, the exact named system it comes from
+                                  # Same doctrine as the scenario telemetry source field: the
+                                  # log, index, table, topic or endpoint BY NAME. A trigger with
+                                  # no named source cannot be wired up.
+
+composes: []                      # The other evidence pulled once the trigger fires. An empty
+                                  # list is legitimate for a single signal use case: it records
+                                  # the composition question as answered, not skipped.
+                                  # Each entry looks like:
+# composes:
+#   - signal: PLACEHOLDER, evidence pulled after the trigger
+#     source: PLACEHOLDER, the exact named system it comes from
+#     role: enrichment            # enrichment | corroboration | scoping.
+#                                 # enrichment: context the operator would otherwise fetch by
+#                                 #   hand; missing it costs minutes.
+#                                 # corroboration: an independent signal that changes the
+#                                 #   confidence of the verdict; missing it costs the verdict.
+#                                 # scoping: evidence of reach, which other runs, identities or
+#                                 #   systems the same condition touches; it sizes the event.
+#                                 # Mistake: marking everything enrichment. If losing it would
+#                                 # change the verdict, it is corroboration, and it deserves the
+#                                 # scrutiny that word invites.
+
+pipeline:                         # How the evidence is delivered to where the decision is made.
+  strategy: collect-centrally     # collect-centrally | instrument-at-source | evaluate-at-platform.
+                                  # THIS FIELD IS WHERE THE DELIVERY DECISION GETS RECORDED: haul
+                                  # the data back to the central analytics platform, tool the
+                                  # owning platform to emit what is missing, or run the logic on
+                                  # the platform that already holds the data so only the verdict
+                                  # travels. The scenario produced the evidence requirement; the
+                                  # owner with the budget makes this call. Once recorded, it can
+                                  # be queried: which platforms keep appearing as needing
+                                  # instrumentation is a question this field answers.
+  destination: PLACEHOLDER, where the composed evidence or verdict lands, named
+  owner: PLACEHOLDER, the team that builds and tunes this use case
+                                  # The BUILDER, not the consumer. The customer goes under
+                                  # outcome. Conflating them is how tuning requests get lost.
+
+outcome:                          # What is produced and who acts. Two axes, kept apart on
+                                  # purpose: kind is the artifact, autonomy is who acts. An
+                                  # accurate alert nobody triages looks like coverage on one
+                                  # axis and is invisible on the other.
+  kind: alert                     # alert | report | trend | dashboard | enrichment | response.
+                                  # The ARTIFACT. A detection that always resolves with no
+                                  # action required has the wrong kind, not the wrong logic:
+                                  # it should probably be a trend or a report, not an alert.
+  autonomy: notify                # notify | assisted | autonomous. WHO ACTS. A ladder, earned
+                                  # in order, never a menu. notify: an operator is told and
+                                  # acts. assisted: automation assembles the known investigation
+                                  # needs and hands over a ready case. autonomous: a bounded
+                                  # action runs first and is reported for review after.
+                                  # Anything above notify REQUIRES the promotion block below;
+                                  # the validator errors without it.
+  consumer: PLACEHOLDER, the role or team that receives the outcome
+  action: PLACEHOLDER, what is actually done with the outcome, stated as the action, not the aspiration
+
+# promotion:                      # THE AUTHORIZATION TO RUN ABOVE NOTIFY. Delete this block for
+#                                 # a notify use case; REQUIRED for assisted or autonomous, and
+#                                 # the validator enforces that. Autonomy cannot be declared. It
+#                                 # is demonstrated with data collected while the use case ran at
+#                                 # a lower level, and this block is that demonstration.
+#   from: assisted                # The level it ran at while the evidence was collected. One
+#                                 # rung at a time; the evidence for a skipped rung cannot exist.
+#   evidence:
+#     true_positive_rate: 0.98    # 0 to 1, over the window below. Gate one: the detection is real.
+#     window: PLACEHOLDER, the measurement period, for example 90 days ending 2026-07-31
+#     volume: 1                   # How many fires the rate was measured across. A perfect rate
+#                                 # over three fires is an anecdote.
+#   action_consistency: 0.95     # 0 to 1, optional. Gate two: the share of true positives that
+#                                 # got the SAME operator response. Accuracy says the detection
+#                                 # is real; consistency says the response is deterministic.
+#                                 # Only both together justify autonomy. Four hundred fires,
+#                                 # always real, a different response each time: that is not an
+#                                 # automation candidate, the analyst's value there is judgment.
+#   blast_radius: PLACEHOLDER, what the action can reach when it runs, stated as a worst case
+#   reversible: true              # Can the action be undone after it runs? Record the reversal
+#                                 # rate from day one; the first time an autonomous action does
+#                                 # something it should not have, the question will be how
+#                                 # anyone decided it was safe.
+#   approved_by: PLACEHOLDER, who authorized it, a name someone will stand behind
+#   approved: '2026-01-01'        # PLACEHOLDER date, YYYY-MM-DD, quoted. The evidence above is
+#                                 # what was true on this date; it does not update itself.
+#   review: PLACEHOLDER, the standing review loop, for example a mid shift review of what ran on its own
+#   disable: PLACEHOLDER, how it gets turned off and by whom
+
+limits: >-
+  PLACEHOLDER. What this use case CANNOT tell you, stated rather than implied: the trigger
+  that can miss and produce nothing, the composed evidence that can be absent, the window
+  that can be too short. A use case with no stated blind spot will be trusted past its
+  range. Mistake: writing a limitation of the threat instead of a limitation of this
+  use case.
+
+# notes: >-                       # Optional. Analyst working notes, never rendered. Why a
+#   PLACEHOLDER                   # covered step was included or left out belongs here.
+
+provenance:
+  authored_by: PLACEHOLDER        # The HUMAN who owns this record. Accountability does not
+                                  # transfer to a tool.

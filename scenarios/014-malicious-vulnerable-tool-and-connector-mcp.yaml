@@ -1,0 +1,90 @@
+schema_version: 1
+id: '014'
+slug: malicious-vulnerable-tool-and-connector-mcp
+title: Malicious / vulnerable tool & connector (MCP)
+one_liner: A tool or connector the agent relies on is itself malicious or vulnerable - so trusting the
+  tool is the mistake. Its poisoned description quietly redirects what the agent does.
+status: draft
+classification:
+  primary_layer_component: Agent
+  ai_infrastructure_layer: L3 · Orchestration & Agent
+  evidence: seen-in-the-wild
+  priority: NEAR-TERM
+  priority_rationale:
+  - Compromised connectors have already been found in the wild, including a real malicious package.
+  - Agents trust a tool's own description of itself, and the attacker controls that description.
+  - It is rated NEAR-TERM rather than NOW because our connector estate is still small. That will change.
+framework_mapping:
+  baseline: '2026.07'
+  attack: []
+  atlas: []
+  owasp_llm:
+  - LLM03:2025
+  owasp_agentic: []
+  mapping_confidence: editorial
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
+    2026.07 identifiers before this record is published: ATLAS: LLM Plugin Compromise | Layers L3 Agent'
+attack_path:
+- step: 1
+  layer: Agent / supply
+  text: A malicious or vulnerable tool / connector is introduced into the agent's toolset
+- step: 2
+  layer: Agent
+  text: The agent trusts the tool's description / interface (which may be poisoned)
+- step: 3
+  layer: Agent
+  text: The agent invokes the tool; it behaves maliciously (exfil, RCE, hidden actions) or has a vulnerability
+- step: 4
+  layer: Tool / host
+  text: A malicious action or exploit runs with the agent's / tool's privilege
+- step: 5
+  layer: Impact
+  text: Data theft, RCE, or hidden manipulation, attributed to the 'tool,' not an attacker
+telemetry:
+- step: 1
+  signal: Tool / connector registration & description
+  emitted_at: MCP registry · tool inventory
+  coverage: Blind
+  detection_opportunity: New / unknown tool; poisoned or changed tool description
+- step: 2
+  signal: Tool invocation & parameters
+  emitted_at: L3 tool-call logs · AI gateway
+  coverage: Collectable
+  detection_opportunity: Calls to un-vetted tools; parameters exfiltrating data
+- step: 3
+  signal: Tool process behavior (host)
+  emitted_at: EDR · container runtime · NDR
+  coverage: Have
+  detection_opportunity: Tool spawning shell / network; RCE indicators (e.g., MCP Inspector)
+- step: 4
+  signal: Tool egress
+  emitted_at: NDR / proxy · DLP
+  coverage: Have
+  detection_opportunity: Data leaving via the tool / connector
+- step: 5
+  signal: Tool supply-chain provenance
+  emitted_at: Package / registry provenance
+  coverage: Collectable
+  detection_opportunity: Unsigned / compromised tool package (see postmark-mcp)
+commentary:
+  already_see: An MCP tool is just software on infrastructure - endpoint (EDR) and network tools already
+    catch it if it runs code or exfiltrates data (steps 3 to 4).
+  blind: The near-term add is a vetted inventory of tools and logging every tool call (1 to 2); validating
+    a tool's description and origin is the AI-specific gap.
+  how_detect: Vet and allow-list every tool / connector (signed, inventoried), log invocations, and let
+    EDR / NDR catch bad behavior. A tool's self-description is untrusted input.
+scaled_up: A widely adopted connector turns out to be malicious. Its poisoned description quietly redirects
+  what every agent using it does, and data leaves through a channel we approved ourselves.
+incidents:
+- mcp-inspector-rce-cve-2025-49596
+- mcp-tool-poisoning-invariant
+- postmark-mcp-compromised-package
+- asana-supabase-mcp-issues
+provenance:
+  authored_by: imported-from-deck
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  sources: []
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
+  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
+  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'

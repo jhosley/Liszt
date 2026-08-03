@@ -1,0 +1,15 @@
+# Moved. The dependency lists now live in requirements/ at the repo root, split
+# into a core tier and an optional deck tier:
+#
+#   requirements/base.txt   PyYAML, jsonschema, ruamel.yaml. Everything the
+#                           validator, coverage, viewer and session tools need.
+#   requirements/deck.txt   python-pptx and friends. Only the render command
+#                           and the deck importer need these.
+#
+# Do not add packages here. Use the installer instead:
+#
+#   bash install.sh                 core tier, online
+#   bash install.sh --with-deck     add the deck tier
+#   bash install.sh --offline       install from vendor/wheels, no network
+#
+# On Windows: install.ps1 with -WithDeck or -Offline.

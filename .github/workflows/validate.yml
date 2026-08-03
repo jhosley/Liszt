@@ -1,0 +1,23 @@
+name: validate
+on: [push, pull_request]
+
+# The gate this enforces: a record at status 'published' must have zero errors and
+# zero warnings. Drafts may carry warnings -- that is what draft means. So CI runs
+# the whole library non-strict (structural errors fail), then runs the published
+# subset strict.
+jobs:
+  scenarios:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r requirements/base.txt
+      - name: schema and structure (whole library)
+        run: python tools/validate.py
+      - name: quality bar (published records only)
+        run: python tools/validate.py --publishable --strict
+      - name: pinned framework checksums
+        run: python tools/pin_frameworks.py --verify
+      - name: metrics integrity
+        run: python tools/coverage.py --gaming

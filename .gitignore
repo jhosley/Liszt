@@ -1,0 +1,18 @@
+# Build output
+build/
+out/
+__pycache__/
+*.pyc
+
+# Local environment
+.venv/
+node_modules/
+vendor/wheels/
+
+# Generated documents and images
+*.pdf
+*.jpg
+
+# Pinned framework artifacts are large. Commit CHECKSUMS.json always; the bytes
+# only if your host tolerates them (Git LFS, or an internal artifact store).
+frameworks/pinned/*/enterprise-attack-*.json

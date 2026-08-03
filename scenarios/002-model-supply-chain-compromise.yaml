@@ -1,0 +1,100 @@
+schema_version: 1
+id: '002'
+slug: model-supply-chain-compromise
+title: Model supply-chain compromise
+one_liner: A downloaded AI model isn't just data - loading it can run hidden code, or the model itself
+  can be secretly backdoored. Importing a model is like installing software from a stranger.
+status: draft
+classification:
+  primary_layer_component: Model
+  ai_infrastructure_layer: L2 · Model
+  evidence: seen-in-the-wild
+  priority: NOW
+  priority_rationale:
+  - Malicious model files have been found on public model hubs and downloaded by real teams.
+  - Loading a tampered model file can run the attacker's code on our infrastructure immediately.
+  - We can see the code running, but we cannot currently prove where a model file came from.
+framework_mapping:
+  baseline: '2026.07'
+  attack: []
+  atlas: []
+  owasp_llm:
+  - LLM03:2025
+  - LLM04:2025
+  owasp_agentic: []
+  mapping_confidence: editorial
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
+    2026.07 identifiers before this record is published: ATLAS: ML Supply Chain Compromise (Model) | Layers
+    L2 Model (+ L1 if data)'
+attack_path:
+- step: 1
+  layer: External
+  text: Attacker publishes a malicious / backdoored model, or compromises a vendor / registry / dependency
+- step: 2
+  layer: Model / pipeline
+  text: A team downloads the model from a hub or vendor into the pipeline or registry
+- step: 3
+  layer: Host / Model
+  text: The file is loaded (torch.load / from_pretrained), malicious code runs, or backdoored weights
+    register
+- step: 4
+  layer: Host
+  text: 'Code execution → foothold: data theft, credential access, lateral movement'
+- step: 5
+  layer: Model / inference
+  text: A trigger input activates the backdoor at inference → attacker-chosen behavior
+telemetry:
+- step: 1
+  signal: Malicious artifact published (external)
+  emitted_at: Threat intel · model-hub reputation
+  coverage: Have
+  detection_opportunity: Known-bad model / publisher intel
+- step: 2
+  signal: Model artifact downloaded / imported
+  emitted_at: NDR / proxy · EDR (file write) · registry import log
+  coverage: Have
+  detection_opportunity: Download from unapproved source; unsigned artifact imported
+- step: 3
+  signal: Model load → code execution
+  emitted_at: EDR / endpoint · container runtime
+  coverage: Have
+  detection_opportunity: Pickle deserialization spawning shell / network; anomalous child process
+- step: 4
+  signal: Post-exploitation (C2, cred access, lateral)
+  emitted_at: EDR · NDR · Identity
+  coverage: Have
+  detection_opportunity: Standard post-exploitation detections
+- step: 5
+  signal: Backdoor behavior at inference
+  emitted_at: L2 model-behavior monitoring · guardrail · eval
+  coverage: Blind
+  detection_opportunity: Behavioral / trigger-input anomaly (hard)
+- step: 6
+  signal: Model signature / hash verification
+  emitted_at: Model registry · AI gateway
+  coverage: Collectable
+  detection_opportunity: Unsigned or hash-mismatch model blocked at import / load
+  kind: control
+commentary:
+  already_see: Endpoint protection (EDR) already catches the scary part - a malicious model file running
+    code is just a program misbehaving, which EDR is built to spot (steps 3 to 4).
+  blind: The new, AI-specific control is checking a model's digital signature before it loads (6); the
+    truly hard part is a silent backdoor that only misbehaves on a secret trigger (5).
+  how_detect: 'You don''t need exotic AI tooling for most of this: block unverified models at import so
+    bad code never runs and let EDR catch anything that slips. The residual - a hidden backdoor - moves
+    to model testing and behavior monitoring.'
+scaled_up: A backdoored model is reused across many internal applications and only misbehaves on a rare
+  trigger phrase, so it passes every test we run and spreads widely before anyone finds it.
+incidents:
+- malicious-models-on-hugging-face-jfrog
+- sleepy-pickle
+- nullifai
+- torchtriton-dependency-compromise
+provenance:
+  authored_by: imported-from-deck
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  sources: []
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
+  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
+  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'

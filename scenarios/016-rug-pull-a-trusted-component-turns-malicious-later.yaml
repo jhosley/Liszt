@@ -1,0 +1,90 @@
+schema_version: 1
+id: '016'
+slug: rug-pull-a-trusted-component-turns-malicious-later
+title: Rug pull - a trusted component turns malicious later
+one_liner: A model, tool, or dependency is clean when you approve it, then the maintainer swaps it for
+  a malicious version later. Trust was earned, then betrayed on the next update.
+status: draft
+classification:
+  primary_layer_component: Model / Agent
+  ai_infrastructure_layer: L2 · Model
+  evidence: seen-in-the-wild
+  priority: NEAR-TERM
+  priority_rationale:
+  - Approved components turning malicious later has been demonstrated for both connectors and packages.
+  - Our approval process checks a component once, at adoption, and never again afterward.
+  - It is rated NEAR-TERM because the fix is process discipline, not new tooling.
+framework_mapping:
+  baseline: '2026.07'
+  attack: []
+  atlas: []
+  owasp_llm:
+  - LLM03:2025
+  owasp_agentic: []
+  mapping_confidence: editorial
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
+    2026.07 identifiers before this record is published: ATLAS: ML Supply Chain Compromise (post-adoption
+    update) | Layers L2 Model / L3 Agent (tool / connector)'
+attack_path:
+- step: 1
+  layer: External
+  text: A model, dataset, tool or connector is adopted after passing review, clean at the time
+- step: 2
+  layer: External
+  text: The maintainer (or a compromised account) later ships a malicious update, the 'rug pull'
+- step: 3
+  layer: Model / Agent
+  text: Consumers auto-pull 'latest' (or an unpinned version) and adopt the malicious version
+- step: 4
+  layer: Host / Agent
+  text: The updated component runs malicious code, or the tool / model now behaves maliciously
+- step: 5
+  layer: Impact
+  text: Compromise propagates to everyone who trusted the formerly-clean component
+telemetry:
+- step: 1
+  signal: Component version change / update
+  emitted_at: Registry · package manager · MCP registry logs
+  coverage: Collectable
+  detection_opportunity: New version pulled; drift from the pinned / approved version
+- step: 2
+  signal: 'Re-verification: signature / hash on update'
+  emitted_at: Model & tool registry · AI gateway · CI/CD
+  coverage: Collectable
+  detection_opportunity: Signature / hash mismatch vs approved; unsigned update
+- step: 3
+  signal: Tool description / interface change
+  emitted_at: MCP registry · tool inventory
+  coverage: Blind
+  detection_opportunity: Approved tool's description or behavior changed since vetting
+- step: 4
+  signal: Post-update behavior (host / network)
+  emitted_at: EDR · NDR · container runtime
+  coverage: Have
+  detection_opportunity: New code execution / egress after an update (as in Scenarios 02 & 14)
+- step: 5
+  signal: Provenance / maintainer integrity
+  emitted_at: Threat intel · package provenance
+  coverage: Have
+  detection_opportunity: Compromised-maintainer / yanked-and-replaced package advisories
+commentary:
+  already_see: This is the supply-chain and tool scenarios with a time axis - endpoint (EDR) and network
+    tools still catch the malicious behavior after an update (step 4).
+  blind: 'The one new habit: pin approved versions and re-check a component''s signature on every update
+    (1 to 3), not just when first adopted.'
+  how_detect: 'There''s no new detector to buy, it’s a discipline: pin approved versions, re-verify origin
+    and signature on every update (never auto-pull ''latest'' for something privileged), and let EDR /
+    Network security backstop. A rug pull is just supply-chain compromise deferred in time.'
+scaled_up: A connector we approved months ago receives a malicious update from a hijacked maintainer account.
+  Every agent that auto-updates adopts it on the next pull, with no fresh review.
+incidents:
+- mcp-tool-rug-pull-research-invariant-labs-an-approved-tool-s
+- malicious-updates-to-previously-clean-packages-models-on-pub
+provenance:
+  authored_by: imported-from-deck
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  sources: []
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
+  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
+  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'

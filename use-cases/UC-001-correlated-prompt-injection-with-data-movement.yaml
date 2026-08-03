@@ -1,0 +1,89 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# WORKED EXAMPLE
+#
+# The first operational use case record, built from the program's own teaching
+# case: an agent moves data toward a model, the data carries a hidden instruction,
+# and a guardrail fires. The guardrail firing alone could go straight to an
+# operator. This record describes the better version: the firing kicks off a
+# correlation that pulls the agent's run history and the content inspection
+# verdict, and delivers one assembled case instead of one lone signal.
+#
+# Read it alongside use-cases/_TEMPLATE.yaml, which explains every field.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+id: UC-001
+title: Correlated prompt injection with data movement toward a model
+status: proposed
+
+covers:
+  # The steps below were matched against each scenario's telemetry table, row by
+  # row, not assumed. List only the steps whose rows this use case actually reads.
+  - scenario: '001'               # Indirect prompt injection to data exfiltration.
+    steps: [2, 3, 4]              # 2: prompt and retrieval event (the run history pulled as
+                                  #    enrichment). 3: guardrail decision (the trigger).
+                                  # 4: sensitive data access and tool call, where the content
+                                  #    inspection verdict corroborates the movement.
+                                  # Steps 1, 5 and 6 are ingestion and egress signals; other
+                                  # use cases, not this one.
+  - scenario: '013'               # Agent memory / context poisoning.
+    steps: [2, 3, 4]              # 2: memory read and retrieval into context. 3: agent decision
+                                  #    trace. 4: the consequential action the content inspection
+                                  #    sees. See notes: this scenario has no guardrail row of
+                                  #    its own, so coverage here leans on the composed evidence.
+
+trigger:
+  signal: Model guardrail policy violation
+  source: model guardrail service decision log
+
+composes:
+  - signal: Agent conversation and retrieval history
+    source: agent trace platform, run and prompt history
+    role: enrichment              # Saves the operator the manual fetch: what the agent was
+                                  # asked, what it retrieved, and what it did next.
+  - signal: Content inspection verdict on model inputs
+    source: data loss prevention inspection verdict log
+    role: corroboration           # An independent second opinion on the same data movement.
+                                  # If it is missing, the verdict changes, so it is not
+                                  # enrichment.
+
+pipeline:
+  strategy: collect-centrally     # All three sources already emit; the gap is the join. So the
+                                  # evidence is hauled back and correlated centrally rather than
+                                  # tooling any platform to emit something new.
+  destination: central analytics platform, correlation index
+  owner: detection engineering
+
+outcome:
+  kind: alert
+  autonomy: notify
+  consumer: security operations and incident response
+  action: >-
+    Open one assembled case that carries the guardrail verdict, the agent run and
+    retrieval history that led up to it, and the content inspection verdict on the same
+    data movement, joined on the run identifier, so the operator starts from the whole
+    chain instead of triaging one firing with no context.
+
+# promotion:                      # Goes here, and is REQUIRED before outcome.autonomy may be
+#                                 # raised above notify. This use case runs at notify, so there
+#                                 # is nothing to authorize yet: the evidence for a promotion
+#                                 # (true positive rate, window, volume, action consistency) is
+#                                 # collected while it runs at this level, not projected.
+
+limits: >-
+  This use case starts at the guardrail. An injection the guardrail never fires on
+  produces no trigger at all, so a guardrail miss is a silent miss: the run history and
+  the content inspection verdict are only ever pulled, never watched. It also cannot see
+  an exfiltration path that skips the inspected data movement, and it says nothing about
+  whether the assembled case is triaged in time; it measures composition, not response.
+
+notes: >-
+  Step selection was the judgment call. For scenario 001, steps 2, 3 and 4 are the rows
+  that name a prompt and retrieval event, the guardrail decision, and the data movement
+  the content inspection sees; the ingestion row (1) and the egress rows (5, 6) belong
+  to other use cases. For scenario 013, there is no guardrail decision row at all, so
+  the trigger only fires there if the guardrail inspects poisoned memory as it re-enters
+  the model context; the covered steps rest on the composed evidence, and a reviewer
+  could argue 013 belongs in a separate memory-focused use case once one exists.
+
+provenance:
+  authored_by: <analyst>

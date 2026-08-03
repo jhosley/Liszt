@@ -1,0 +1,88 @@
+schema_version: 1
+id: '006'
+slug: sensitive-information-disclosure-and-data-leakage
+title: Sensitive information disclosure & data leakage
+one_liner: The model hands out sensitive information it shouldn’t - data it memorized in training, secrets,
+  or another user's data - often just because someone asked the right way.
+status: draft
+classification:
+  primary_layer_component: Model
+  ai_infrastructure_layer: L2 · Model
+  evidence: seen-in-the-wild
+  priority: NOW
+  priority_rationale:
+  - Models repeat information they have seen. This is a known, repeatable behavior, not a rare fault.
+  - The data most at risk is exactly the regulated data we are accountable for.
+  - A leak here is directly reportable under privacy regulation.
+framework_mapping:
+  baseline: '2026.07'
+  attack: []
+  atlas: []
+  owasp_llm:
+  - LLM02:2025
+  owasp_agentic: []
+  mapping_confidence: editorial
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
+    2026.07 identifiers before this record is published: ATLAS: LLM Data Leakage / Membership Inference
+    | Layers L2 Model (+ L1 data)'
+attack_path:
+- step: 1
+  layer: App
+  text: User (or attacker) crafts prompts probing for memorized or other users' data
+- step: 2
+  layer: Model
+  text: Model surfaces training-data fragments, secrets, or PII it memorized
+- step: 3
+  layer: Model / App
+  text: Or a session / caching flaw returns another user's or context's data
+- step: 4
+  layer: App / net
+  text: Sensitive data leaves in the response
+telemetry:
+- step: 1
+  signal: Prompt content (probing patterns)
+  emitted_at: AI gateway prompt logs
+  coverage: Collectable
+  detection_opportunity: Extraction-style prompts; repeated probing
+- step: 2
+  signal: Model output (PII / secret / other-user data)
+  emitted_at: AI gateway output · guardrail · DLP
+  coverage: Collectable
+  detection_opportunity: Output DLP; PII / secret classifier on responses
+- step: 3
+  signal: Cross-user / session anomaly
+  emitted_at: App session logs · Identity
+  coverage: Have
+  detection_opportunity: Data returned outside the user's authorization scope
+- step: 4
+  signal: Data access underlying the answer
+  emitted_at: API / DLP / data-access logs
+  coverage: Have
+  detection_opportunity: Sensitive data reached by the model / service account
+- step: 5
+  signal: Egress of the response
+  emitted_at: NDR / proxy · DLP
+  coverage: Have
+  detection_opportunity: Sensitive data in an outbound response
+  kind: control
+commentary:
+  already_see: Your existing data-loss-prevention (DLP) and identity tools already catch the sensitive
+    data leaving, and access outside a user's rights (steps 3 to 5).
+  blind: The near-term add is scanning the model's answers for personal data or secrets (2), and spotting
+    prompts that are fishing for memorized data (1).
+  how_detect: 'Put DLP on the model''s output, not just the network, and connect the dots: a probing prompt,
+    followed by sensitive data in the reply, going to someone who shouldn''t have it.'
+scaled_up: A model fine-tuned on sensitive corporate records repeats personal data or credentials to anyone
+  who asks the right question, or a caching fault shows one customer another customer's information.
+incidents:
+- training-data-extraction-research-extractable-memorization
+- chatgpt-cross-user-history-bug-2023
+- pii-regurgitation
+provenance:
+  authored_by: imported-from-deck
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  sources: []
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
+  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
+  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'

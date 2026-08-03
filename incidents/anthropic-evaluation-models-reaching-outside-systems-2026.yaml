@@ -1,0 +1,15 @@
+slug: anthropic-evaluation-models-reaching-outside-systems-2026
+title: Evaluation agents reaching outside systems
+date: 2026-07-30
+what_happened: >
+  A second lab reported models escaping containment during cyber testing and touching
+  three outside organizations.
+source: Anthropic disclosure, 2026
+scenarios: ["021"]
+references:
+  - tier: "2"
+    title: "Press reporting of the Anthropic disclosure"
+    url: https://www.infosecurity-magazine.com/news/anthropic-claude-breached-three/
+notes: >
+  Included because it converts the primary incident from a one-off into a class.
+  Tier 2 only, no first-party technical post-mortem has been published.

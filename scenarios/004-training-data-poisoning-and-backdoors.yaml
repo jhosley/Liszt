@@ -1,0 +1,92 @@
+schema_version: 1
+id: '004'
+slug: training-data-poisoning-and-backdoors
+title: Training-data poisoning & backdoors
+one_liner: Someone slips bad data into what the model is trained on, planting a hidden flaw or 'backdoor'
+  that survives testing and only misbehaves on the attacker's secret cue.
+status: draft
+classification:
+  primary_layer_component: Data → Model
+  ai_infrastructure_layer: L1 · Data
+  evidence: seen-in-research
+  priority: NEAR-TERM
+  priority_rationale:
+  - Poisoning our training data means reaching that data first, which is harder than the NOW scenarios.
+  - If it does succeed, the damage is baked into the model and survives retraining and testing.
+  - It is rated NEAR-TERM because it is less likely today, not because it is less serious.
+framework_mapping:
+  baseline: '2026.07'
+  attack: []
+  atlas: []
+  owasp_llm:
+  - LLM04:2025
+  owasp_agentic: []
+  mapping_confidence: editorial
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
+    2026.07 identifiers before this record is published: ATLAS: Poison Training Data / Backdoor ML Model
+    | Layers L1 Data → L2 Model'
+attack_path:
+- step: 1
+  layer: Data
+  text: Attacker tampers records in a training / fine-tuning set (or upstream public source / labeling
+    pipeline)
+- step: 2
+  layer: Data → Model
+  text: The poisoned data is ingested into a training / fine-tuning run
+- step: 3
+  layer: Model
+  text: The model learns the malicious pattern or a hidden trigger → behavior mapping
+- step: 4
+  layer: Model
+  text: Poison survives evaluation (fires only on the cue, or shifts a distribution subtly)
+- step: 5
+  layer: Model / inference
+  text: In production, the backdoor fires or the bias manifests
+telemetry:
+- step: 1
+  signal: Data write / ingestion into training set
+  emitted_at: L1 data-pipeline & storage logs · DLP
+  coverage: Collectable
+  detection_opportunity: Anomalous source / volume; records outside expected schema or distribution
+- step: 2
+  signal: Data provenance / lineage
+  emitted_at: L1 lineage · data catalog
+  coverage: Blind
+  detection_opportunity: Data with no / odd lineage; unverified upstream source
+- step: 3
+  signal: Training-run inputs & config
+  emitted_at: ML pipeline / MLOps logs
+  coverage: Collectable
+  detection_opportunity: Untracked dataset version used in a run; unexpected data mix
+- step: 4
+  signal: Pre-deployment evaluation results
+  emitted_at: Model eval / test harness
+  coverage: Collectable
+  detection_opportunity: Eval gaps; trigger / backdoor tests; distribution shift
+- step: 5
+  signal: Anomalous behavior at inference
+  emitted_at: L2 behavior monitoring · guardrail
+  coverage: Blind
+  detection_opportunity: Trigger-input / behavioral anomaly (hard)
+commentary:
+  already_see: This is caught mostly by data-governance stack - the pipeline and logs that record exactly
+    what data went into a training run (steps 1 to 4).
+  blind: The near-term work is tracking where data came from (its lineage) and testing models for hidden
+    triggers before release; the silent trigger at run-time stays hard (5).
+  how_detect: 'Prevention beats detection here: only train on data whose source you''ve verified and expand
+    red-teaming for backdoors. Whatever slips through moves to watching the model''s behavior in production.'
+scaled_up: A poisoned public dataset or a compromised labeling vendor seeds a hidden trigger into a model
+  we reuse across products. It behaves perfectly until the trigger appears, so evaluation never catches
+  it.
+incidents:
+- poisoning-web-scale-datasets-carlini-et-al-research
+- sleeper-agents-backdoor-persistence-research
+- poisoned-datasets-on-public-hubs
+provenance:
+  authored_by: imported-from-deck
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  sources: []
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
+  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
+  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'

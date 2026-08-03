@@ -1,0 +1,81 @@
+schema_version: 1
+id: '012'
+slug: vector-and-embedding-weaknesses
+title: Vector & embedding weaknesses
+one_liner: The search index that feeds the AI its reference documents is itself a sensitive database.
+  If it is poorly separated, one team's confidential documents can surface inside another team's answers.
+status: draft
+classification:
+  primary_layer_component: Data
+  ai_infrastructure_layer: L1 · Data
+  evidence: seen-in-research
+  priority: BACKLOG
+  priority_rationale:
+  - This is an emerging risk rather than one we have observed in our environment.
+  - It becomes serious when several teams or tenants share a single vector store.
+  - The controls needed are the same ones we already apply to any sensitive database.
+framework_mapping:
+  baseline: '2026.07'
+  attack: []
+  atlas: []
+  owasp_llm:
+  - LLM08:2025
+  owasp_agentic: []
+  mapping_confidence: editorial
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
+    2026.07 identifiers before this record is published: Layers L1 Data'
+attack_path:
+- step: 1
+  layer: Data
+  text: Sensitive data is embedded and stored in a vector DB (possibly multi-tenant / shared)
+- step: 2
+  layer: Data
+  text: Weak access control or isolation on the vector store
+- step: 3
+  layer: App → Data
+  text: An attacker retrieves another tenant's / unauthorized embeddings, or extracts embeddings
+- step: 4
+  layer: Impact
+  text: Cross-tenant leakage, or reconstruction of source text via embedding inversion
+telemetry:
+- step: 1
+  signal: Vector-store access (query / read)
+  emitted_at: Vector-DB access logs · Identity
+  coverage: Have
+  detection_opportunity: Access outside tenant / authorization scope; unusual bulk reads
+- step: 2
+  signal: Retrieval results vs authorization
+  emitted_at: RAG retrieval logs · Identity
+  coverage: Collectable
+  detection_opportunity: Retrieved chunks outside the user's permission set
+- step: 3
+  signal: Embedding export / bulk extraction
+  emitted_at: Vector-DB · DLP · NDR
+  coverage: Have
+  detection_opportunity: Bulk embedding export; large read volume
+- step: 4
+  signal: Index / config change
+  emitted_at: Vector-DB admin logs
+  coverage: Collectable
+  detection_opportunity: Isolation / ACL change; index reconfiguration
+commentary:
+  already_see: Identity + data-access logging on the vector store (1, 3) - apply the same access control
+    & monitoring used for any datastore.
+  blind: Near-term - retrieval-vs-authorization checks (2) and vector-store access logging (1).
+  how_detect: 'Treat the vector DB as a sensitive datastore: enforce and monitor per-tenant access, log
+    retrieval against authorization, and watch for bulk extraction.'
+scaled_up: A shared vector store with weak separation returns one team's confidential documents inside
+  another team's answers, or an attacker reconstructs the original sensitive text from the stored numeric
+  representations.
+incidents:
+- embedding-inversion-research-reconstruct-text-from-embedding
+- cross-tenant-leakage-in-shared-vector-stores
+- rag-access-control-gaps
+provenance:
+  authored_by: imported-from-deck
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  sources: []
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
+  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
+  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'

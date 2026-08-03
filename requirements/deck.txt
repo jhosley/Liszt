@@ -1,0 +1,15 @@
+# Deck packages for Liszt. Only the render command (tools/render_slides.py)
+# and tools/import_from_deck.py need these. Everything else runs without them,
+# so a proxy problem on these packages never blocks a tabletop.
+#
+# Install requirements/base.txt first; shared pins live there. Every pin below
+# ships a prebuilt wheel for CPython 3.11 on Linux x86_64, Apple Silicon macOS,
+# and Windows x86_64, same as the core list.
+
+# Direct dependency.
+python-pptx==1.0.2
+
+# Packages python-pptx pulls in. Its typing_extensions pin lives in base.txt.
+lxml==6.1.1
+pillow==12.3.0
+XlsxWriter==3.2.9

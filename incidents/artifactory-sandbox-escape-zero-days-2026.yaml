@@ -1,0 +1,21 @@
+slug: artifactory-sandbox-escape-zero-days-2026
+title: Artifactory sandbox-escape zero-days
+date: 2026-07-27
+what_happened: >
+  Eleven Artifactory CVEs published at once, ten credited to the AI lab's own models.
+  The package proxy was the evaluation sandbox's only permitted egress path.
+source: JFrog / CVE Program records, 2026
+scenarios: ["021"]
+references:
+  - tier: "0"
+    title: "JFrog. Fast Remediation Is the New Trust Model"
+    url: https://jfrog.com/blog/jfrog-and-openai-collaboration-on-zero-day-security-findings/
+    note: Names no CVE IDs. The IDs come from the CVE Program records, not this post.
+  - tier: "0"
+    title: "CVE Program records (CNA credits and exact version data)"
+    url: https://github.com/CVEProject/cvelistV5
+notes: >
+  Secondary reporting variously says 3, 8 or 9 CVEs. The correct figure is 11, of which
+  10 are credited to the AI lab and 1 to an unrelated researcher. Fixed in 7.161.15
+  (7.161.14 is the last vulnerable build). No party has stated which CVE was used in
+  the escape. Keep this record as the standing example of why the verification step exists.

@@ -1,0 +1,81 @@
+schema_version: 1
+id: '011'
+slug: adversarial-evasion-doctored-inputs-that-fool-a-model
+title: Adversarial evasion - doctored inputs that fool a model
+one_liner: An attacker tweaks an input just enough to fool an AI-based security control (fraud, malware,
+  or content filtering) into waving something malicious through as harmless.
+status: draft
+classification:
+  primary_layer_component: Model
+  ai_infrastructure_layer: L2 · Model
+  evidence: seen-in-research
+  priority: BACKLOG
+  priority_rationale:
+  - This only matters where an AI model is itself acting as a security control.
+  - In our estate that is a small number of systems, such as fraud and malware scoring.
+  - Where a non-AI backstop exists, the bad outcome is still caught by that backstop.
+framework_mapping:
+  baseline: '2026.07'
+  attack: []
+  atlas: []
+  owasp_llm: []
+  owasp_agentic: []
+  mapping_confidence: editorial
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
+    2026.07 identifiers before this record is published: ATLAS: Evade ML Model / Craft Adversarial Data
+    | Layers L2 Model / L4 App'
+attack_path:
+- step: 1
+  layer: App
+  text: Attacker makes small, deliberate changes to an input so the model gets it wrong
+- step: 2
+  layer: Model
+  text: The model misclassifies, or is steered to the attacker's target output
+- step: 3
+  layer: App
+  text: The ML-based control (fraud / malware / moderation) is bypassed
+- step: 4
+  layer: Impact
+  text: Malicious content or transaction passes as benign
+telemetry:
+- step: 1
+  signal: Input content (signs of deliberate tampering)
+  emitted_at: AI gateway · model input logs
+  coverage: Collectable
+  detection_opportunity: Inputs that look deliberately doctored to fool the model
+- step: 2
+  signal: Model confidence / output anomaly
+  emitted_at: Model monitoring · scores
+  coverage: Collectable
+  detection_opportunity: Low-confidence or near-boundary decisions; confidence anomalies
+- step: 3
+  signal: Control-bypass outcome
+  emitted_at: The protected system's logs (fraud / AV / moderation)
+  coverage: Have
+  detection_opportunity: Downstream fraud / malware / abuse the ML missed
+- step: 4
+  signal: Model performance drift
+  emitted_at: Eval / monitoring metrics
+  coverage: Collectable
+  detection_opportunity: Accuracy / precision drop on a slice
+commentary:
+  already_see: When an AI-based control (fraud, malware, moderation) is fooled, the system it protects
+    still catches the bad outcome - that's your safety net (step 3).
+  blind: 'Near-term: watch the model''s own confidence and accuracy for tell-tale dips (2, 4). Recognizing
+    a doctored input as an attack in real time is genuinely hard.'
+  how_detect: 'Never trust one AI control alone: monitor its confidence and performance, keep a non-AI
+    backstop, and adversarially test it. Detection here is mostly ''watch the model''s own health metrics.'''
+scaled_up: An attacker works out how to reliably fool an AI-based fraud or malware check, making that
+  control blind to an entire category of abuse while it continues to report itself as healthy.
+incidents:
+- adversarial-example-research-on-doctored-image-and-text-inpu
+- evasion-of-machine-learning-malware-fraud-and-content-classi
+- obfuscation-used-to-slip-past-filters
+provenance:
+  authored_by: imported-from-deck
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  sources: []
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
+  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
+  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'

@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# Liszt command dispatcher. Run "./liszt help" for the command list.
+set -u
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+VENV_PY="$ROOT/.venv/bin/python"
+if [ ! -x "$VENV_PY" ] && [ -x "$ROOT/.venv/Scripts/python.exe" ]; then
+  VENV_PY="$ROOT/.venv/Scripts/python.exe"   # a virtual environment made on Windows
+fi
+
+CMD="${1:-help}"
+if [ "$#" -gt 0 ]; then shift; fi
+
+usage() {
+  cat <<'EOF'
+usage: ./liszt <command> [options]
+
+  new           start a new scenario record, or a use case with --use-case
+  validate      check every record against the schema and the quality bar
+  strict        like validate, but warnings fail too
+  publishable   check only records at status: published
+  coverage      coverage, exposure, and maturity rollup
+  viewer        rebuild the static viewer page and liszt-data.json
+  serve         rebuild the viewer, then serve it on a local address
+  session       apply a session file back into the records
+  render        rebuild the slide deck (needs the deck packages)
+  publish       write the records out as Markdown pages
+  pin           vendor the pinned framework artifacts (needs network)
+  verify-pin    re-check the pinned artifact checksums (no network)
+  doctor        check this machine and explain anything that is off
+  update        pull the latest changes, refresh the packages, validate
+  help          show this list
+
+Anything after the command is passed through to the tool it runs.
+EOF
+}
+
+need_venv() {
+  if [ ! -x "$VENV_PY" ]; then
+    echo "No virtual environment found at .venv. Run install.sh (or install.ps1 on Windows) first." >&2
+    exit 1
+  fi
+}
+
+case "$CMD" in
+  help|-h|--help)
+    usage ;;
+  new)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/new_scenario.py" "$@" ;;
+  validate)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/validate.py" "$@" ;;
+  strict)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/validate.py" --strict "$@" ;;
+  publishable)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/validate.py" --publishable --strict "$@" ;;
+  coverage)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/coverage.py" "$@" ;;
+  viewer)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/build_viewer.py" "$@" ;;
+  serve)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/serve.py" "$@" ;;
+  session)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/apply_session.py" "$@" ;;
+  render)
+    need_venv
+    if ! "$VENV_PY" -c "import pptx" >/dev/null 2>&1; then
+      echo "The render command needs the deck packages, which are not installed." >&2
+      echo "Add them with: bash install.sh --with-deck (on Windows: powershell -ExecutionPolicy Bypass -File install.ps1 -WithDeck)." >&2
+      exit 1
+    fi
+    exec "$VENV_PY" "$ROOT/tools/render_slides.py" "$@" ;;
+  publish)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/publish_library.py" "$@" ;;
+  pin)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/pin_frameworks.py" "$@" ;;
+  verify-pin)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/pin_frameworks.py" --verify "$@" ;;
+  doctor)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/doctor.py" "$@" ;;
+  update)
+    need_venv
+    echo "Pulling the latest changes ..."
+    git -C "$ROOT" pull --ff-only || exit 1
+    echo "Refreshing the packages ..."
+    "$VENV_PY" -m pip install --quiet --no-cache-dir -r "$ROOT/requirements/base.txt" || exit 1
+    if "$VENV_PY" -c "import pptx" >/dev/null 2>&1; then
+      "$VENV_PY" -m pip install --quiet --no-cache-dir -r "$ROOT/requirements/deck.txt" || exit 1
+    fi
+    echo "Validating ..."
+    exec "$VENV_PY" "$ROOT/tools/validate.py" ;;
+  *)
+    echo "unknown command: $CMD" >&2
+    usage >&2
+    exit 2 ;;
+esac

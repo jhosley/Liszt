@@ -1,0 +1,43 @@
+# Per-org coverage overlay. EXAMPLE, copy this shape into coverage/<your-org>/.
+#
+# The scenario library is org-independent: the attack path, the signals that would be
+# emitted, and the framework mapping are properties of the scenario. Coverage is not, # it is a property of YOUR estate. This file overrides individual telemetry rows.
+#
+#   python tools/coverage.py --org _example-org
+#
+# Rows you omit, or mark `inherit: true`, keep the reference assessment. Only override
+# what you have actually assessed; an inherited score you never checked is worse than
+# an absent one.
+#
+# The political point: an org can adopt the entire scenario library, and contribute to
+# it, without ever publishing this file. Disclosing your gaps is a separate, later,
+# voluntary decision.
+
+scenario: '021'
+org: _example-org
+assessed_by: <name>
+assessed: '2026-07-31'
+
+telemetry:
+  - step: 1
+    inherit: true          # we agree with the reference: nothing emits this
+
+  - step: 2
+    # We run a different egress stack. Better visibility, no detection wired yet.
+    dettect:
+      visibility: 4
+      detection: 0
+      quality: {device_completeness: 5, data_field_completeness: 4, timeliness: 4, consistency: 4, retention: 5}
+    coverage: Collectable   # derived: visibility>=1 and detection<=0
+    owner: Platform Networking
+    backlog_ref: SEC-882
+
+  - step: 5
+    # Kubernetes audit is centralized here and joined to cloud audit already.
+    dettect:
+      visibility: 3
+      detection: 2
+      quality: {device_completeness: 4, data_field_completeness: 3, timeliness: 3, consistency: 3, retention: 4}
+    coverage: Have
+    owner: Container Platform
+    evidence: Detection K8S-PRIV-POD-01; joined to CloudTrail via correlation rule CORR-14

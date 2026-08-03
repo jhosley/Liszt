@@ -1,0 +1,81 @@
+schema_version: 1
+id: '010'
+slug: model-theft-extraction
+title: Model theft / extraction
+one_liner: An attacker copies your model - either by hammering its API to clone its behavior, or by stealing
+  the actual model file - walking off with expensive intellectual property.
+status: draft
+classification:
+  primary_layer_component: Model
+  ai_infrastructure_layer: L2 · Model
+  evidence: seen-in-research
+  priority: BACKLOG
+  priority_rationale:
+  - Stealing a model is mainly an intellectual-property loss, not a safety or privacy breach.
+  - It matters most for genuinely differentiated models; most of our estate is not that.
+  - The controls that would catch it, identity and data-loss prevention, are already in place.
+framework_mapping:
+  baseline: '2026.07'
+  attack: []
+  atlas: []
+  owasp_llm: []
+  owasp_agentic: []
+  mapping_confidence: editorial
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
+    2026.07 identifiers before this record is published: ATLAS: Exfiltrate ML Model / Model Extraction
+    | Layers L2 Model'
+attack_path:
+- step: 1
+  layer: App / Model
+  text: Attacker either queries the model API at high volume to clone it, or accesses the artifact directly
+- step: 2
+  layer: Model
+  text: Harvests input / output pairs to train a surrogate, or reads weights from registry / storage
+- step: 3
+  layer: net
+  text: The model, or its behavior, is exfiltrated
+- step: 4
+  layer: Impact
+  text: IP loss; a local copy enables offline attack development
+telemetry:
+- step: 1
+  signal: High-volume / systematic API querying
+  emitted_at: AI gateway · API gateway · rate limits
+  coverage: Have
+  detection_opportunity: Extraction-pattern query volume; systematic input sweeps
+- step: 2
+  signal: Model-artifact access (registry / storage)
+  emitted_at: Registry · object-store · Identity logs
+  coverage: Have
+  detection_opportunity: Unusual read of model weights; access by an unexpected identity
+- step: 3
+  signal: Exfil of artifact
+  emitted_at: DLP · NDR · CASB
+  coverage: Have
+  detection_opportunity: Large model-file egress; upload to an external store
+- step: 4
+  signal: Cost / usage anomaly
+  emitted_at: Usage / billing telemetry
+  coverage: Collectable
+  detection_opportunity: Query volume / cost spike consistent with extraction
+commentary:
+  already_see: Identity, object-store and DLP logs already govern who can read a model file and stop large
+    files leaving - treat model weights like crown-jewel data (steps 2 to 3).
+  blind: The near-term add is spotting API abuse used to clone a model by relentless, systematic querying
+    (1, 4).
+  how_detect: 'Guard both theft paths with tools you have: rate-limit and watch query patterns for cloning
+    and use identity + DLP for artifact theft. Classify model files as sensitive data.'
+scaled_up: An insider or a compromised service account copies a model file out of the registry, or a competitor
+  rebuilds a close copy of a proprietary model by querying its interface relentlessly over months.
+incidents:
+- model-extraction-research-query-based-cloning
+- model-artifact-theft-from-registries-buckets
+- distillation-attacks
+provenance:
+  authored_by: imported-from-deck
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  sources: []
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
+  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
+  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'

@@ -1,0 +1,31 @@
+slug: hugging-face-openai-agent-intrusion-july-2026
+title: Hugging Face agent intrusion
+date: 2026-07-09/2026-07-13
+disclosed: 2026-07-16
+what_happened: >
+  An AI lab's evaluation agent escaped its sandbox and breached another company's
+  production systems, unaided by any human operator.
+source: Hugging Face & OpenAI post-mortems, 2026
+scenarios: ["002", "017", "021"]
+references:
+  - tier: "0"
+    title: "Hugging Face. Security incident disclosure, July 2026"
+    url: https://huggingface.co/blog/security-incident-july-2026
+  - tier: "0"
+    title: "Hugging Face. Anatomy of a Frontier Lab Agent Intrusion (technical post-mortem)"
+    url: https://huggingface.co/blog/agent-intrusion-technical-timeline
+    note: Ground truth. Read in full before citing any secondary summary.
+  - tier: "0"
+    title: "OpenAI. Security incident during model evaluation (+ 2 dated updates)"
+    url: https://openai.com/index/hugging-face-model-evaluation-security-incident/
+  - tier: "1"
+    title: "Elastic Security Labs, mapping AI agent tactics to Elastic Defend"
+    url: https://www.elastic.co/security-labs/ai-agent-attack-detection-hugging-face-breach
+    note: The only shipped detection content published for this incident.
+contested:
+  - claim: The agent obtained test solutions from Hugging Face's production database.
+    positions:
+      - "[OpenAI] 'to obtain test solutions directly from Hugging Face's production database'"
+      - "[Hugging Face] Both connection attempts timed out against private-link allow-listing; the only database reached was the internal datasets-server MongoDB."
+    status: unresolved
+    note: No correction has been issued by either party.

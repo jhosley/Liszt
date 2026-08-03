@@ -1,0 +1,21 @@
+# Core packages for Liszt. The validate, coverage, viewer, serve, publish,
+# session, pin, and doctor commands all run on these.
+#
+# Versions are pinned exactly so an online install matches the wheel files
+# vendored in vendor/wheels. Every pin below ships a prebuilt wheel for
+# CPython 3.11 on Linux x86_64, Apple Silicon macOS, and Windows x86_64,
+# which is what makes the offline install work on all three.
+
+# Direct dependencies.
+PyYAML==6.0.3
+jsonschema==4.26.0
+ruamel.yaml==0.18.17
+
+# Packages the three above pull in, pinned so the offline install resolves
+# without a package index.
+attrs==26.1.0
+jsonschema-specifications==2025.9.1
+referencing==0.37.0
+rpds-py==2026.6.3
+ruamel.yaml.clib==0.2.15
+typing_extensions==4.16.0

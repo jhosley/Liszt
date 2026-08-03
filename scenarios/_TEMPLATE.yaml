@@ -1,0 +1,286 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCENARIO RECORD TEMPLATE
+#
+# Copy this file to scenarios/NNN-your-slug.yaml and replace every PLACEHOLDER.
+# The filename MUST be exactly "<id>-<slug>.yaml", the validator checks it.
+#
+# Two things this file cannot do for you:
+#   1. tools/validate.py SKIPS any file whose name starts with "_", so this
+#      template is never validated in place. To check a change you made here,
+#      copy it to scenarios/999-scratch.yaml, validate, then delete the copy.
+#   2. The validator does NOT flag the word PLACEHOLDER. It flags TBD, TODO, XXX
+#      and "[insert". So a half-finished record built from this template can pass
+#      the validator. You are the check. Grep for PLACEHOLDER before you hand it over.
+#
+# As shipped, this template is structurally valid: 0 errors, 3 warnings. The three
+# warnings are the ones you are supposed to clear by doing the work, #   framework_mapping: no framework IDs at all
+#   framework_mapping: agent-layer scenario with no OWASP Agentic (ASI) mapping
+#   incidents: evidence is 'seen-in-research' but no incident is referenced
+# If you see a fourth, you introduced it.
+#
+# Read scenarios/021-agent-sandbox-escape-to-autonomous-intrusion.yaml first.
+# It is the reference record: every optional field populated, zero errors, zero
+# warnings. Copying a good example beats reading a procedure.
+#
+# Field authority: schema/scenario.schema.json (structure) and tools/validate.py
+# (the quality bar). Where a comment below gives a tighter limit than the schema,
+# the tighter number is the validator's slide-geometry limit, respect it.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+schema_version: 1                 # Always 1. Bump only on a breaking schema change.
+
+id: '000'                         # PLACEHOLDER. Zero-padded 3 digits, quoted, assigned by a
+                                  # HUMAN from the repo, take the next free number, never reuse
+                                  # one, not even from a retired scenario. '000' is structurally
+                                  # valid, so the validator will NOT catch it. You must.
+
+slug: placeholder-scenario-slug   # PLACEHOLDER. kebab-case, ≤60 chars, stable forever.
+                                  # Mistake: changing the slug after publication. It is in
+                                  # filenames and cross-references; changing it breaks both.
+
+title: PLACEHOLDER scenario title # 8 to 70 chars. As it appears on the slide, WITHOUT the
+                                  # "Scenario NN · " prefix, the renderer adds that.
+                                  # Mistake: writing the prefix in, giving "Scenario 22 · Scenario 22 · ..".
+
+one_liner: >-                     # 40 to 420 chars. The "In plain terms" paragraph.
+  PLACEHOLDER. One paragraph a non-specialist executive can read without stopping. Expand every
+  acronym on first use. No framework IDs, no vendor names unless the vendor is the story.
+  Mistake: writing it for a security engineer. This is the most-read field in the record and
+  usually the worst-written one, spend disproportionate effort here.
+
+status: draft                     # draft | in-review | published | retired.
+                                  # NEVER set 'published' yourself. Only the human reviewer does,
+                                  # and only after the record has ZERO errors AND ZERO warnings.
+                                  # Records are never born published.
+
+# retired:                        # ONLY on a retired record. Delete this block otherwise, #   date: '2027-01-01'            # if present it must carry both date and reason.
+#   reason: PLACEHOLDER, why this scenario no longer earns its slot
+#   superseded_by: '022'          # optional, 3 digits
+                                  # Retired records stay in the repo forever: excluded from
+                                  # current metrics, preserved for history. Do not delete files.
+
+classification:
+  primary_layer_component: Agent  # Data | Model | Agent | Application | External | Infrastructure |
+                                  # Data → Model | App / Model | Model / App | Model / Agent |
+                                  # Model / Data | Agent / Model. Where the scenario PRIMARILY
+                                  # operates. Drives the index slide.
+                                  # Mistake: picking where the damage lands instead of where it operates.
+
+  ai_infrastructure_layer: L3 · Orchestration & Agent
+                                  # Exactly one of: "L0 · Infrastructure", "L1 · Data",
+                                  # "L2 · Model", "L3 · Orchestration & Agent", "L4 · Application".
+                                  # Note the "·" is U+00B7 with spaces around it, copy the string,
+                                  # do not retype it. Mistake: a hyphen instead of the middle dot.
+
+  evidence: seen-in-research      # seen-in-the-wild | seen-in-research | doomsday.
+                                  # seen-in-the-wild REQUIRES a Tier 0 source describing it
+                                  # happening to a real organization. Mistake: claiming
+                                  # seen-in-the-wild off a vendor blog summarizing a demo.
+
+  priority: BACKLOG               # NOW | NEAR-TERM | BACKLOG. A leadership call informed by the
+                                  # rationale below, not something the drafting agent decides.
+                                  # A 'doomsday' scenario marked NOW warns.
+
+  priority_rationale:             # 2 to 4 items, each 20 to 130 chars, each one line on the slide.
+    - PLACEHOLDER, why this threat is credible, in one line under 130 characters
+    - PLACEHOLDER. OUR OWN EXPOSURE. At least one item MUST be about us, not the threat
+                                  # Mistake: three lines of "it happened to someone else". That
+                                  # does not justify spending this cycle's instrumentation budget,
+                                  # and it is the single most common review rejection.
+
+framework_mapping:                # Scenario-level roll-up. Step-level mapping lives on attack_path[].
+                                  # Read docs/03-framework-mapping.md before touching this block.
+  baseline: '2026.07'             # Pointer to frameworks/baseline-2026.07.yaml. Every ID in this
+                                  # file is in THAT baseline's vocabulary. Never mix baselines.
+
+  attack: []                      # MITRE ATT&CK technique IDs, e.g. [T1190, T1552.005].
+                                  # ORDERED AS THE CHAIN PROCEEDS, not sorted. Union of the
+                                  # step-level IDs, every one must appear in at least one step.
+                                  # Mistake: recording both T1552 and T1552.005. The parent is
+                                  # implied and recording both double-counts every metric.
+
+  attack_tactics: []              # TAxxxx. DERIVED from the techniques above, not hand-picked to
+                                  # make the chain look complete.
+
+  atlas: []                       # AML.TAxxxx / AML.Txxxx[.xxx] / AML.Mxxxx / AML.CSxxxx.
+                                  # Empty is a legitimate answer. Mistake: forcing a near-miss
+                                  # technique in rather than recording the gap in mapping_notes.
+
+  owasp_llm: []                   # EDITION-QUALIFIED: LLM03:2025, never LLM03. OWASP renumbered
+                                  # between editions and publishes no crosswalk, so a bare number
+                                  # inherited from an old deck must be RE-DERIVED from the text.
+
+  owasp_agentic: []               # ASI01:2026, prefix is ASI (Agentic Security Initiative),
+                                  # not AAI. An agent-layer scenario with no ASI ID warns.
+
+  mapping_confidence: editorial   # authoritative | editorial. 'authoritative' is reserved for a
+                                  # linkage published by the framework owner, in practice only an
+                                  # ATLAS attack-reference field qualifies. If this record contains
+                                  # ANY OWASP ID, it is editorial. Almost every record is.
+
+  # mapping_notes is optional in the schema and required by the quality bar whenever
+  # mapping_confidence is editorial. Warns on a draft, ERRORS on a published record.
+  mapping_notes: >-
+    PLACEHOLDER. State the reasoning for the non-obvious IDs; name at least one mapping a
+    reasonable analyst would dispute AND their counter-position; record every gap where nothing
+    fit and every candidate rejected, with the reason.
+    Mistake: "mapped per standard practice". That is a failed note.
+
+attack_path:                      # 3 to 6 steps. SIX IS THE SLIDE'S HARD CEILING. If the chain needs
+                                  # more, the scenario is too broad, split it. Do not merge stages
+                                  # to fit; a compressed chain is one nobody can follow.
+  - step: 1                       # Steps must run 1.N with no gaps.
+    layer: Layer / tag            # ≤18 chars, free text, a reading aid: "Data / inbound",
+                                  # "Host / Cloud", "Agent / eval". The controlled field is
+                                  # classification.ai_infrastructure_layer, not this one.
+    text: PLACEHOLDER, what happens mechanically at this stage, 25 to 125 characters
+                                  # THE REAL LIMIT IS THE RENDERED LINE: len(text) + len(layer) + 7
+                                  # must be ≤125, because the renderer prefixes the step number and
+                                  # the bracketed layer. Count it. This is the most common error.
+                                  # Mistake: writing the principle instead of the mechanism. The
+                                  # principle has no room on the slide.
+    attack: []                    # Step-level ATT&CK IDs. Most specific technique ACTUALLY
+                                  # evidenced by this step's text, 1 to 2, ceiling 3.
+    atlas: []                     # Step-level ATLAS IDs, 1 to 2, ceiling 3.
+                                  # OWASP IDs are FORBIDDEN here, they are risk classes, not
+                                  # techniques, and the schema rejects the key.
+  - step: 2
+    layer: Layer / tag
+    text: PLACEHOLDER, what happens mechanically at this stage, 25 to 125 characters
+    attack: []
+    atlas: []
+  - step: 3
+    layer: Layer / tag
+    text: PLACEHOLDER, what happens mechanically at this stage, 25 to 125 characters
+    attack: []
+    atlas: []
+    control_held: false           # true if a control BLOCKED OR DEGRADED this step in the source
+                                  # incident. The most commonly omitted field in the schema.
+                                  # Recording what held is as valuable as recording what failed, # it is what makes a hardening item evidence-backed. Omit the key
+                                  # entirely if no control was tested at this step; do not write
+                                  # false to mean "I did not check".
+
+telemetry:                        # 3 to 8 rows. EVERY attack_path step needs a row, even if the
+                                  # answer is Blind. Extra 'control' rows are allowed on top.
+  - step: 1                       # Matches an attack_path step for kind 'attack-step'.
+    signal: PLACEHOLDER signal    # A NOUN PHRASE naming what is emitted, not a sentence.
+                                  # Schema cap 80; quality bar 55, over which the cell wraps.
+    emitted_at: PLACEHOLDER · layer or control that emits it
+                                  # Use " · " as the separator, matching the deck. Quality bar 60.
+                                  # Mistake: naming a product we do not own.
+    data_components: []           # ATT&CK DCxxxx ONLY. DSxxxx is a data SOURCE, retired in v18, # the validator ERRORS on it. Walk the technique's DET → AN → DC
+                                  # chain rather than guessing from the component name. Empty is
+                                  # correct when nothing fits.
+    coverage: Blind               # Have | Collectable | Blind. NEVER ASSERTED. DERIVED from the
+                                  # dettect scores below, and the validator recomputes it and
+                                  # errors on mismatch:
+                                  #   visibility == 0                     → Blind
+                                  #   visibility >= 1 and detection <= 0  → Collectable
+                                  #   visibility >= 1 and detection >= 1  → Have
+                                  # If the derived value surprises you, fix the scores or fix your
+                                  # intuition. Do not fix the tag.
+    dettect:                      # Optional at draft; REQUIRED for the row to count toward
+                                  # maturity reporting, and required on a published record.
+      visibility: 0               # 0 None · 1 Minimal · 2 Medium · 3 Good · 4 Excellent.
+                                  # Is the data there and usable?
+      detection: -1               # -1 None · 0 Forensics/context only · 1 Basic · 2 Fair ·
+                                  # 3 Good · 4 Very good · 5 Excellent. Does anything ALERT on it?
+                                  # Mistake: reading 0 as "a bit of detection". 0 means logged
+                                  # only, which is Collectable, not Have. That distinction is the
+                                  # entire point of the coverage tag.
+      quality: {device_completeness: 0, data_field_completeness: 0, timeliness: 0, consistency: 0, retention: 0}
+                                  # Each 0 to 5. Come out of the working session with the data owner,
+                                  # not out of a drafting agent's head.
+    detection_opportunity: PLACEHOLDER, the OUTCOME you would alert on
+                                  # Schema cap 130; quality bar 95. Write the outcome, never the
+                                  # tool that detects it. Mistake: "EDR alert", that is a product,
+                                  # not a detection opportunity.
+    owner: PLACEHOLDER Team       # REQUIRED in practice for any Blind or Collectable row: the
+                                  # accountable team. An unowned gap is an orphan and never closes.
+    evidence: ''                  # REQUIRED for any 'Have': a query that returns rows, a rule ID,
+                                  # a ticket. Warns on a draft, ERRORS on published. If you cannot
+                                  # name one, the row is not Have.
+    backlog_ref: ''               # Ticket ID for the instrumentation work once a Blind or
+                                  # Collectable gap has been accepted. THIS FIELD IS THE CLOSED
+                                  # LOOP, a gap with no ticket is a slide, not a program.
+    kind: attack-step             # attack-step (default) | control. A verification or preventive
+                                  # signal not tied to a step is kind: control, and control rows
+                                  # are numbered AFTER the last attack step so the slide reads in
+                                  # order. Mistake: leaving a control row as attack-step, which the
+                                  # validator reads as a row pointing at a step that does not exist.
+  - step: 2
+    signal: PLACEHOLDER signal
+    emitted_at: PLACEHOLDER · layer or control that emits it
+    coverage: Blind
+    dettect:
+      visibility: 0
+      detection: -1
+    detection_opportunity: PLACEHOLDER, the OUTCOME you would alert on
+    owner: PLACEHOLDER Team
+  - step: 3
+    signal: PLACEHOLDER signal
+    emitted_at: PLACEHOLDER · layer or control that emits it
+    coverage: Blind
+    dettect:
+      visibility: 0
+      detection: -1
+    detection_opportunity: PLACEHOLDER, the OUTCOME you would alert on
+    owner: PLACEHOLDER Team
+
+commentary:                       # The three-paragraph analysis block on the telemetry slide.
+  # already_see ≤420: what existing, usually non-AI-specific telemetry already catches.
+  # Reference step numbers.
+  already_see: >-
+    PLACEHOLDER, what we already see, and at which steps.
+  # blind ≤420: where the AI-specific gaps are. Reference step numbers.
+  blind: >-
+    PLACEHOLDER, where we are blind, and at which steps.
+  # how_detect ≤560: the detection thesis, what pattern to alert on, and why the obvious
+  # approach fails.
+  how_detect: >-
+    PLACEHOLDER, the detection thesis.
+
+# scaled_up ≤480. The "If this scaled up" box. ALWAYS HYPOTHETICAL, it must not assert
+# anything as observed; the validator warns on "did", "was observed", "has happened".
+# Write it as this happening to US, in our environment, at a scale we have not seen.
+scaled_up: >-
+  PLACEHOLDER, the hypothetical scaled version, in our own estate.
+
+incidents: []                     # Slugs of records in incidents/. REFERENTIAL INTEGRITY IS
+                                  # ENFORCED, a slug with no matching incidents/<slug>.yaml is a
+                                  # build failure, so never guess one. If evidence is not
+                                  # 'doomsday' and this is empty, the validator asks what the claim
+                                  # is grounded in. Create the incident record first.
+
+hardening:                        # Remediations ranked by leverage against THIS chain. This is
+                                  # what a tabletop actually consumes.
+  - action: PLACEHOLDER, a specific control, ≤200 chars
+    breaks_step: [1]              # REQUIRED, non-empty, and every number must be a step that
+                                  # exists. A hardening item that breaks no step is generic best
+                                  # practice and does not belong here. That is why the field exists.
+    leverage: high                # high | medium | low. Rank against this chain, not in general.
+    owner: PLACEHOLDER Team       # Accountable team. Assigned by a human.
+    backlog_ref: ''               # Ticket. Assigned by a human.
+                                  # Include the control that HELD as a hardening item, a
+                                  # recommendation with evidence behind it beats one without.
+
+provenance:
+  authored_by: PLACEHOLDER        # The HUMAN who owns this record. Accountability does not transfer
+                                  # to a tool. If nobody will put their name on it, it is not ready.
+  # reviewed_by:                  # LEAVE THIS KEY OUT until a second analyst has actually reviewed
+                                  # the record. It must differ from authored_by, it is required
+                                  # before status may become 'published', and an author must
+                                  # never write it.
+  created: '2026-01-01'           # PLACEHOLDER date, YYYY-MM-DD, quoted.
+  last_updated: '2026-01-01'      # PLACEHOLDER. Bump on every substantive edit.
+  review_date: '2026-01-01'       # PLACEHOLDER. The date the review actually happened.
+  sources: []                     # Each: tier ("0" | "1" | "2", quoted STRINGS), url, and
+                                  # optionally title and note. Tier 0 = primary. A published,
+                                  # non-doomsday record with no Tier 0 source warns.
+                                  # Write the note as WHY the source earns its tier.
+
+# notes: analyst working notes. NEVER RENDERED. Use freely: disagreements, what the reviewer
+# pushed back on, open questions, anything the next author should know. An empty notes field
+# on a record that went through review means the review left no trace.
+notes: >-
+  PLACEHOLDER, open questions, disagreements, and what the next author needs to know.

@@ -1,0 +1,82 @@
+schema_version: 1
+id: '007'
+slug: system-prompt-and-configuration-extraction
+title: System-prompt & configuration extraction
+one_liner: An attacker gets the AI to reveal its own hidden instructions, rules, and any secrets baked
+  into them - then uses that blueprint to attack it reliably.
+status: draft
+classification:
+  primary_layer_component: Model / App
+  ai_infrastructure_layer: L2 · Model
+  evidence: seen-in-the-wild
+  priority: NEAR-TERM
+  priority_rationale:
+  - Extracting an AI's hidden instructions is easy and is attempted constantly.
+  - On its own the direct damage is limited, which is why it is not rated NOW.
+  - It matters because it hands an attacker the map they need for the attacks that are rated NOW.
+framework_mapping:
+  baseline: '2026.07'
+  attack: []
+  atlas: []
+  owasp_llm:
+  - LLM07:2025
+  owasp_agentic: []
+  mapping_confidence: editorial
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
+    2026.07 identifiers before this record is published: ATLAS: prompt-based extraction | Layers L2 Model
+    / L4 App'
+attack_path:
+- step: 1
+  layer: App
+  text: Attacker prompts the model to reveal its system prompt / instructions / tool config
+- step: 2
+  layer: Model
+  text: Model discloses the system prompt, guardrail rules, or embedded credentials / keys
+- step: 3
+  layer: App
+  text: Attacker gains the blueprint, rules, tools, secrets
+- step: 4
+  layer: Various
+  text: Uses it to craft targeted jailbreaks / injections, or abuses leaked secrets
+telemetry:
+- step: 1
+  signal: Prompt content (extraction attempts)
+  emitted_at: AI gateway prompt logs
+  coverage: Collectable
+  detection_opportunity: System-prompt-extraction patterns ('repeat your instructions')
+- step: 2
+  signal: Model output (contains system prompt / secrets)
+  emitted_at: AI gateway output · guardrail scan
+  coverage: Blind
+  detection_opportunity: Output contains known system-prompt text or secret patterns
+- step: 3
+  signal: Secret exposure
+  emitted_at: Secrets scanning · DLP
+  coverage: Collectable
+  detection_opportunity: Known credential / key pattern in a response
+- step: 4
+  signal: Follow-on attack activity
+  emitted_at: Jailbreak / injection telemetry (Scenarios 01, 08)
+  coverage: Blind
+  detection_opportunity: Spike in jailbreak / injection attempts after a leak
+commentary:
+  already_see: Scan the model's answers for your own hidden instructions or secret keys - if your confidential
+    system prompt shows up in a reply, you'll know (steps 2 to 3).
+  blind: The near-term work is output scanning; the harder part is linking a leak to the follow-on attacks
+    it enables (4).
+  how_detect: Plant a known phrase in your system prompt and alert if it ever appears in output; scan
+    replies for secrets. The best fix, though, is preventive - never put secrets in the prompt.
+scaled_up: An attacker recovers the full hidden instruction set, the list of tools the AI can call, and
+  any secrets embedded in them - then uses that map to build reliable attacks against every user of the
+  application.
+incidents:
+- widespread-system-prompt-leak-demonstrations-across-major-as
+- repeat-your-instructions-attacks
+provenance:
+  authored_by: imported-from-deck
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  sources: []
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
+  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
+  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'

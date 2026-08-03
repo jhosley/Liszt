@@ -1,0 +1,93 @@
+schema_version: 1
+id: 018
+slug: ai-coding-assistant-pulls-malicious-code-into-our-build
+title: AI coding assistant pulls malicious code into our build
+one_liner: An attacker registers a package name that AI coding assistants tend to invent or hides instructions
+  in a repository file the assistant reads. The developer trusts the suggestion, and attacker code walks
+  straight into our build.
+status: draft
+classification:
+  primary_layer_component: Application
+  ai_infrastructure_layer: L4 · Application
+  evidence: seen-in-the-wild
+  priority: NEAR-TERM
+  priority_rationale:
+  - Attackers are already registering the package names AI assistants invent.
+  - Our developers use these assistants daily, and their suggestions are trusted by default.
+  - It is rated NEAR-TERM because our existing supply-chain controls catch most of it once it lands.
+framework_mapping:
+  baseline: '2026.07'
+  attack: []
+  atlas: []
+  owasp_llm:
+  - LLM03:2025
+  - LLM05:2025
+  owasp_agentic: []
+  mapping_confidence: editorial
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
+    2026.07 identifiers before this record is published: ATLAS: ML Supply Chain Compromise | Layers L4
+    Application, L1 Data (the assistant''s context)'
+attack_path:
+- step: 1
+  layer: External
+  text: Attacker registers a package name that AI coding assistants are known to invent
+- step: 2
+  layer: Data
+  text: Or plants hidden instructions in a repository file the assistant reads as guidance
+- step: 3
+  layer: Application
+  text: A developer asks the assistant for help and accepts its suggestion
+- step: 4
+  layer: Host / CI
+  text: The suggested dependency is installed and runs on the developer machine and in the build
+- step: 5
+  layer: Impact
+  text: Attacker code reaches our software supply chain carrying a developer's own credentials
+telemetry:
+- step: 1
+  signal: Dependency added to a project
+  emitted_at: Source control · package manager · build logs
+  coverage: Have
+  detection_opportunity: A dependency no human explicitly chose; a package with no history
+- step: 2
+  signal: Package reputation and age
+  emitted_at: Software composition analysis · package registry
+  coverage: Have
+  detection_opportunity: Package created very recently, or a near-miss of a well-known name
+- step: 3
+  signal: Assistant suggestion accepted
+  emitted_at: Coding-assistant telemetry
+  coverage: Blind
+  detection_opportunity: Which code and dependencies came from the assistant rather than a person
+- step: 4
+  signal: Repository instruction files
+  emitted_at: Source-control diffs
+  coverage: Collectable
+  detection_opportunity: Changes to the configuration and rules files the assistant reads as instructions
+- step: 5
+  signal: Build and developer host behavior
+  emitted_at: EDR · CI runner logs · NDR
+  coverage: Have
+  detection_opportunity: Install scripts reaching the network; unexpected execution during build
+commentary:
+  already_see: 'Our existing software supply-chain controls cover most of this: composition analysis flags
+    brand-new or lookalike packages (1, 2), and endpoint and build monitoring catch an install script
+    behaving badly (5).'
+  blind: The AI-specific gap is that we cannot tell which code and which dependencies came from the assistant
+    rather than from a person (3), so we cannot give AI-suggested changes the extra scrutiny they warrant.
+  how_detect: Treat AI-suggested code as untrusted third-party input rather than as the developer's own
+    work. The one new signal worth having is origin - mark what the assistant wrote, then apply the dependency
+    and review controls we already run.
+scaled_up: A package name that assistants suggest across many teams is registered by an attacker. It is
+  installed dozens of times before anyone notices, and it runs with each developer's own credentials.
+incidents:
+- slopsquatting-attackers-registering-package-names-that-ai-as
+- poisoned-configuration-and-rules-files-that-silently-steer-a
+provenance:
+  authored_by: imported-from-deck
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  sources: []
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
+  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
+  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'

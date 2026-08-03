@@ -1,0 +1,581 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.internal/liszt/schema/scenario.schema.json",
+  "title": "Attack Path Scenario",
+  "description": "Canonical record for one attack-path scenario. Slides, coverage metrics and tabletop material are all generated FROM this record. This file is the system of record; PowerPoint is a build artifact.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "slug",
+    "title",
+    "one_liner",
+    "status",
+    "classification",
+    "framework_mapping",
+    "attack_path",
+    "telemetry",
+    "provenance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Bump only on breaking schema change. Migration notes go in schema/CHANGELOG.md."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9]{3}$",
+      "description": "Zero-padded scenario number. Immutable once published. Never reused, even after retirement."
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "maxLength": 60,
+      "description": "Stable kebab-case handle used in filenames and cross-references."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 70,
+      "description": "Scenario title as it appears on the slide, without the 'Scenario NN \u00b7 ' prefix."
+    },
+    "one_liner": {
+      "type": "string",
+      "minLength": 40,
+      "maxLength": 420,
+      "description": "The 'In plain terms' paragraph. Must be readable by a non-specialist executive. No acronyms without expansion."
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "in-review",
+        "published",
+        "retired"
+      ],
+      "description": "retired scenarios stay in the repo forever; they are excluded from current metrics but preserve history."
+    },
+    "retired": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "reason"
+      ],
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "superseded_by": {
+          "type": "string",
+          "pattern": "^[0-9]{3}$"
+        }
+      }
+    },
+    "classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary_layer_component",
+        "ai_infrastructure_layer",
+        "evidence",
+        "priority",
+        "priority_rationale"
+      ],
+      "properties": {
+        "primary_layer_component": {
+          "$ref": "#/$defs/layerComponent",
+          "description": "Where the scenario primarily operates. Drives the index slide."
+        },
+        "ai_infrastructure_layer": {
+          "$ref": "#/$defs/aiLayer"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidenceTier"
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        },
+        "priority_rationale": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 130
+          },
+          "description": "Why this priority. Each item must fit one line on the slide (<=130 chars). At least one must reference our own exposure, not just the threat."
+        },
+        "mode": {
+          "enum": [
+            "attack",
+            "failure"
+          ],
+          "default": "attack",
+          "description": "attack: an adversary drives the chain. failure: no adversary \u2014 the chain is failure propagation (a control degrades, a dependency fails, an agent misbehaves without malice). Framework mapping is often thin or empty for failure records and the validator relaxes accordingly; the telemetry map is unchanged and is where all the value sits."
+        }
+      }
+    },
+    "framework_mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline",
+        "mapping_confidence"
+      ],
+      "description": "Scenario-level mapping. Step-level mapping lives on attack_path[].",
+      "properties": {
+        "baseline": {
+          "type": "string",
+          "pattern": "^[0-9]{4}\\.[0-9]{2}$",
+          "description": "Pointer to frameworks/baseline-YYYY.MM.yaml. Every mapping in this file is expressed in THAT baseline's vocabulary. Never mix baselines within a record."
+        },
+        "attack": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/attackTechniqueId"
+          },
+          "description": "MITRE ATT&CK technique IDs. Ordered as the chain proceeds, not sorted."
+        },
+        "attack_tactics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/attackTacticId"
+          }
+        },
+        "atlas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/atlasId"
+          },
+          "description": "MITRE ATLAS technique or tactic IDs."
+        },
+        "owasp_llm": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/owaspLlmId"
+          },
+          "description": "Edition-qualified, e.g. LLM03:2025. OWASP renumbers between editions; the bare number is meaningless."
+        },
+        "owasp_agentic": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/owaspAgenticId"
+          },
+          "description": "OWASP Top 10 for Agentic Applications, edition-qualified, e.g. ASI01:2026."
+        },
+        "mapping_confidence": {
+          "enum": [
+            "authoritative",
+            "editorial"
+          ],
+          "description": "authoritative = the linkage is published by the framework owner (in practice: only ATLAS attack-reference fields qualify). editorial = OUR judgment. Almost every cross-framework mapping is editorial. See docs/03-framework-mapping.md."
+        },
+        "mapping_notes": {
+          "type": "string",
+          "description": "Required in practice when mapping_confidence is editorial: state the reasoning and any mapping a reasonable analyst would dispute."
+        }
+      }
+    },
+    "attack_path": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 6,
+      "description": "The ordered chain. Six steps is the slide's hard ceiling. If the chain needs more, the scenario is too broad -- split it.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "step",
+          "layer",
+          "text"
+        ],
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "layer": {
+            "type": "string",
+            "maxLength": 18,
+            "description": "Free-text layer tag shown in brackets on the slide, e.g. 'Data / inbound', 'Host / Cloud'. Kept free-text deliberately -- it is a reading aid, not a controlled field. The controlled field is classification.ai_infrastructure_layer."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 25,
+            "maxLength": 125,
+            "description": "One line. The renderer will not wrap gracefully past ~125 chars including the step prefix and layer tag."
+          },
+          "attack": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/attackTechniqueId"
+            }
+          },
+          "atlas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/atlasId"
+            }
+          },
+          "control_held": {
+            "type": "boolean",
+            "description": "True if a control blocked or degraded this step in the source incident. Recording what HELD is as valuable as recording what failed, and it is the most commonly omitted field."
+          }
+        }
+      }
+    },
+    "telemetry": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 8,
+      "description": "Telemetry rows. Every attack_path step must have a matching 'attack-step' row. Additional 'control' rows are allowed for verification/preventive signals. The program's word for this data is evidence; the field name 'telemetry' is kept for compatibility with existing records and consumers.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "step",
+          "signal",
+          "emitted_at",
+          "coverage",
+          "detection_opportunity"
+        ],
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8,
+            "description": "Row number as rendered. For kind 'attack-step' this MUST match an attack_path step. For kind 'control' it is display order only. Max 8 so a six-step scenario still has legal numbers for control rows."
+          },
+          "kind": {
+            "enum": [
+              "attack-step",
+              "control"
+            ],
+            "default": "attack-step",
+            "description": "attack-step: answers a numbered step in attack_path. control: a verification or preventive signal that is not tied to a step (e.g. 'model signature verified at import'). Control rows may carry a row number beyond the step count. Modeling these explicitly stops the validator from reading a deliberate control row as a missing attack step."
+          },
+          "signal": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 80,
+            "description": "What is emitted. A noun phrase, not a sentence. Schema hard cap 80; the quality bar prefers a tighter limit (see tools/validate.py LIMITS)."
+          },
+          "emitted_at": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 90,
+            "description": "Which layer or control emits it. Use ' \u00b7 ' as the separator, matching the deck. Schema hard cap 90; the quality bar prefers a tighter limit (see tools/validate.py LIMITS)."
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "The EXACT system this signal comes from, or would come from. The product, log source, index, table, topic or endpoint by name. 'emitted_at' is the category ('EDR / endpoint'); 'source' is the specific thing ('CrowdStrike Falcon ProcessRollup2, index=edr_main'). Required in practice for Have and Collectable: a Have with no named source cannot be verified, and a Collectable with no named source cannot be wired up. For Blind rows, leave empty or state where it would have to come from."
+          },
+          "data_components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/attackDataComponentId"
+            },
+            "description": "ATT&CK data components (DCxxxx). NOTE: ATT&CK v18 removed data sources and replaced them with data components. Do not use DSxxxx on baselines >= 2025.10."
+          },
+          "coverage": {
+            "$ref": "#/$defs/coverage",
+            "description": "DERIVED from dettect scores when present -- see docs/04-measurement.md for the derivation. Stored explicitly so the renderer and any offline reader do not need the derivation logic. The validator recomputes it and errors on mismatch."
+          },
+          "dettect": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "DeTT&CT scoring. Optional at draft stage, REQUIRED for a scenario to count toward maturity reporting. This is what turns a judgment call into an evidence-backed determination.",
+            "properties": {
+              "visibility": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4,
+                "description": "DeTT&CT visibility scale. 0 None, 1 Minimal, 2 Medium, 3 Good, 4 Excellent."
+              },
+              "detection": {
+                "type": "integer",
+                "minimum": -1,
+                "maximum": 5,
+                "description": "DeTT&CT detection maturity. -1 None, 0 Forensics/context only, 1 Basic, 2 Fair, 3 Good, 4 Very good, 5 Excellent."
+              },
+              "quality": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "The five DeTT&CT data-quality dimensions, each 0-5.",
+                "properties": {
+                  "device_completeness": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "data_field_completeness": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "timeliness": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "consistency": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "retention": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  }
+                }
+              }
+            }
+          },
+          "detection_opportunity": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 130,
+            "description": "What you would actually alert on. One line on the slide. Write the OUTCOME to detect, not the tool that detects it. Schema hard cap 130; the quality bar prefers a tighter limit (see tools/validate.py LIMITS)."
+          },
+          "owner": {
+            "type": "string",
+            "description": "Team accountable for this data source. A Blind row with no owner is an orphan and will never be fixed."
+          },
+          "evidence": {
+            "type": "string",
+            "description": "Link or reference proving the coverage assessment -- a query that returns rows, a rule ID, a ticket. Required for any 'Have' claim under the quality bar."
+          },
+          "backlog_ref": {
+            "type": "string",
+            "description": "Ticket ID for the instrumentation work, when coverage is Collectable or Blind and the gap has been accepted for work. This field is the closed loop."
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 400,
+            "description": "Row-level working notes captured during a session. Never rendered on the slides."
+          }
+        }
+      }
+    },
+    "commentary": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The three-paragraph analysis block on the telemetry slide.",
+      "properties": {
+        "already_see": {
+          "type": "string",
+          "maxLength": 420
+        },
+        "blind": {
+          "type": "string",
+          "maxLength": 420
+        },
+        "how_detect": {
+          "type": "string",
+          "maxLength": 560
+        }
+      }
+    },
+    "scaled_up": {
+      "type": "string",
+      "maxLength": 480,
+      "description": "The 'If this scaled up' box. ALWAYS hypothetical -- must not assert anything as observed."
+    },
+    "incidents": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+      },
+      "description": "Slugs of records in incidents/. Referential integrity is enforced by the validator."
+    },
+    "hardening": {
+      "type": "array",
+      "description": "Remediations ranked by leverage against THIS chain. Optional on the slides, but this is what a tabletop consumes.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "breaks_step"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "breaks_step": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "minItems": 1,
+            "description": "Which attack_path step(s) this control breaks. A hardening item that breaks no step is generic best practice and does not belong here."
+          },
+          "leverage": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "owner": {
+            "type": "string"
+          },
+          "backlog_ref": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authored_by",
+        "created",
+        "last_updated"
+      ],
+      "properties": {
+        "authored_by": {
+          "type": "string"
+        },
+        "reviewed_by": {
+          "type": "string",
+          "description": "Required before status may become 'published'. Must differ from authored_by."
+        },
+        "created": {
+          "type": "string",
+          "format": "date"
+        },
+        "last_updated": {
+          "type": "string",
+          "format": "date"
+        },
+        "review_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tier",
+              "url"
+            ],
+            "properties": {
+              "tier": {
+                "enum": [
+                  "0",
+                  "1",
+                  "2"
+                ]
+              },
+              "url": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Analyst working notes. Never rendered. Use freely -- disagreements, open questions, things the next author should know."
+    }
+  },
+  "$defs": {
+    "layerComponent": {
+      "enum": [
+        "Data",
+        "Model",
+        "Agent",
+        "Application",
+        "External",
+        "Data \u2192 Model",
+        "App / Model",
+        "Model / App",
+        "Model / Agent",
+        "Model / Data",
+        "Agent / Model",
+        "Infrastructure"
+      ]
+    },
+    "aiLayer": {
+      "enum": [
+        "L1 \u00b7 Data",
+        "L2 \u00b7 Model",
+        "L3 \u00b7 Orchestration & Agent",
+        "L4 \u00b7 Application",
+        "L0 \u00b7 Infrastructure"
+      ]
+    },
+    "evidenceTier": {
+      "enum": [
+        "seen-in-the-wild",
+        "seen-in-research",
+        "doomsday"
+      ],
+      "description": "seen-in-the-wild: it has happened to a real organization. seen-in-research: demonstrated by researchers, not yet in an incident. doomsday: hypothetical worst case, never observed, included as a stress test."
+    },
+    "priority": {
+      "enum": [
+        "NOW",
+        "NEAR-TERM",
+        "BACKLOG"
+      ]
+    },
+    "coverage": {
+      "enum": [
+        "Have",
+        "Collectable",
+        "Blind"
+      ],
+      "description": "Have: a control already emits this AND it is wired to detection. Collectable: the source exists but is not wired to detection. Blind: nothing produces it today."
+    },
+    "attackTechniqueId": {
+      "type": "string",
+      "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$"
+    },
+    "attackTacticId": {
+      "type": "string",
+      "pattern": "^TA[0-9]{4}$"
+    },
+    "attackDataComponentId": {
+      "type": "string",
+      "pattern": "^DC[0-9]{4}$"
+    },
+    "atlasId": {
+      "type": "string",
+      "pattern": "^AML\\.(TA[0-9]{4}|T[0-9]{4}(\\.[0-9]{3})?|M[0-9]{4}|CS[0-9]{4})$"
+    },
+    "owaspLlmId": {
+      "type": "string",
+      "pattern": "^LLM(0[1-9]|10):[0-9]{4}$"
+    },
+    "owaspAgenticId": {
+      "type": "string",
+      "pattern": "^ASI(0[1-9]|10):[0-9]{4}$"
+    }
+  }
+}

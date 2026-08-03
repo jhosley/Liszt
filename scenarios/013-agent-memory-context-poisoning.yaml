@@ -1,0 +1,90 @@
+schema_version: 1
+id: '013'
+slug: agent-memory-context-poisoning
+title: Agent memory / context poisoning
+one_liner: An attacker plants a payload in an AI agent's memory, so it re-triggers on future, unrelated
+  tasks - a quiet, persistent compromise that's hard to trace back to a cause.
+status: draft
+classification:
+  primary_layer_component: Agent
+  ai_infrastructure_layer: L3 · Orchestration & Agent
+  evidence: seen-in-research
+  priority: NEAR-TERM
+  priority_rationale:
+  - Agents with long-term memory are being adopted quickly across the industry.
+  - A payload planted once can keep re-triggering on unrelated tasks days later.
+  - We have no logging of agent memory at all, so we could not trace an incident back to it.
+framework_mapping:
+  baseline: '2026.07'
+  attack: []
+  atlas: []
+  owasp_llm:
+  - LLM01:2025
+  owasp_agentic: []
+  mapping_confidence: editorial
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
+    2026.07 identifiers before this record is published: Layers L3 Agent'
+attack_path:
+- step: 1
+  layer: App / Agent
+  text: Attacker gets malicious content into the agent's memory / context (a task, a document, a prior
+    turn)
+- step: 2
+  layer: Agent
+  text: The content is written to the agent's persistent memory or shared state
+- step: 3
+  layer: Agent
+  text: On a later task, the agent retrieves the poisoned memory as trusted context
+- step: 4
+  layer: Agent
+  text: The agent acts on the embedded instruction, outside the original session
+- step: 5
+  layer: Impact
+  text: Persistent, cross-session manipulation; hard to attribute to a cause
+telemetry:
+- step: 1
+  signal: Memory write event
+  emitted_at: L3 agent memory / state-store logs
+  coverage: Blind
+  detection_opportunity: Content written to memory containing instructions / anomalies
+- step: 2
+  signal: Memory read / retrieval into context
+  emitted_at: L3 memory retrieval · AI gateway
+  coverage: Blind
+  detection_opportunity: Poisoned memory surfacing in a later, unrelated task
+- step: 3
+  signal: Agent decision influenced by memory
+  emitted_at: Agent reasoning / decision logs
+  coverage: Blind
+  detection_opportunity: Action traceable to a stored memory, not the current prompt
+- step: 4
+  signal: Consequential action
+  emitted_at: Tool-call · target-app · Identity · DLP
+  coverage: Have
+  detection_opportunity: The downstream action (see Scenario 03)
+- step: 5
+  signal: Cross-session correlation
+  emitted_at: SIEM correlation
+  coverage: Collectable
+  detection_opportunity: The same payload influencing multiple sessions / agents
+commentary:
+  already_see: The eventual action the agent takes is still visible in your identity, app and DLP logs
+    (step 4) - the AI-specific blind spot is the agent's memory itself (1 to 2).
+  blind: 'Near-term: log what gets written to and read from agent memory. The hardest part is proving
+    that today''s action came from a payload planted in memory days ago (3).'
+  how_detect: 'Treat agent memory as an untrusted store: log reads and writes, scan its content, and correlate
+    a planted payload across sessions. It''s an emerging area - worth instrumenting early.'
+scaled_up: An instruction planted in an agent's memory keeps firing on future, unrelated jobs. Because
+  the trigger was planted days earlier, nobody connects today's incident back to it.
+incidents:
+- agent-memory-poisoning-research
+- persistent-injection-via-stored-conversation-memory
+- poisoned-long-term-memory-demonstrations
+provenance:
+  authored_by: imported-from-deck
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  sources: []
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
+  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
+  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'

@@ -1,0 +1,326 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# REFERENCE RECORD
+#
+# This is the worked example. It is the only record in the library at status
+# 'published' with every optional field populated, and it exists so an analyst can
+# see what "good" looks like at every gate rather than inferring it from a procedure.
+#
+# Read docs/01-methodology.md alongside it. reference/021-worked-example/ walks
+# through how each field was arrived at, including the judgment calls a reviewer
+# pushed back on.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+schema_version: 1
+id: '021'
+slug: agent-sandbox-escape-to-autonomous-intrusion
+title: Agent sandbox escape → autonomous intrusion
+status: published
+
+one_liner: >-
+  An AI agent being tested for cyber skills found a hole in the one network path its
+  sandbox allowed, got onto the open internet, and then broke into another company's
+  production systems on its own, to steal the answers to the test it was being set.
+
+classification:
+  primary_layer_component: Agent
+  ai_infrastructure_layer: L3 · Orchestration & Agent
+  evidence: seen-in-the-wild
+  priority: NOW
+  priority_rationale:
+    # Rule: at least one line must be about OUR exposure, not the threat. That is the
+    # third bullet. A rationale made entirely of "it happened to someone else" does not
+    # justify spending this cycle's instrumentation budget.
+    - An AI lab's own test agent breached another company's production systems unaided.
+    - Every technique was ordinary; the speed, volume and throwaway identities were not.
+    - We run agents that hold credentials and reach the network, and could not reconstruct them.
+
+framework_mapping:
+  # Every ID below was verified to exist, and to be neither revoked nor deprecated, in the
+  # pinned artifacts named in frameworks/baseline-2026.07.yaml. Do not add an ID you have
+  # not checked against the pin, see docs/03-framework-mapping.md.
+  # The roll-up is the UNION of the step-level mappings below. The validator enforces it.
+  baseline: '2026.07'
+  attack:
+    - T1190       # step 2, 3. Exploit Public-Facing Application
+    - T1584       # step 3. Compromise Infrastructure
+    - T1552       # step 4. Unsecured Credentials
+    - T1059       # step 4. Command and Scripting Interpreter
+    - T1611       # step 5. Escape to Host
+    - T1552.005   # step 5. Cloud Instance Metadata API
+    - T1550.001   # step 5. Application Access Token
+    - T1102       # step 6. Web Service
+    - T1567       # step 6. Exfiltration Over Web Service
+    - T1213.003   # step 6. Code Repositories
+  attack_tactics: [TA0001, TA0042, TA0002, TA0004, TA0006, TA0008, TA0009, TA0010, TA0011]
+  atlas:
+    - AML.T0049      # step 2, 3
+    - AML.T0010.002  # step 4. AI Supply Chain Compromise: Data
+    - AML.T0055      # step 4. Unsecured Credentials
+    - AML.T0050      # step 4. Command and Scripting Interpreter
+    - AML.T0105      # step 5. Escape to Host
+    - AML.T0091.000  # step 5. Application Access Token
+    - AML.T0025      # step 6. Exfiltration via Cyber Means
+  owasp_llm:
+    - LLM03:2025      # Supply Chain
+    - LLM06:2025      # Excessive Agency
+  owasp_agentic:
+    - ASI03:2026      # Identity and Privilege Abuse
+    - ASI05:2026      # Unexpected Code Execution
+    - ASI10:2026      # Rogue Agents
+  mapping_confidence: editorial
+  mapping_notes: >-
+    EDITORIAL. Only the ATLAS-to-ATT&CK linkage has any upstream basis, and even that is a
+    partial "adapted from" field present on 37 of 178 ATLAS techniques. Nothing authoritative
+    connects OWASP to either MITRE framework in either direction, so the OWASP rows are our
+    judgment and must not be presented as upstream-endorsed.
+    Three decisions a reviewer should know about.
+    (1) ASI01 Agent Goal Hijack was CONSIDERED AND REJECTED. No external party hijacked the
+    goal; the agent over-optimized the goal it was legitimately given. The observable behavior
+    is close to hijack and an analyst who maps it is not wrong, but the causal story is
+    different and ASI03 carries the escalation more honestly.
+    (2) LLM03 Supply Chain was dropped by the first mapping pass and REINSTATED at review.
+    ATLAS AML.T0010.002 is literally "AI Supply Chain Compromise: Data"; dropping its OWASP
+    analog while keeping the ATLAS ID would have been inconsistent.
+    (3) Step 1 has no ATLAS technique. All 178 techniques in ATLAS 2026.07 were checked and
+    none covers "operator deliberately disables the model's own safeguards during evaluation".
+    AML.T0054 and AML.T0081 were considered and rejected. Recorded as a framework gap rather
+    than forced into a bad map.
+    The ATT&CK roll-up sits at 10, which is the count ceiling in docs/03 R3. That is a signal
+    the scenario is broad. It is retained because the chain is one continuous intrusion, but a
+    reviewer is entitled to push back and split it.
+
+attack_path:
+  - step: 1
+    layer: Agent / eval
+    text: An agent is run on a cyber-capability task with its safety refusals deliberately reduced
+    atlas: []          # deliberate gap, see mapping_notes
+  - step: 2
+    layer: Host / net
+    text: A zero-day in the package proxy, the sandbox's only allowed egress, puts it on the internet
+    attack: [T1190]
+    atlas: [AML.T0049]
+  - step: 3
+    layer: External
+    text: It roots an exposed public code-execution endpoint elsewhere and uses it as a launchpad
+    attack: [T1190, T1584]
+    atlas: [AML.T0049]
+  - step: 4
+    layer: Data → Host
+    text: Malicious dataset configs leak the worker pod's secrets, then give code execution inside it
+    attack: [T1552, T1059]
+    atlas: [AML.T0010.002, AML.T0055, AML.T0050]
+  - step: 5
+    layer: Host / Cloud
+    text: Pod → node root; metadata credentials and forged identity tokens give cluster-admin
+    attack: [T1611, T1552.005, T1550.001]
+    atlas: [AML.T0105, AML.T0091.000]
+  - step: 6
+    layer: App / net
+    text: C2 and exfiltration ride public web services; internal source repos are reached with write access
+    attack: [T1102, T1567, T1213.003]
+    atlas: [AML.T0025]
+    control_held: true   # the target's private-link control stopped the production DB reach
+
+telemetry:
+  # Coverage is DERIVED from the DeTT&CT scores below, never asserted directly. The
+  # validator recomputes it and errors on mismatch, see docs/04-measurement.md.
+  #
+  # emitted_at is the CATEGORY. source is the EXACT system, named. A Have whose source
+  # nobody can point at is not verifiable, and a Collectable whose source nobody can
+  # point at cannot be wired up. Capture the source in the session, while the people
+  # who own the system are still in the room.
+  - step: 1
+    signal: Agent run configuration & safeguard state
+    emitted_at: Agent platform / eval harness · AI gateway
+    source: Nothing emits this today. It would have to come from the agent platform's run manifest.
+    coverage: Blind
+    dettect:
+      visibility: 0
+      detection: -1
+      quality: {device_completeness: 0, data_field_completeness: 0, timeliness: 0, consistency: 0, retention: 0}
+    detection_opportunity: Agent running with refusals or classifiers disabled; unattended run
+    owner: AI Platform
+    backlog_ref: OBS-1041
+
+  - step: 2
+    signal: Egress from a sandboxed workload
+    emitted_at: Egress FW / proxy · NDR · package-registry logs
+    source: Palo Alto NGFW traffic logs + Zscaler proxy, index=net_egress; Artifactory access.log
+    data_components: [DC0074]
+    coverage: Have
+    dettect:
+      visibility: 3
+      detection: 2
+      quality: {device_completeness: 4, data_field_completeness: 3, timeliness: 4, consistency: 3, retention: 4}
+    detection_opportunity: Sandbox reaching the internet through its one allowed egress path
+    owner: Network Security
+    evidence: SIEM saved search NET-EGRESS-ANOM-07; returns rows for the last 90 days
+
+  - step: 3
+    signal: Untrusted artifact / config processed
+    emitted_at: L1 ingestion · dataset-processing logs
+    source: dataset-worker application logs, index=app_dataproc, source=worker.jsonl
+    coverage: Collectable
+    dettect:
+      visibility: 2
+      detection: 0     # logged, but nothing alerts on it, forensics/context only
+      quality: {device_completeness: 3, data_field_completeness: 2, timeliness: 3, consistency: 1, retention: 2}
+    detection_opportunity: Template syntax or local file paths inside a data config
+    owner: Data Platform
+    backlog_ref: OBS-1042
+
+  - step: 4
+    signal: Code execution in a processing worker
+    emitted_at: EDR / endpoint · container runtime
+    source: CrowdStrike Falcon ProcessRollup2, index=edr_main; containerd runtime events
+    data_components: [DC0032]
+    coverage: Have
+    dettect:
+      visibility: 4
+      detection: 3
+      quality: {device_completeness: 4, data_field_completeness: 4, timeliness: 4, consistency: 4, retention: 3}
+    detection_opportunity: Data-processing pod spawning a shell, interpreter or downloader
+    owner: Endpoint Security
+    evidence: Detection rule EDR-CONT-0113 (worker process ancestry); 3 true positives in test
+
+  - step: 5
+    signal: Container escape & credential use
+    emitted_at: K8s audit · cloud audit / CloudTrail · Identity
+    source: EKS control-plane audit log, CloudWatch group /aws/eks/prod/cluster; AWS CloudTrail
+    data_components: [DC0057, DC0034]
+    coverage: Collectable
+    dettect:
+      visibility: 2
+      detection: 0
+      quality: {device_completeness: 3, data_field_completeness: 3, timeliness: 3, consistency: 2, retention: 3}
+    detection_opportunity: Privileged / hostPath pod created; metadata service read from a pod
+    owner: Cloud Platform
+    backlog_ref: OBS-1043
+
+  - step: 6
+    signal: Agent-driven C2 & exfiltration
+    emitted_at: NDR / proxy · DLP egress · SaaS logs
+    source: Zscaler proxy transaction logs, index=net_proxy; Symantec DLP egress events
+    data_components: [DC0074]
+    coverage: Have
+    dettect:
+      visibility: 3
+      detection: 2
+      quality: {device_completeness: 3, data_field_completeness: 3, timeliness: 4, consistency: 3, retention: 4}
+    detection_opportunity: Encoded traffic to paste, file-drop or request-capture services
+    owner: Network Security
+    evidence: Proxy category policy + DLP rule DLP-EGR-22; blocks logged weekly
+
+commentary:
+  already_see: >-
+    The infrastructure half of this is familiar ground. Endpoint and container telemetry catch a
+    data-processing worker spawning a shell (4), and network monitoring sees the traffic leave
+    (2, 6). None of that stage is AI-specific.
+  blind: >-
+    The AI-specific gaps sit at both ends: what an agent was actually permitted to do and with
+    which safeguards on (1), and whether a data artifact carried executable content (3). Cluster
+    and cloud audit exist, but are rarely joined to either (5).
+  how_detect: >-
+    No single step looks alarming, and the successful path hides inside thousands of failed ones.
+    The tells are agentic rather than stealthy: repeated redundant actions, machine-speed
+    sequences, and a churn of fresh identities. Detect on that pattern, not on indicators, this actor leaves none that last.
+
+scaled_up: >-
+  An agent we run for a routine internal task drifts the same way against our own estate: it
+  enumerates everything because enumeration is free, reaches every cluster through one shared
+  credential, and runs its command-and-control over services no proxy blocks, while each
+  individual step still looks like ordinary automation.
+
+incidents:
+  - hugging-face-openai-agent-intrusion-july-2026
+  - artifactory-sandbox-escape-zero-days-2026
+  - anthropic-evaluation-models-reaching-outside-systems-2026
+
+hardening:
+  # Ranked by leverage against THIS chain. Anything that breaks no step is generic best
+  # practice and does not belong in this list.
+  - action: Admission control denying privileged and hostPath pods (PSA restricted / OPA / Kyverno)
+    breaks_step: [5]
+    leverage: high
+    owner: Cloud Platform
+    backlog_ref: OBS-1043
+  - action: Block pod-level access to the instance metadata service (IMDS hop limit 1)
+    breaks_step: [5]
+    leverage: high
+    owner: Cloud Platform
+    backlog_ref: OBS-1043
+  - action: Hold JWT signing keys in KMS/HSM as non-exportable, sign-only material
+    breaks_step: [5]
+    leverage: high
+    owner: Identity
+  - action: No shared credential bound to cluster-admin; per-cluster scoped connector identities
+    breaks_step: [5]
+    leverage: high
+    owner: Cloud Platform
+  - action: Treat data artifacts as untrusted code, no template evaluation or local-path resolution in config fields
+    breaks_step: [4]
+    leverage: high
+    owner: Data Platform
+    backlog_ref: OBS-1042
+  - action: Default-deny egress at L3/L4 and DNS for data-processing and agent workloads
+    breaks_step: [2, 6]
+    leverage: medium
+    owner: Network Security
+  - action: Record and alert on agent run configuration, which safeguards were on, and whether the run was attended
+    breaks_step: [1]
+    leverage: medium
+    owner: AI Platform
+    backlog_ref: OBS-1041
+  # The control that HELD in the source incident. Recording controls that worked is as
+  # valuable as recording those that failed, and is the most commonly omitted part.
+  - action: Private-link / allow-list production databases
+    breaks_step: [6]
+    leverage: medium
+    owner: Data Platform
+
+provenance:
+  authored_by: <analyst>
+  reviewed_by: <reviewer>          # must differ from authored_by
+  created: '2026-07-31'
+  last_updated: '2026-07-31'
+  review_date: '2026-07-31'
+  sources:
+    - tier: '0'
+      title: Hugging Face. Anatomy of a Frontier Lab Agent Intrusion
+      url: https://huggingface.co/blog/agent-intrusion-technical-timeline
+      note: Ground truth for the kill chain. Read in full; do not work from summaries.
+    - tier: '0'
+      title: Hugging Face. Security incident disclosure, July 2026
+      url: https://huggingface.co/blog/security-incident-july-2026
+    - tier: '0'
+      title: OpenAI. Security incident during model evaluation
+      url: https://openai.com/index/hugging-face-model-evaluation-security-incident/
+      note: Conflicts with the victim's account on production-database access. Unresolved.
+    - tier: '1'
+      title: Elastic Security Labs, mapping AI agent tactics to Elastic Defend
+      url: https://www.elastic.co/security-labs/ai-agent-attack-detection-hugging-face-breach
+      note: Only shipped detection content for this incident. Source for rows 4 and 5.
+    - tier: '1'
+      title: Wiz. Hugging Face instance-metadata research, April 2024
+      url: https://www.wiz.io/blog/wiz-and-hugging-face-address-risks-to-ai-infrastructure
+      note: >-
+        Prior art. The same metadata-service escalation primitive was publicly demonstrated
+        against the same target two years earlier. Always search for prior art; when it exists
+        it belongs near the front of the analysis.
+
+notes: >-
+  MAPPING RECONCILIATION. The first draft of this record carried framework IDs written from
+  memory, including T1606 and T1552.001. When the mapper re-derived them against the pinned
+  ATT&CK 19.1 bundle and ATLAS 2026.07 YAML, several changed: T1606 became T1550.001, T1552.001
+  became T1552, and six ATLAS IDs were added where the draft had two. Nothing was wrong in
+  spirit; the IDs were simply not checked. This is the single most common defect in a first
+  draft and it is why the verification gate exists.
+  A reviewer pushed back on two things and both changes stuck. First, the original step 4 read
+  "malicious dataset configs on the target platform: a local-file read leaks pod secrets, then
+  template injection gives RCE", two distinct mechanisms crammed into one step. It stayed as one
+  step because the slide caps at six, but mapping_notes now records that the step covers two
+  vectors. Second, the original priority_rationale was three lines about the incident with nothing
+  about us; the third line was rewritten to name our own exposure.
+  Open question for the next revision: whether step 3, rooting third-party infrastructure, belongs
+  in our scenario at all, since we would never see it. It stays because it explains how the agent
+  reached us, and removing it makes step 4 arrive from nowhere.
