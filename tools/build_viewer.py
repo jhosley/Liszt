@@ -269,6 +269,59 @@ nav .navact:hover{border-color:var(--brand);background:#F3F7FA;color:var(--brand
 .bar span:last-child{border-radius:0 4px 4px 0}
 .bar span.Have{background:var(--have)}.bar span.Collectable{background:var(--collectable)}
 .bar span.Blind{background:var(--blind)}.bar span.Unscored{background:var(--unscored)}
+
+/* reports ----------------------------------------------------------------- */
+.rmenu{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 10px}
+.rmenu button{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--rule);
+  background:var(--surface);color:var(--muted);border-radius:8px;padding:8px 15px;cursor:pointer}
+.rmenu button:hover{border-color:var(--brand);color:var(--brand-ink)}
+.rmenu button[aria-current="page"]{background:var(--brand);color:#fff;border-color:var(--brand)}
+.rstamp{font-family:var(--mono);font-size:11px;color:var(--unscored);margin:0 0 4px}
+.rh{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--ink);margin:0}
+.rsub{color:var(--muted);font-size:13px;margin:2px 0 14px}
+.rk{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
+.distbar{display:flex;height:42px;border-radius:8px;overflow:hidden;margin:4px 0 6px}
+.distbar span{display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px}
+.rank{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid var(--rule);
+  border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface)}
+.rank .rnum{width:26px;height:26px;border-radius:50%;background:var(--now);color:#fff;font-weight:700;
+  display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.rank .rtitle{font-weight:700;color:var(--ink);flex:1;min-width:200px}
+.rank .rown{color:var(--muted);font-size:11px;text-align:right;line-height:1.3}
+.pillx{font-size:10px;font-weight:700;color:#fff;border-radius:5px;padding:4px 9px;white-space:nowrap;letter-spacing:.03em}
+.tagx{font-size:10px;font-weight:700;border-radius:5px;padding:4px 9px;white-space:nowrap;border:1px solid var(--rule);color:var(--muted)}
+.strip{border-radius:8px;padding:10px 14px;font-size:12.5px;line-height:1.45;margin-top:10px}
+.rbanner{background:var(--brand-ink);color:#fff;border-radius:8px;padding:13px 18px;font-weight:600;
+  text-align:center;margin-top:16px;font-size:14px;line-height:1.45}
+.meterwrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.meter{position:relative;height:36px;flex:1;min-width:260px;background:var(--surface-3);border-radius:8px;overflow:visible}
+.meter .fill{height:100%;background:var(--have);border-radius:8px 0 0 8px}
+.meter .target{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--ink)}
+.meter .tlab{position:absolute;top:-20px;transform:translateX(-50%);font-size:10px;font-weight:700;color:var(--ink)}
+.trend{display:flex;gap:18px;align-items:flex-end;height:120px;padding:6px 0}
+.trend .tb{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.trend .tbar{width:44px;background:var(--have);border-radius:3px}
+.fwcard{border:1px solid var(--rule);border-radius:8px;padding:12px 14px;background:var(--surface)}
+.fwcard .p{font-size:26px;font-weight:700;color:var(--ink)}
+.pbarwrap{height:12px;background:var(--surface-3);border-radius:6px;overflow:hidden;margin:6px 0}
+.pbarwrap span{display:block;height:100%}
+.rgrid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.rgrid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.kc{overflow-x:auto;padding-bottom:6px}
+.kcgrid{display:grid;gap:5px;min-width:940px}
+.kc .kchead{font-size:10px;font-weight:700;text-align:center;color:var(--ink);padding:2px;line-height:1.15}
+.kc .cell{border-radius:6px;padding:12px 4px;text-align:center;font-weight:700;font-size:15px;color:#fff}
+.kc .rl{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+  display:flex;align-items:center}
+.kc .flag{outline:2px dashed var(--blind);outline-offset:2px;border-radius:8px}
+.slrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--rule);
+  border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface)}
+.mtile{border:1px solid var(--rule);border-radius:8px;padding:12px 14px;background:var(--surface)}
+.mtile .n{font-size:26px;font-weight:700;color:var(--ink)}
+.deltachip{font-weight:700;border-radius:6px;padding:2px 9px;font-size:12px}
+.rcard{border:1px solid var(--rule);border-radius:8px;padding:14px;background:var(--surface)}
+.rcard h4{margin:0 0 8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.rcard li{margin-bottom:6px;font-size:12.5px;line-height:1.4}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:10px 0 0}
 .legend .k{display:inline-flex;align-items:center;gap:6px}
 
@@ -1495,12 +1548,159 @@ function setView(v) {
   $("#coverage").hidden = v !== "coverage";
   $("#usecases").hidden = v !== "usecases";
   $("#frameworks").hidden = v !== "frameworks";
+  $("#reports").hidden = v !== "reports";
   $("#sessionview").hidden = v !== "session";
   if (v === "coverage") renderCoverage();
   if (v === "usecases") renderUseCases();
   if (v === "frameworks") renderFrameworks();
+  if (v === "reports") renderReports();
   if (v === "session") renderSession();
 }
+
+/* ---------- reports (illustrative mock) ---------- */
+const LAYERCOL = { App:"#566DB2", Agent:"#5A3B9C", Model:"#277885", Data:"#9A6B08", Infra:"#63707B" };
+function reportHead(t, sub) {
+  return `<div class="rstamp">generated by liszt from ${DATA.scenarios.length} scenario records, pinned `
+    + `ATT&CK v19.1 and ATLAS 2026.07 · illustrative figures</div>`
+    + `<div class="rh">${esc(t)}</div><div class="rsub">${esc(sub)}</div>`;
+}
+const covc = (p) => p >= 70 ? "var(--have)" : (p >= 40 ? "var(--collectable)" : "var(--blind)");
+const covbg = (p) => p >= 70 ? "var(--have-bg)" : (p >= 40 ? "var(--collectable-bg)" : "var(--blind-bg)");
+
+function reportPosture() {
+  const tiles = [["21","scenarios","15 from real incidents, 6 hypotheses","var(--ink)"],
+    ["96","scored moves","across the five stack layers","var(--ink)"],
+    ["14","blind moves","every one owned and ticketed","var(--blind)"]];
+  const rows = [
+    {n:1,l:"Model",lc:LAYERCOL.Model,t:"The model’s decision path leaves no record",v:"Blind",vc:"var(--blind)",ev:"4 scenarios, 3 incidents",dl:"No use case yet",dc:"var(--blind)",db:"var(--blind-bg)",o:"AI engineering",k:"OBS-1203"},
+    {n:2,l:"Data",lc:LAYERCOL.Data,t:"Documents reach our people with no inspection",v:"Blind",vc:"var(--blind)",ev:"3 scenarios, 2 incidents",dl:"No use case yet",dc:"var(--blind)",db:"var(--blind-bg)",o:"Data platform",k:"OBS-1198"},
+    {n:3,l:"Agents",lc:LAYERCOL.Agent,t:"Agent tool calls are logged but never watched",v:"Collectable",vc:"var(--collectable)",ev:"5 scenarios, 3 incidents",dl:"UC-015 in build",dc:"var(--collectable)",db:"var(--collectable-bg)",o:"Observability",k:"OBS-1201"},
+    {n:4,l:"Agents",lc:LAYERCOL.Agent,t:"Shared prompt template edits go unreviewed",v:"Collectable",vc:"var(--collectable)",ev:"1 scenario, hypothesis",dl:"UC-014 active",dc:"var(--have)",db:"var(--have-bg)",o:"Platform eng.",k:"OBS-1195"}];
+  return reportHead("The Posture Report","How worried should I be, and what do I prioritize, answered from the records.")
+    + `<div class="rk">Coverage, across every scored move</div>`
+    + `<div class="distbar"><span style="width:62%;background:var(--have)">Have 62%</span>`
+      + `<span style="width:23%;background:var(--collectable)">Collectable 23%</span>`
+      + `<span style="width:15%;background:var(--blind)">Blind 15%</span></div>`
+    + `<div class="tiles">${tiles.map(([n,l,sub,c])=>`<div class="tile"><div class="n" style="color:${c}">${n}</div>`
+      + `<div class="l">${l}</div><div class="s">${sub}</div></div>`).join("")}</div>`
+    + `<div class="rk">What to prioritize, ranked from the records</div>`
+    + rows.map(r=>`<div class="rank"><span class="rnum">${r.n}</span>`
+      + `<span class="pillx" style="background:${r.lc}">${r.l.toUpperCase()}</span>`
+      + `<span class="rtitle">${esc(r.t)}</span>`
+      + `<span class="pillx" style="background:${r.vc}">${r.v.toUpperCase()}</span>`
+      + `<span class="tagx">${esc(r.ev)}</span>`
+      + `<span class="tagx" style="color:${r.dc};background:${r.db};border-color:${r.dc}">${esc(r.dl)}</span>`
+      + `<span class="rown">${esc(r.o)}<br>${esc(r.k)}</span></div>`).join("")
+    + `<div class="strip" style="background:var(--surface-2);color:var(--ink-2)">The order is computed: blind outranks collectable, incidents outrank hypotheses, more scenarios outrank fewer, undefended outranks defended. Nobody hand-sorts this list.</div>`
+    + `<div class="rbanner">How worried is never an adjective here. It is a distribution, a ranked list, and an owner on every line, all generated from the records.</div>`;
+}
+
+function reportScoreboard() {
+  const trend = [["Q3 25",48],["Q4 25",54],["Q1 26",58],["Q2 26",62],["restated",58]];
+  const fw = [["MITRE ATT&CK","v19.1",65,"#566DB2","52 of 96 moves"],
+    ["MITRE ATLAS","2026.07",58,"#277885","31 of 96 moves"],
+    ["OWASP LLM & Agentic","2025 / 2026",62,"#5A3B9C","13 of 96 moves"]];
+  const d=[["+4","var(--have)","instrumentation we built"],["-8","var(--blind)","techniques the new release added"],["-4","var(--now)","net restatement, every point named"]];
+  return reportHead("The Scoreboard","Where we stand against the pinned standards, whether the 80 percent goal is met, and why the number moved.")
+    + `<div class="rk">The goal, on the pinned ruler</div>`
+    + `<div class="meterwrap"><div style="font-size:30px;font-weight:700;color:var(--ink)">62%</div>`
+      + `<div class="meter"><div class="fill" style="width:62%"></div>`
+        + `<div class="target" style="left:80%"></div><div class="tlab" style="left:80%">TARGET 80%</div></div>`
+      + `<span class="deltachip" style="background:var(--have-bg);color:var(--have)">+4 this quarter</span></div>`
+    + `<div class="rsub" style="margin-top:8px">18 points to go, and the ruler cannot move under us.</div>`
+    + `<div class="rk">The trend, same ruler the whole way</div>`
+    + `<div class="trend">${trend.map(([l,v])=>`<div class="tb"><div style="font-weight:700;color:var(--ink)">${v}</div>`
+      + `<div class="tbar" style="height:${(v-30)/40*90}px;${l==="restated"?"background:transparent;border:2px dashed var(--have)":""}"></div>`
+      + `<div>${l}</div></div>`).join("")}</div>`
+    + `<div class="rsub">The dashed bar is Q2 26 restated under the next release, both positions kept.</div>`
+    + `<div class="rk">By framework, at the pinned version</div>`
+    + `<div class="rgrid3">${fw.map(([n,ver,pc,c,sub])=>`<div class="fwcard">`
+      + `<div style="display:flex;justify-content:space-between;align-items:center"><strong>${n}</strong>`
+      + `<span class="pillx" style="background:${c}">${ver}</span></div>`
+      + `<div class="p">${pc}%</div><div class="pbarwrap"><span style="width:${pc}%;background:${c}"></span></div>`
+      + `<div class="s" style="color:var(--muted);font-size:12px">${sub}</div></div>`).join("")}</div>`
+    + `<div class="rk">The two ways to count, both on the page</div>`
+    + `<div class="rgrid2">`
+      + `<div class="rcard"><h4 style="color:var(--have)">Posture, where the 80 percent lives</h4>`
+        + `<div style="font-size:12.5px;color:var(--ink-2)">62 percent of the 96 scored moves in our threat model are at Have. Depth, against the attacks we have mapped.</div></div>`
+      + `<div class="rcard"><h4>Breadth, a different claim</h4>`
+        + `<div style="font-size:12.5px;color:var(--ink-2)">Our scenarios exercise 47 techniques across the pinned catalogs. Adding scenarios grows this; the goal only moves when scored moves reach Have.</div></div></div>`
+    + `<div class="strip" style="background:var(--collectable-bg);color:#8A5B08"><strong>Every movement named &nbsp;</strong>`
+      + d.map(([n,c,t])=>`<span class="deltachip" style="background:${c};color:#fff;margin-right:6px">${n}</span>${t}. `).join("")+`</div>`
+    + `<div class="rbanner">A goal only means something on a fixed ruler. This page names the ruler, shows both ways to count, and explains every point of movement.</div>`;
+}
+
+function reportKillChain() {
+  const KC=[["Reconnaissance",6,0,33,false],["Initial Access",14,3,79,false],["Execution",16,4,75,false],
+    ["Persistence",8,1,69,false],["Defense Evasion",11,0,27,true],["Credential Access",7,2,71,false],
+    ["Discovery",9,0,33,true],["Collection",12,2,75,false],["Exfiltration",9,2,78,false],["Impact",4,0,50,false]];
+  const mcol=(n)=>n>=14?"#22357A":n>=10?"#5E76BD":n>=7?"#9AABD8":"#CBD3EA";
+  const ucol=(n,f)=>f?"var(--blind-bg)":n>=4?"#1E7F4B":n>=1?"#A9CDBB":"var(--surface-3)";
+  const cols=`grid-template-columns:120px repeat(10,1fr)`;
+  const heads=`<div class="rl"></div>`+KC.map(k=>`<div class="kchead" style="${k[4]?"color:var(--blind)":""}">${k[0]}</div>`).join("");
+  const r1=`<div class="rl">Scenario moves</div>`+KC.map(k=>`<div class="cell" style="background:${mcol(k[1])};color:${k[1]>=7?"#fff":"#1F2A63"}">${k[1]}</div>`).join("");
+  const r2=`<div class="rl">Use cases</div>`+KC.map(k=>`<div class="cell" style="background:${ucol(k[2],k[4])};color:${(k[2]>=1&&!k[4])?"#fff":k[4]?"var(--blind)":"var(--muted)"}">${k[2]}</div>`).join("");
+  const r3=`<div class="rl">Coverage</div>`+KC.map(k=>`<div class="cell" style="background:${covbg(k[3])};color:${covc(k[3])};font-size:13px">${k[3]}%</div>`).join("");
+  return reportHead("The Kill Chain Map","Where attacks travel and where defenses stand, stage by stage, in the tactic vocabulary we already pin.")
+    + `<div class="kc"><div class="kcgrid" style="${cols}">${heads}${r1}${r2}${r3}</div></div>`
+    + `<div class="strip" style="background:var(--surface-2);color:var(--ink-2)">A stage is flagged when eight or more moves land there and nothing defends it. <strong style="color:var(--blind)">Defense Evasion</strong> (11 moves, 0 use cases) and <strong style="color:var(--blind)">Discovery</strong> (9 moves, 0 use cases) are the busiest undefended stages. Four stages with no scenario traffic are omitted.</div>`
+    + `<div class="rbanner">Per-scenario reports can look healthy while a whole stage sits undefended. The empty column is where the next use case comes from.</div>`;
+}
+
+function reportStack() {
+  const L=[["Application","#566DB2",16,22,17,4,1,4,77,false],
+    ["Agents","#5A3B9C",14,24,13,9,2,4,54,false],
+    ["Model","#277885",12,18,8,4,6,1,44,true],
+    ["Data","#9A6B08",11,14,8,3,3,2,57,false],
+    ["Infrastructure","#63707B",13,18,14,2,2,3,78,false]];
+  const rows=L.map(([name,c,sc,mv,hv,cl,bl,uc,pct,flag])=>{
+    const dist=`<div class="bar" style="height:16px;flex:1;min-width:160px"><span class="Have" style="width:${hv/mv*100}%"></span>`
+      +`<span class="Collectable" style="width:${cl/mv*100}%"></span><span class="Blind" style="width:${bl/mv*100}%"></span></div>`;
+    return `<div class="slrow"${flag?' style="border-color:var(--blind)"':''}>`
+      +`<span class="pillx" style="background:${c};min-width:110px;text-align:center">${name.toUpperCase()}</span>`
+      +`<span style="font-weight:700;font-size:15px;color:var(--ink);width:34px;text-align:center">${sc}</span>`
+      +`<span style="font-weight:700;font-size:15px;color:var(--ink);width:34px;text-align:center">${mv}</span>`
+      +dist
+      +`<span style="font-weight:700;color:${covc(pct)};width:44px;text-align:center">${pct}%</span>`
+      +`<span style="font-weight:700;font-size:15px;color:var(--ink);width:34px;text-align:center">${uc}</span>`
+      +`<span class="tagx" style="${flag?"color:var(--blind);background:var(--blind-bg);border-color:var(--blind)":"color:var(--have);background:var(--have-bg);border-color:var(--have)"}">${flag?"Underdefended":"Keeping pace"}</span></div>`;
+  }).join("");
+  return reportHead("The Stack Layer Report","Every layer of the AI stack, its attack traffic, its coverage, and whether defense is keeping pace.")
+    + `<div class="rsub" style="font-size:11px;letter-spacing:.05em;text-transform:uppercase">Layer · scenarios · moves · coverage (have / collectable / blind) · at have · use cases · verdict</div>`
+    + rows
+    + `<div class="strip" style="background:var(--surface-2);color:var(--ink-2)">A layer is flagged when eight or more exposed moves outrun its defenses at more than five per use case. <strong style="color:var(--blind)">Model</strong> flags: 10 exposed moves, 1 use case, six of our fourteen blind moves live here. Scenario counts sum past 21 because one attack crosses several layers.</div>`
+    + `<div class="rbanner">The busiest layer is not the riskiest layer. Traffic, coverage and defense sit side by side, and the imbalance is where the next quarter of work goes.</div>`;
+}
+
+function reportMovement() {
+  const tiles=[["Coverage at Have","62%","+4",true,"from 58"],["Scenarios","21","+3",true,"from 18"],
+    ["Scored moves","96","+12",true,"from 84"],["Blind moves","14","-2",true,"from 16"],["Use cases","14","+3",true,"from 11"]];
+  const cards=[
+    ["What entered, by front door",["+2 from the incident journey: an ATLAS case study and a vendor writeup","+1 from the hypothesis journey: the poisoned template, SC-022","1 disclosed breach record revised as the postmortem landed"]],
+    ["Scores that moved, and why",["4 moves rescored up after instrumentation shipped","2 moves rescored down: a session corrected an optimistic log-depth assumption","Every rescore carries who, when and why"]],
+    ["Gaps closed and opened",["3 closed: two by new emit, one by a rescore that proved coverage","1 opened: the new hypothesis exposed unreviewed template edits","Net blind moves, 16 down to 14"]],
+    ["Use cases and the ladder",["3 built: UC-013 and UC-014 active, UC-015 in build","First promotion: UC-009, notify to assisted, block attached","Nothing runs autonomous, and nothing asked to"]]];
+  return reportHead("The Movement Report","What changed since last quarter and why, line by line. The other four pages are snapshots. This is the pulse.")
+    + `<div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">`
+      + tiles.map(([l,n,dl,good,was])=>`<div class="mtile"><div class="l" style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">${l}</div>`
+        + `<div style="display:flex;align-items:center;gap:8px"><span class="n">${n}</span>`
+        + `<span class="deltachip" style="background:${good?"var(--have-bg)":"var(--blind-bg)"};color:${good?"var(--have)":"var(--blind)"}">${dl}</span></div>`
+        + `<div class="s" style="font-size:11px;color:var(--muted);font-style:italic">${was}</div></div>`).join("")+`</div>`
+    + `<div class="rgrid2">${cards.map(([h,items])=>`<div class="rcard"><h4>${esc(h)}</h4><ul style="margin:0;padding-left:16px">`
+      + items.map(i=>`<li>${esc(i)}</li>`).join("")+`</ul></div>`).join("")}</div>`
+    + `<div class="strip" style="background:var(--surface-2);color:var(--ink-2)"><strong>The standards watch &nbsp;</strong>One release landed late in the quarter. The adoption playbook ran, the scoreboard carries both positions (62 and 58 restated), and the evidence was not retouched.</div>`
+    + `<div class="rbanner">The other four reports are photographs. This one is the pulse: what entered, what moved, what closed, who earned trust, every line traceable to a record change.</div>`;
+}
+
+function renderReports() {
+  const REPORTS=[["posture","Posture"],["scoreboard","Scoreboard"],["killchain","Kill chain map"],["stack","Stack layers"],["movement","Movement"]];
+  if (!state.report) state.report = "posture";
+  const menu=`<div class="rmenu">${REPORTS.map(([k,l])=>`<button data-report="${k}" aria-current="${state.report===k?"page":"false"}">${l}</button>`).join("")}</div>`;
+  const build={posture:reportPosture,scoreboard:reportScoreboard,killchain:reportKillChain,stack:reportStack,movement:reportMovement}[state.report]||reportPosture;
+  $("#reports").innerHTML = `<div class="panel">${menu}${build()}</div>`;
+  $$("#reports .rmenu button").forEach(b => b.onclick = () => { state.report=b.dataset.report; renderReports(); });
+}
+
 function route() {
   const m = (location.hash || "").match(/^#\/scenario\/([A-Za-z0-9-]+)$/);
   if (m && DATA.scenarios.some(s => s.id === m[1])) {
@@ -1601,6 +1801,7 @@ def page(data: dict) -> str:
     <button data-view="coverage" aria-current="false">Coverage</button>
     <button data-view="usecases" aria-current="false">Use cases</button>
     <button data-view="frameworks" aria-current="false">Frameworks</button>
+    <button data-view="reports" aria-current="false">Reports</button>
     <button data-view="session" aria-current="false" id="sessionnav" hidden>Session</button>
     <button style="margin-left:auto;color:var(--brand)" id="sessiontoggle">Start session mode</button>
   </nav>
@@ -1649,6 +1850,7 @@ def page(data: dict) -> str:
   <section id="coverage" hidden></section>
   <section id="usecases" hidden></section>
   <section id="frameworks" hidden></section>
+  <section id="reports" hidden></section>
   <section id="sessionview" hidden></section>
 
   <footer>
