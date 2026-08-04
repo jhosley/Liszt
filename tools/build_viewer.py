@@ -375,6 +375,21 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
   border-radius:6px;padding:4px 11px;cursor:pointer;color:var(--muted)}
 .prop button:hover{color:var(--blind);border-color:var(--blind)}
 .err{color:var(--blind);font-size:12px;font-weight:700;margin-top:8px}
+.jrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.jbtn{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--rule);background:var(--surface);
+  color:var(--brand-ink);border-radius:8px;padding:9px 14px;cursor:pointer;text-align:left;max-width:220px}
+.jbtn:hover{border-color:var(--brand);background:#F3F7FA}
+.jbtn .jb{display:block;color:var(--muted);font-weight:400;font-size:11px;margin-top:3px;line-height:1.35}
+.jsteps{margin:8px 0 2px;padding-left:18px;color:var(--ink-2);font-size:12.5px;line-height:1.55}
+.pbox{margin:12px 0}
+.pbox .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.pbox .ph .pt{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.copybtn{font:inherit;font-size:11px;border:1px solid var(--rule);background:var(--surface);
+  border-radius:6px;padding:3px 11px;cursor:pointer;color:var(--brand)}
+.copybtn:hover{border-color:var(--brand)}
+.pbox pre{margin:0;background:#131A30;color:#F2F5FC;border-radius:8px;padding:12px;overflow:auto;
+  max-height:230px;white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.45;
+  font-family:ui-monospace,Menlo,Consolas,monospace}
 
 /* use cases ---------------------------------------------------------------- */
 /* Lifecycle and autonomy chips reuse the established chip pairs; the four
@@ -897,8 +912,150 @@ function wireProposals() {
   $("#np-cancel").onclick = () => { proposeOpen = false; renderSession(); };
 }
 
-/* ---------- import a scenario built from a published incident ---------- */
-let importOpen = false;
+/* ---------- import a scenario from a journey: incident, research feeds, hypothesis ---------- */
+/* The prompts live here so they open right next to the paste box, no doc-hunting.
+   They mirror docs/PROTOTYPE-SCENARIO-INTAKE.md; keep the two in step if you edit. */
+const P_MAP =
+`You are mapping ONE incident into a Liszt scenario. Research it from the source(s) I give you,
+then output a SINGLE JSON object and NOTHING else. No prose, no code fence, just JSON.
+
+THE INCIDENT:
+<<< paste the incident name and its source URL here >>>
+
+JSON shape:
+{
+  "title": "short scenario title, attacker-goal phrasing",
+  "one_liner": "2-3 plain sentences about OUR environment ('our', 'we'): what the attacker does and the damage.",
+  "classification": {
+    "ai_infrastructure_layer": "one layer, exactly one of: L0 · Infrastructure | L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application",
+    "evidence": "seen-in-the-wild for a real incident, or seen-in-research for a proof of concept",
+    "priority": "NOW, NEAR-TERM, or BACKLOG",
+    "priority_rationale": ["3 short plain-sentence bullets"]
+  },
+  "attack_path": [
+    { "step": 1, "layer": "the stack layer this move lands on", "text": "one move of the attack, plainly" }
+  ],
+  "telemetry": [
+    { "step": 1, "signal": "the observable event this move produces", "emitted_at": "where it is emitted from, named generically", "detection_opportunity": "what a detection could look for" }
+  ],
+  "framework_mapping": {
+    "baseline": "2026.07",
+    "attack": ["ATT&CK v19.1 IDs; [] if none"],
+    "atlas": ["ATLAS 2026.07 IDs; [] if none"],
+    "owasp_llm": ["OWASP LLM 2025 IDs; [] if none"],
+    "owasp_agentic": ["OWASP Agentic 2026 IDs; [] if none"]
+  },
+  "incidents": [ { "title": "source title", "url": "source URL", "tier": "1, 2, or 3" } ]
+}
+
+Rules:
+  - One telemetry entry per attack_path step, same step number.
+  - DO NOT include any coverage, visibility, detection or score field. Owners score it later; you
+    only identify the signal that WOULD exist.
+  - Real framework IDs only where you are confident; a short defensible list beats a long guess.
+  - 4-7 distinct steps. Valid JSON only, no trailing commas, no commentary.`;
+
+const P_INCIDENT =
+`You are a threat-intelligence researcher building a list of PUBLISHED, real-world incidents that
+involve AI INFRASTRUCTURE. Use web search and cite a source URL for every item.
+
+Include incidents touching any of: model supply chain (tampered/backdoored models, malicious
+models on public hubs, typosquatted model or package names); inference and serving (exploited
+inference servers, model-load code execution, exposed model endpoints and AI gateways); data
+(training-data or RAG poisoning, exposed vector stores); orchestration and agents (agent tool
+abuse, prompt-injection with real impact, malicious MCP servers); MLOps (compromised pipelines,
+leaked AI credentials); guardrail bypasses that caused a real incident.
+
+For each item give: 1) short name  2) date  3) who disclosed it  4) one sentence on what happened
+5) the single layer it most affects (L0 · Infrastructure | L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application)
+6) source URL  7) source tier (1 first-party, 2 reputable press/research, 3 community)  8) why it matters.
+
+Rules: prefer confirmed incidents over demos (label any notable demo "research, not in the wild");
+prefer first-party and tier-1 sources; no marketing; do not speculate; spread across the layers.
+Return the 12 most relevant items as a table, most recent and most severe first.`;
+
+const P_RESEARCH =
+`You are a threat-intelligence researcher. Search these SPECIFIC sources for published incidents
+and technical writeups about attacks on AI systems and AI infrastructure, and cite a link for each:
+  - Wiz research (wiz.io/blog and their research team posts)
+  - JFrog security research (jfrog.com, malicious-package and model findings)
+  - Mandiant / Google Threat Intelligence (cloud.google.com/security, Mandiant blog)
+  - The AI Incident Database (incidentdatabase.ai), a public community record of AI harms
+
+Focus on AI infrastructure: malicious or backdoored models, poisoned hubs and packages, compromised
+ML pipelines, exposed model endpoints and vector stores, agent and MCP tool abuse, prompt-injection
+with real impact, leaked AI credentials.
+
+For each item give: 1) short name  2) date  3) source (Wiz, JFrog, Mandiant, or AI Incident Database)
+and a link  4) one sentence on what happened  5) the single layer it most affects (L0 · Infrastructure
+| L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application)  6) source tier (1 first-party,
+2 reputable research, 3 community).
+
+Rules: only these four sources; if one has nothing relevant, say so and move on; prefer confirmed
+incidents and concrete technical findings over opinion; mark unknown details "unknown".
+Return the 12 most relevant items as a table, most recent and most severe first.
+
+Then, once I pick one, use the mapping prompt to turn it into scenario JSON.`;
+
+const P_HYP =
+`You are an AI threat modeler. Take the analyst hypothesis below, an attack that has NOT happened
+yet, and turn it into a rigorous Liszt scenario. Output a SINGLE JSON object and NOTHING else.
+
+THE HYPOTHESIS:
+<<< write your hypothesis here: what is the attacker trying to do, and what makes you worried it
+    could work against us? >>>
+
+Sharpen the idea, do not judge it. Break it into concrete moves; for each, name the observable
+signal a defender would look for.
+
+JSON shape:
+{
+  "origin": "hypothesis",
+  "proposed_by": "AI Threat Modeler",
+  "title": "short scenario title, attacker-goal phrasing",
+  "one_liner": "2-3 plain sentences about OUR environment: what the attacker does and why it would hurt.",
+  "classification": {
+    "ai_infrastructure_layer": "one of: L0 · Infrastructure | L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application",
+    "evidence": "seen-in-research",
+    "priority": "NOW, NEAR-TERM, or BACKLOG",
+    "priority_rationale": ["3 short bullets; it is honest to say 'nobody has run this yet, but ...'"]
+  },
+  "attack_path": [ { "step": 1, "layer": "stack layer this move lands on", "text": "one move, plainly" } ],
+  "telemetry": [ { "step": 1, "signal": "the event this move WOULD produce", "emitted_at": "where it would be emitted from", "detection_opportunity": "what a detection could look for" } ],
+  "framework_mapping": {
+    "baseline": "2026.07",
+    "attack": ["[] if none"], "atlas": ["[] if none"],
+    "owasp_llm": ["[] if none"], "owasp_agentic": ["[] if none"]
+  }
+}
+
+Rules:
+  - Keep "origin": "hypothesis" and "proposed_by": "AI Threat Modeler" exactly, so Liszt tags it.
+    A specific analyst may replace proposed_by with their own name.
+  - One telemetry entry per step. DO NOT include any coverage, visibility, detection or score field.
+  - 4-7 distinct steps. A hypothesis may map to no framework IDs yet; an empty list is a fine answer.
+  - Valid JSON only, no trailing commas, no commentary.`;
+
+const JOURNEYS = [
+  { key: "incident", label: "Published incident", origin: "incident",
+    blurb: "Something that really happened to someone else. Find it, then map it.",
+    steps: ["Run the first prompt in an LLM with web access and pick an incident from the list.",
+            "Run the second prompt on the one you picked.",
+            "Paste the JSON it returns into the box below and add it."],
+    prompts: [ {title:"1 · Find incidents", body: P_INCIDENT}, {title:"2 · Map the one you picked", body: P_MAP} ] },
+  { key: "research", label: "Threat-research feeds", origin: "incident",
+    blurb: "Search Wiz, JFrog, Mandiant and the AI Incident Database.",
+    steps: ["Run the first prompt in an LLM with web access; it searches those four sources.",
+            "Pick an incident, then run the second prompt on it.",
+            "Paste the JSON into the box below and add it."],
+    prompts: [ {title:"1 · Search the feeds", body: P_RESEARCH}, {title:"2 · Map the one you picked", body: P_MAP} ] },
+  { key: "hypothesis", label: "Analyst hypothesis", origin: "hypothesis",
+    blurb: "An attack nobody has run yet. Tagged as Threat modeler proposed.",
+    steps: ["Write your hypothesis into the prompt where marked, and run it in any LLM.",
+            "Paste the JSON into the box below and add it. It arrives tagged Threat modeler."],
+    prompts: [ {title:"Turn a hypothesis into JSON", body: P_HYP} ] }
+];
+let importJourney = null;
 
 /* Take whatever the mapping prompt produced and make it safe to render: fill the
    fields the views read, force draft status, and never trust a coverage the file
@@ -944,8 +1101,10 @@ function normalizeImported(raw) {
   if (!out.one_liner) out.one_liner = out.title;
   return out;
 }
-function addImported(raw) {
-  const sc = normalizeImported(raw);
+function addImported(raw, originFallback) {
+  const obj = (raw && typeof raw === "object") ? { ...raw } : {};
+  if (!obj.origin && originFallback) obj.origin = originFallback;
+  const sc = normalizeImported(obj);
   session.importedScenarios.push(sc);
   DATA.scenarios.push(sc);
   session.recorded = session.recorded || new Date().toISOString().slice(0, 10);
@@ -963,37 +1122,63 @@ function dropImported(i) {
 
 function importPanel() {
   const list = session.importedScenarios || [];
-  return `<div class="panel"><h3>Imported scenarios, from an incident (${list.length})</h3>
-    <div class="sub">Paste a scenario built from a published incident as JSON. It is added to the
-      library as a draft you can open, score in session mode, and export. The two prompts in
-      <code>docs/PROTOTYPE-SCENARIO-INTAKE.md</code> turn a published incident or an analyst
-      hypothesis into this JSON.</div>
-    ${list.length ? list.map((p, i) => `<div class="prop"><div>
-        <div class="t">${esc(p.id)} &middot; ${esc(p.title)}</div>
-        <div class="m">${p.origin === "hypothesis" ? "threat-modeler hypothesis" : "from incident"} &middot;
-          ${esc(p.classification.ai_infrastructure_layer)} &middot;
-          ${(p.attack_path || []).length} steps &middot; ${(p.telemetry || []).length} signals</div>
-      </div><button data-dropimp="${i}">Remove</button></div>`).join("")
-    : '<div style="color:var(--muted)">None yet.</div>'}
-    <div style="margin-top:14px">${importOpen ? `
-      <div class="fld"><label>Scenario JSON</label>
-        <textarea id="imp-json" rows="10" placeholder="paste the JSON from the mapping prompt"
+  const listHtml = list.length ? list.map((p, i) => `<div class="prop"><div>
+      <div class="t">${esc(p.id)} &middot; ${esc(p.title)}</div>
+      <div class="m">${p.origin === "hypothesis" ? "threat-modeler hypothesis" : "from incident"} &middot;
+        ${esc(p.classification.ai_infrastructure_layer)} &middot;
+        ${(p.attack_path || []).length} steps &middot; ${(p.telemetry || []).length} signals</div>
+    </div><button data-dropimp="${i}">Remove</button></div>`).join("")
+    : '<div style="color:var(--muted)">None yet.</div>';
+
+  let body;
+  if (!importJourney) {
+    body = `<div class="sub" style="margin-bottom:6px">Bring in a scenario. Pick how you are sourcing
+      it, and the directions, the prompts and the paste box open right here.</div>
+      <div class="jrow">${JOURNEYS.map(j => `<button class="jbtn" data-open="${j.key}">${esc(j.label)}
+        <span class="jb">${esc(j.blurb)}</span></button>`).join("")}</div>`;
+  } else {
+    const j = JOURNEYS.find(x => x.key === importJourney) || JOURNEYS[0];
+    const prompts = j.prompts.map((p, i) => `<div class="pbox">
+      <div class="ph"><span class="pt">${esc(p.title)}</span>
+        <button class="copybtn" data-jkey="${j.key}" data-pidx="${i}">Copy prompt</button></div>
+      <pre>${esc(p.body)}</pre></div>`).join("");
+    body = `<button class="toggle" id="imp-back">&larr; all journeys</button>
+      <div class="sub" style="margin:10px 0 2px"><strong>${esc(j.label)}.</strong> ${esc(j.blurb)}</div>
+      <ol class="jsteps">${j.steps.map(t => `<li>${esc(t)}</li>`).join("")}</ol>
+      ${prompts}
+      <div class="fld" style="margin-top:12px"><label>Paste the JSON the prompt produced</label>
+        <textarea id="imp-json" rows="8" placeholder="paste the scenario JSON here"
           style="width:100%;box-sizing:border-box;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
         <span class="hint">One scenario object, or an array of them. It needs at least a title;
           every other field fills in with a sensible default.</span></div>
       <div style="display:flex;gap:8px">
         <button class="toggle" id="imp-add">Add to the library</button>
         <button class="toggle" id="imp-cancel">Cancel</button></div>
-      <div class="err" id="imp-err" hidden></div>`
-      : '<button class="toggle" id="importscenario">Import a scenario from JSON</button>'}</div></div>`;
+      <div class="err" id="imp-err" hidden></div>`;
+  }
+  return `<div class="panel"><h3>Bring in a scenario (${list.length} imported)</h3>
+    ${listHtml}
+    <div style="margin-top:14px">${body}</div></div>`;
 }
 
+
 function wireImport() {
-  const open = $("#importscenario");
-  if (open) open.onclick = () => { importOpen = true; renderSession();
-    const t = $("#imp-json"); if (t) t.focus(); };
+  $$("#sessionview .jbtn[data-open]").forEach(b => b.onclick = () => {
+    importJourney = b.dataset.open; renderSession();
+  });
+  const back = $("#imp-back");
+  if (back) back.onclick = () => { importJourney = null; renderSession(); };
   const cancel = $("#imp-cancel");
-  if (cancel) cancel.onclick = () => { importOpen = false; renderSession(); };
+  if (cancel) cancel.onclick = () => { importJourney = null; renderSession(); };
+  $$("#sessionview .copybtn").forEach(b => b.onclick = () => {
+    const j = JOURNEYS.find(x => x.key === b.dataset.jkey);
+    const pr = j && j.prompts[Number(b.dataset.pidx)];
+    if (!pr) return;
+    const done = () => { const t = b.textContent; b.textContent = "Copied"; setTimeout(() => b.textContent = t, 1200); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pr.body).then(done).catch(() => { b.textContent = "Press Cmd-C"; });
+    } else { b.textContent = "Press Cmd-C"; }
+  });
   $$("#sessionview .prop button[data-dropimp]").forEach(b => b.onclick = () => {
     dropImported(Number(b.dataset.dropimp));
     renderSession(); renderList(); renderDetail(); updateSessionCount();
@@ -1006,12 +1191,14 @@ function wireImport() {
     try { raw = JSON.parse($("#imp-json").value); }
     catch (e) { err.textContent = "That is not valid JSON: " + e.message; err.hidden = false; return; }
     try {
-      (Array.isArray(raw) ? raw : [raw]).forEach(addImported);
-      importOpen = false;
+      const j = JOURNEYS.find(x => x.key === importJourney);
+      (Array.isArray(raw) ? raw : [raw]).forEach(o => addImported(o, j ? j.origin : undefined));
+      importJourney = null;
       renderSession(); renderList(); renderDetail(); updateSessionCount();
     } catch (e) { err.textContent = e.message; err.hidden = false; }
   };
 }
+
 
 /* ---------- session review and export ---------- */
 function updateSessionCount() {
@@ -1125,7 +1312,7 @@ function renderSession() {
       if (j >= 0) DATA.scenarios.splice(j, 1);
     });
     session.changes = {}; session.newScenarios = []; session.importedScenarios = [];
-    proposeOpen = false; importOpen = false; saveSession();
+    proposeOpen = false; importJourney = null; saveSession();
     renderSession(); renderList(); renderDetail(); updateSessionCount();
   };
 }

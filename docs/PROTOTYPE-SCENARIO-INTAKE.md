@@ -8,6 +8,10 @@ hand-writing a record.
 - **Path B, an analyst hypothesis.** An attack nobody has run yet, proposed by the AI Threat
   Modeler. Liszt tags these so they read differently from a real incident.
 
+> **These prompts are built into the viewer.** In session mode, open **Readback and export →
+> Bring in a scenario**, pick a journey, and its directions and prompts are right there with a
+> Copy button and the paste box. This document is the same content for reading or editing offline.
+
 Every path is: a prompt produces scenario JSON, and you paste that JSON into the viewer. The JSON
 is a faithful subset of the real scenario record, so anything you bring in this way can later
 become a permanent `scenarios/NNN-*.yaml` record with no rework.
@@ -199,6 +203,44 @@ Rules:
 Same as any scenario, below. Once imported, it shows a purple **Threat modeler** tag in the list
 and a **Threat modeler hypothesis** tag on the record, so anyone can see at a glance that it is a
 proposed attack, not one seen in the wild.
+
+---
+
+# Path C — threat-research feeds
+
+Same as Path A, but the discovery prompt searches four specific sources instead of the open web:
+**Wiz**, **JFrog**, **Mandiant / Google Threat Intelligence**, and the **AI Incident Database**.
+Use it when you want vetted, technical writeups rather than a broad sweep. After you pick one,
+run the **Path A mapping prompt** (Step A2) on it, unchanged.
+
+## Step C1 — Search the threat-research feeds (discovery prompt)
+
+```
+You are a threat-intelligence researcher. Search these SPECIFIC sources for published incidents
+and technical writeups about attacks on AI systems and AI infrastructure, and cite a link for each:
+  - Wiz research (wiz.io/blog and their research team posts)
+  - JFrog security research (jfrog.com, malicious-package and model findings)
+  - Mandiant / Google Threat Intelligence (cloud.google.com/security, Mandiant blog)
+  - The AI Incident Database (incidentdatabase.ai), a public community record of AI harms
+
+Focus on AI infrastructure: malicious or backdoored models, poisoned hubs and packages, compromised
+ML pipelines, exposed model endpoints and vector stores, agent and MCP tool abuse, prompt-injection
+with real impact, leaked AI credentials.
+
+For each item give: 1) short name  2) date  3) source (Wiz, JFrog, Mandiant, or AI Incident Database)
+and a link  4) one sentence on what happened  5) the single layer it most affects
+(L0 · Infrastructure | L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application)
+6) source tier (1 first-party, 2 reputable research, 3 community).
+
+Rules: only these four sources; if one has nothing relevant, say so and move on; prefer confirmed
+incidents and concrete technical findings over opinion; mark unknown details "unknown".
+Return the 12 most relevant items as a table, most recent and most severe first.
+```
+
+## Step C2 — Map and add
+
+Run the **Path A mapping prompt** (Step A2) on the incident you picked, then add it the same way
+as any scenario, below.
 
 ---
 
