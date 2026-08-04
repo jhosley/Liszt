@@ -438,7 +438,7 @@ const state = { view: "scenarios", sel: null, q: "", priority: "", evidence: "",
    Export produces a session file; tools/apply_session.py writes it into the YAML
    with the validator in the loop. The page itself is never a system of record. */
 const SKEY = "liszt.session.v1";
-const session = { active: false, facilitator: "", recorded: "", changes: {}, newScenarios: [] };
+const session = { active: false, facilitator: "", recorded: "", changes: {}, newScenarios: [], importedScenarios: [] };
 
 /* A scenario the room says is missing. Captured as a few plain answers, never as a
    record: tools/apply_session.py turns each one into a draft record with the next free
@@ -467,6 +467,15 @@ function loadSession() {
   } catch (e) { /* private mode or file:// restrictions. Held in memory instead. */ }
   // A session saved before proposals existed has no list. Absent means empty, not broken.
   if (!Array.isArray(session.newScenarios)) session.newScenarios = [];
+  if (!Array.isArray(session.importedScenarios)) session.importedScenarios = [];
+  mergeImported();
+}
+/* Imported scenarios live in the session only. Lay them over the built-in library so
+   they render in every view, without ever being written to a record. */
+function mergeImported() {
+  (session.importedScenarios || []).forEach(sc => {
+    if (!DATA.scenarios.some(x => x.id === sc.id)) DATA.scenarios.push(sc);
+  });
 }
 function saveSession() {
   try { localStorage.setItem(SKEY, JSON.stringify(session)); }
@@ -885,14 +894,126 @@ function wireProposals() {
   $("#np-cancel").onclick = () => { proposeOpen = false; renderSession(); };
 }
 
+/* ---------- import a scenario built from a published incident ---------- */
+let importOpen = false;
+
+/* Take whatever the mapping prompt produced and make it safe to render: fill the
+   fields the views read, force draft status, and never trust a coverage the file
+   claims, because coverage is computed from scores captured with the owners. */
+function normalizeImported(raw) {
+  const s = (raw && typeof raw === "object") ? raw : {};
+  const cls = s.classification || {};
+  const out = {
+    schema_version: 1, imported: true, status: "draft",
+    id: String(s.id || "").trim(),
+    slug: String(s.slug || "").trim(),
+    title: String(s.title || "").trim(),
+    one_liner: String(s.one_liner || "").trim(),
+    classification: {
+      primary_layer_component: cls.primary_layer_component || "",
+      ai_infrastructure_layer: cls.ai_infrastructure_layer || "L2 \u00b7 Model",
+      evidence: EV[cls.evidence] ? cls.evidence : "seen-in-the-wild",
+      priority: ["NOW", "NEAR-TERM", "BACKLOG"].includes(cls.priority) ? cls.priority : "NEAR-TERM",
+      priority_rationale: Array.isArray(cls.priority_rationale) ? cls.priority_rationale : []
+    },
+    framework_mapping: s.framework_mapping || {
+      baseline: DATA.baseline.id, attack: [], atlas: [], owasp_llm: [], owasp_agentic: [] },
+    attack_path: Array.isArray(s.attack_path) ? s.attack_path.map((a, i) => ({
+      step: a.step || i + 1, layer: a.layer || "", text: a.text || "",
+      attack: Array.isArray(a.attack) ? a.attack : [],
+      atlas: Array.isArray(a.atlas) ? a.atlas : [] })) : [],
+    telemetry: Array.isArray(s.telemetry) ? s.telemetry.map((t, i) => ({
+      step: t.step || i + 1, signal: t.signal || "", emitted_at: t.emitted_at || "",
+      source: t.source || "", detection_opportunity: t.detection_opportunity || "",
+      owner: t.owner || "" })) : [],
+    incidents: Array.isArray(s.incidents) ? s.incidents : [],
+    provenance: s.provenance || {}
+  };
+  if (!out.title) throw new Error("the scenario needs a title");
+  if (!out.id || DATA.scenarios.some(x => x.id === out.id)) {
+    let n = 1; while (DATA.scenarios.some(x => x.id === "IMP-" + n)) n++;
+    out.id = "IMP-" + n;
+  }
+  if (!out.slug) out.slug = out.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!out.one_liner) out.one_liner = out.title;
+  return out;
+}
+function addImported(raw) {
+  const sc = normalizeImported(raw);
+  session.importedScenarios.push(sc);
+  DATA.scenarios.push(sc);
+  session.recorded = session.recorded || new Date().toISOString().slice(0, 10);
+  saveSession();
+  return sc;
+}
+function dropImported(i) {
+  const sc = session.importedScenarios[i];
+  if (!sc) return;
+  session.importedScenarios.splice(i, 1);
+  const j = DATA.scenarios.findIndex(x => x.id === sc.id);
+  if (j >= 0) DATA.scenarios.splice(j, 1);
+  saveSession();
+}
+
+function importPanel() {
+  const list = session.importedScenarios || [];
+  return `<div class="panel"><h3>Imported scenarios, from an incident (${list.length})</h3>
+    <div class="sub">Paste a scenario built from a published incident as JSON. It is added to the
+      library as a draft you can open, score in session mode, and export. The two prompts in
+      <code>docs/PROTOTYPE-INCIDENT-INTAKE.md</code> find incidents and produce the JSON.</div>
+    ${list.length ? list.map((p, i) => `<div class="prop"><div>
+        <div class="t">${esc(p.id)} &middot; ${esc(p.title)}</div>
+        <div class="m">${esc(p.classification.ai_infrastructure_layer)} &middot;
+          ${(p.attack_path || []).length} steps &middot; ${(p.telemetry || []).length} signals</div>
+      </div><button data-dropimp="${i}">Remove</button></div>`).join("")
+    : '<div style="color:var(--muted)">None yet.</div>'}
+    <div style="margin-top:14px">${importOpen ? `
+      <div class="fld"><label>Scenario JSON</label>
+        <textarea id="imp-json" rows="10" placeholder="paste the JSON from the mapping prompt"
+          style="width:100%;box-sizing:border-box;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
+        <span class="hint">One scenario object, or an array of them. It needs at least a title;
+          every other field fills in with a sensible default.</span></div>
+      <div style="display:flex;gap:8px">
+        <button class="toggle" id="imp-add">Add to the library</button>
+        <button class="toggle" id="imp-cancel">Cancel</button></div>
+      <div class="err" id="imp-err" hidden></div>`
+      : '<button class="toggle" id="importscenario">Import a scenario from JSON</button>'}</div></div>`;
+}
+
+function wireImport() {
+  const open = $("#importscenario");
+  if (open) open.onclick = () => { importOpen = true; renderSession();
+    const t = $("#imp-json"); if (t) t.focus(); };
+  const cancel = $("#imp-cancel");
+  if (cancel) cancel.onclick = () => { importOpen = false; renderSession(); };
+  $$("#sessionview .prop button[data-dropimp]").forEach(b => b.onclick = () => {
+    dropImported(Number(b.dataset.dropimp));
+    renderSession(); renderList(); renderDetail(); updateSessionCount();
+  });
+  const add = $("#imp-add");
+  if (!add) return;
+  add.onclick = () => {
+    const err = $("#imp-err");
+    let raw;
+    try { raw = JSON.parse($("#imp-json").value); }
+    catch (e) { err.textContent = "That is not valid JSON: " + e.message; err.hidden = false; return; }
+    try {
+      (Array.isArray(raw) ? raw : [raw]).forEach(addImported);
+      importOpen = false;
+      renderSession(); renderList(); renderDetail(); updateSessionCount();
+    } catch (e) { err.textContent = e.message; err.hidden = false; }
+  };
+}
+
 /* ---------- session review and export ---------- */
 function updateSessionCount() {
-  const n = changedCount(), p = (session.newScenarios || []).length;
+  const n = changedCount(), p = (session.newScenarios || []).length, im = (session.importedScenarios || []).length;
   const el = $("#scount");
   if (!el) return;
   const parts = [];
   if (n) parts.push(`${n} change${n === 1 ? "" : "s"} across ${changedScenarios().length} scenario${changedScenarios().length === 1 ? "" : "s"}`);
   if (p) parts.push(`${p} proposed scenario${p === 1 ? "" : "s"}`);
+  if (im) parts.push(`${im} imported scenario${im === 1 ? "" : "s"}`);
   el.textContent = parts.length ? parts.join(" · ") : "nothing captured yet";
 }
 
@@ -945,8 +1066,8 @@ function renderSession() {
       : `<div class="panel"><div style="color:var(--muted)">Nothing captured yet.
           Turn on session mode, open a scenario, and work down the evidence rows.</div></div>`);
 
-  $("#sessionview").innerHTML = head + proposalsPanel() + body;
-  wireProposals();
+  $("#sessionview").innerHTML = head + proposalsPanel() + importPanel() + body;
+  wireProposals(); wireImport();
 
   $("#export").onclick = () => {
     const date = session.recorded || new Date().toISOString().slice(0, 10);
@@ -959,7 +1080,8 @@ function renderSession() {
       changes: session.changes,
       new_scenarios: (session.newScenarios || []).map(p => ({
         title: p.title, mode: p.mode, layer: p.layer,
-        priority: p.priority, one_liner: p.one_liner || "" }))
+        priority: p.priority, one_liner: p.one_liner || "" })),
+      imported_scenarios: session.importedScenarios || []
       }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -978,6 +1100,8 @@ function renderSession() {
         if (d.session_format !== 1) throw new Error("unsupported session_format");
         session.changes = d.changes || {};
         session.newScenarios = Array.isArray(d.new_scenarios) ? d.new_scenarios : [];
+        session.importedScenarios = Array.isArray(d.imported_scenarios) ? d.imported_scenarios : [];
+        mergeImported();
         session.facilitator = d.facilitator || session.facilitator;
         session.recorded = d.recorded || session.recorded;
         saveSession(); renderSession(); renderList(); renderDetail(); updateSessionCount();
@@ -988,7 +1112,12 @@ function renderSession() {
   $("#wipe").onclick = () => {
     if (!confirm("Discard everything captured in this session, including any proposed "
       + "scenarios? This cannot be undone, and anything not exported is lost.")) return;
-    session.changes = {}; session.newScenarios = []; proposeOpen = false; saveSession();
+    (session.importedScenarios || []).forEach(sc => {
+      const j = DATA.scenarios.findIndex(x => x.id === sc.id);
+      if (j >= 0) DATA.scenarios.splice(j, 1);
+    });
+    session.changes = {}; session.newScenarios = []; session.importedScenarios = [];
+    proposeOpen = false; importOpen = false; saveSession();
     renderSession(); renderList(); renderDetail(); updateSessionCount();
   };
 }
@@ -1178,7 +1307,7 @@ function setView(v) {
   if (v === "session") renderSession();
 }
 function route() {
-  const m = (location.hash || "").match(/^#\/scenario\/(\d{3})$/);
+  const m = (location.hash || "").match(/^#\/scenario\/([A-Za-z0-9-]+)$/);
   if (m && DATA.scenarios.some(s => s.id === m[1])) {
     state.sel = m[1];
     if (state.view !== "scenarios") setView("scenarios");
@@ -1236,7 +1365,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   updateSessionCount();
   window.addEventListener("beforeunload", (e) => {
-    if (changedCount() || (session.newScenarios || []).length) {
+    if (changedCount() || (session.newScenarios || []).length || (session.importedScenarios || []).length) {
       e.preventDefault(); e.returnValue = "";
     }
   });
