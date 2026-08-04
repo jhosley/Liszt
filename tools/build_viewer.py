@@ -246,6 +246,7 @@ nav .navact:hover{border-color:var(--brand);background:#F3F7FA;color:var(--brand
 .chip.near-term{background:#EDF2F5;color:#3F6E88}
 .chip.backlog,.chip.muted{background:var(--surface-3);color:var(--muted)}
 .chip.draft{background:var(--surface-3);color:var(--muted)}
+.chip.modeler{background:#F1ECFA;color:#5A3B9C}
 .chip.published{background:var(--have-bg);color:var(--have)}
 .chip.wild{background:var(--blind-bg);color:var(--blind)}
 .chip.research{background:var(--collectable-bg);color:#8A6318}
@@ -570,7 +571,8 @@ function renderList() {
       <div class="top"><span class="id">${esc(s.id)}</span>
         <span class="chip ${s.classification.priority.toLowerCase()}">${s.classification.priority}</span>
         <span class="chip ${ecls}">${esc(elabel)}</span>
-        ${s.status !== "published" ? `<span class="chip draft">${esc(s.status)}</span>` : ""}</div>
+        ${s.status !== "published" ? `<span class="chip draft">${esc(s.status)}</span>` : ""}
+        ${s.origin === "hypothesis" ? '<span class="chip modeler">Threat modeler</span>' : ""}</div>
       <div class="t">${esc(s.title)}</div>
       ${bar(effCounts(s), total)}
       <div class="sub"><span>${esc(s.classification.ai_infrastructure_layer)}</span>
@@ -602,6 +604,7 @@ function renderDetail() {
       <span class="chip ${(EV[s.classification.evidence] || [""])[0]}">${esc((EV[s.classification.evidence] || ["", s.classification.evidence])[1])}</span>
       <span class="chip ${s.status === "published" ? "published" : "draft"}">${esc(s.status)}</span>
       <span class="chip muted">${esc(s.classification.ai_infrastructure_layer)}</span>
+      ${s.origin === "hypothesis" ? '<span class="chip modeler">Threat modeler hypothesis</span>' : ""}
     </div>
     <h2>Scenario ${esc(s.id)} &middot; ${esc(s.title)}</h2>
     <p class="lede">${esc(s.one_liner)}</p>
@@ -905,6 +908,8 @@ function normalizeImported(raw) {
   const cls = s.classification || {};
   const out = {
     schema_version: 1, imported: true, status: "draft",
+    origin: s.origin === "hypothesis" ? "hypothesis" : "incident",
+    proposed_by: String(s.proposed_by || (s.origin === "hypothesis" ? "AI Threat Modeler" : "")).trim(),
     id: String(s.id || "").trim(),
     slug: String(s.slug || "").trim(),
     title: String(s.title || "").trim(),
@@ -912,7 +917,8 @@ function normalizeImported(raw) {
     classification: {
       primary_layer_component: cls.primary_layer_component || "",
       ai_infrastructure_layer: cls.ai_infrastructure_layer || "L2 \u00b7 Model",
-      evidence: EV[cls.evidence] ? cls.evidence : "seen-in-the-wild",
+      evidence: EV[cls.evidence] ? cls.evidence
+                : (s.origin === "hypothesis" ? "seen-in-research" : "seen-in-the-wild"),
       priority: ["NOW", "NEAR-TERM", "BACKLOG"].includes(cls.priority) ? cls.priority : "NEAR-TERM",
       priority_rationale: Array.isArray(cls.priority_rationale) ? cls.priority_rationale : []
     },
@@ -960,10 +966,12 @@ function importPanel() {
   return `<div class="panel"><h3>Imported scenarios, from an incident (${list.length})</h3>
     <div class="sub">Paste a scenario built from a published incident as JSON. It is added to the
       library as a draft you can open, score in session mode, and export. The two prompts in
-      <code>docs/PROTOTYPE-INCIDENT-INTAKE.md</code> find incidents and produce the JSON.</div>
+      <code>docs/PROTOTYPE-SCENARIO-INTAKE.md</code> turn a published incident or an analyst
+      hypothesis into this JSON.</div>
     ${list.length ? list.map((p, i) => `<div class="prop"><div>
         <div class="t">${esc(p.id)} &middot; ${esc(p.title)}</div>
-        <div class="m">${esc(p.classification.ai_infrastructure_layer)} &middot;
+        <div class="m">${p.origin === "hypothesis" ? "threat-modeler hypothesis" : "from incident"} &middot;
+          ${esc(p.classification.ai_infrastructure_layer)} &middot;
           ${(p.attack_path || []).length} steps &middot; ${(p.telemetry || []).length} signals</div>
       </div><button data-dropimp="${i}">Remove</button></div>`).join("")
     : '<div style="color:var(--muted)">None yet.</div>'}
