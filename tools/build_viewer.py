@@ -694,8 +694,8 @@ function telemetryBlock(s) {
 function editCard(s, t) {
   const e = effRow(s.id, t), c = effCoverage(s.id, t);
   const u = rowChange(s.id, t.step), touched = Object.keys(u).length > 0;
-  const v = e.dettect ? e.dettect.visibility : "";
-  const d = e.dettect ? e.dettect.detection : "";
+  const v = u.pending_v ?? (e.dettect ? e.dettect.visibility : "");
+  const d = u.pending_d ?? (e.dettect ? e.dettect.detection : "");
   const opt = (list, cur) => list.map(([val, label]) =>
     `<option value="${val}" ${String(val) === String(cur) ? "selected" : ""}>${esc(label)}</option>`).join("");
 
@@ -772,12 +772,21 @@ function wireEditors(s) {
         } else if (k === "visibility" || k === "detection") {
           const cur = effRow(s.id, (s.telemetry || []).find(r => r.step === step)) || {};
           const base = cur.dettect || {};
-          const vv = k === "visibility" ? el.value : (base.visibility ?? "");
-          const dd = k === "detection" ? el.value : (base.detection ?? "");
+          const held = rowChange(s.id, step);
+          const vv = k === "visibility" ? el.value
+                   : (held.pending_v ?? (base.visibility ?? ""));
+          const dd = k === "detection" ? el.value
+                   : (held.pending_d ?? (base.detection ?? ""));
           if (vv === "" || dd === "") {
+            // Half a pair. Hold what was picked so it survives the redraw,
+            // and stay Unscored until the other half arrives.
             setRow(s.id, step, "dettect", null);
+            setRow(s.id, step, "pending_v", vv === "" ? null : vv);
+            setRow(s.id, step, "pending_d", dd === "" ? null : dd);
           } else {
             const q = base.quality;
+            setRow(s.id, step, "pending_v", null);
+            setRow(s.id, step, "pending_d", null);
             setRow(s.id, step, "dettect",
               { visibility: Number(vv), detection: Number(dd), ...(q ? { quality: q } : {}) });
           }
