@@ -247,6 +247,10 @@ nav .navact:hover{border-color:var(--brand);background:#F3F7FA;color:var(--brand
 .chip.backlog,.chip.muted{background:var(--surface-3);color:var(--muted)}
 .chip.draft{background:var(--surface-3);color:var(--muted)}
 .chip.modeler{background:#F1ECFA;color:#5A3B9C}
+.chip.review{background:#FBEFEC;color:#A93F34;border:1px solid #E3B5AC}
+.reviewbox{margin:10px 0;padding:10px 13px;border-left:3px solid #A93F34;background:#FBEFEC;
+  border-radius:6px;font-size:13px;color:#6E2921}
+.reviewbox ul{margin:6px 0 0;padding-left:18px}
 .chip.published{background:var(--have-bg);color:var(--have)}
 .chip.wild{background:var(--blind-bg);color:var(--blind)}
 .chip.research{background:var(--collectable-bg);color:#8A6318}
@@ -640,7 +644,8 @@ function renderList() {
         <span class="chip ${s.classification.priority.toLowerCase()}">${s.classification.priority}</span>
         <span class="chip ${ecls}">${esc(elabel)}</span>
         ${s.status !== "published" ? `<span class="chip draft">${esc(s.status)}</span>` : ""}
-        ${s.origin === "hypothesis" ? '<span class="chip modeler">Threat modeler</span>' : ""}</div>
+        ${s.origin === "hypothesis" ? '<span class="chip modeler">Threat modeler</span>' : ""}
+        ${s.needs_review ? '<span class="chip review">needs review</span>' : ""}</div>
       <div class="t">${esc(s.title)}</div>
       ${bar(effCounts(s), total)}
       <div class="sub"><span>${esc(s.classification.ai_infrastructure_layer)}</span>
@@ -673,6 +678,10 @@ function renderDetail() {
       <span class="chip ${s.status === "published" ? "published" : "draft"}">${esc(s.status)}</span>
       <span class="chip muted">${esc(s.classification.ai_infrastructure_layer)}</span>
       ${s.origin === "hypothesis" ? '<span class="chip modeler">Threat modeler hypothesis</span>' : ""}
+      ${s.needs_review ? `<div class="reviewbox"><strong>Needs review before this record is used.</strong>
+        <ul>${s.needs_review.map(r => `<li>${esc(r)}</li>`).join("")}</ul>
+        An unresolved layer is left empty on purpose rather than guessed, because a guessed
+        layer is indistinguishable from a real one once it is in the library.</div>` : ""}
     </div>
     <h2>Scenario ${esc(s.id)} &middot; ${esc(s.title)}</h2>
     <p class="lede">${esc(s.one_liner)}</p>
@@ -980,7 +989,7 @@ JSON shape:
   "title": "short scenario title, attacker-goal phrasing",
   "one_liner": "2-3 plain sentences about OUR environment ('our', 'we'): what the attacker does and the damage.",
   "classification": {
-    "ai_infrastructure_layer": "one layer, exactly one of: L0 · Infrastructure | L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application",
+    "ai_infrastructure_layer": "L3 · Orchestration & Agent",
     "evidence": "seen-in-the-wild for a real incident, or seen-in-research for a proof of concept",
     "priority": "NOW, NEAR-TERM, or BACKLOG",
     "priority_rationale": ["3 short plain-sentence bullets"]
@@ -993,15 +1002,27 @@ JSON shape:
   ],
   "framework_mapping": {
     "baseline": "2026.07",
-    "attack": ["ATT&CK v19.1 IDs; [] if none"],
-    "atlas": ["ATLAS 2026.07 IDs; [] if none"],
-    "owasp_llm": ["OWASP LLM 2025 IDs; [] if none"],
-    "owasp_agentic": ["OWASP Agentic 2026 IDs; [] if none"]
+    "attack": ["T1190"],
+    "atlas": ["AML.T0049"],
+    "owasp_llm": ["LLM06:2025"],
+    "owasp_agentic": ["ASI10:2026"]
   },
   "incidents": [ { "title": "source title", "url": "source URL", "tier": "1, 2, or 3" } ]
 }
 
 Rules:
+  - ai_infrastructure_layer MUST be copied verbatim as exactly ONE of these five strings.
+    The separator is the character "·" (U+00B7) with a space either side, not a hyphen:
+      L0 · Infrastructure
+      L1 · Data
+      L2 · Model
+      L3 · Orchestration & Agent
+      L4 · Application
+    Choose the layer the attack primarily OPERATES at. Do not default to the first one, and
+    do not return the list. The example in the shape above is an example, not the answer.
+  - The framework_mapping values above are FORMAT EXAMPLES, not answers. Replace them with
+    real identifiers, or use an empty list [] where you have none. Any value that is not a
+    real identifier is discarded on import, so a placeholder is worse than an empty list.
   - One telemetry entry per attack_path step, same step number.
   - DO NOT include any coverage, visibility, detection or score field. Owners score it later; you
     only identify the signal that WOULD exist.
@@ -1068,7 +1089,7 @@ JSON shape:
   "title": "short scenario title, attacker-goal phrasing",
   "one_liner": "2-3 plain sentences about OUR environment: what the attacker does and why it would hurt.",
   "classification": {
-    "ai_infrastructure_layer": "one of: L0 · Infrastructure | L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application",
+    "ai_infrastructure_layer": "L3 · Orchestration & Agent",
     "evidence": "seen-in-research",
     "priority": "NOW, NEAR-TERM, or BACKLOG",
     "priority_rationale": ["3 short bullets; it is honest to say 'nobody has run this yet, but ...'"]
@@ -1077,17 +1098,81 @@ JSON shape:
   "telemetry": [ { "step": 1, "signal": "the event this move WOULD produce", "emitted_at": "where it would be emitted from", "detection_opportunity": "what a detection could look for" } ],
   "framework_mapping": {
     "baseline": "2026.07",
-    "attack": ["[] if none"], "atlas": ["[] if none"],
-    "owasp_llm": ["[] if none"], "owasp_agentic": ["[] if none"]
+    "attack": ["T1190"], "atlas": ["AML.T0049"],
+    "owasp_llm": ["LLM06:2025"], "owasp_agentic": ["ASI10:2026"]
   }
 }
 
 Rules:
+  - ai_infrastructure_layer MUST be copied verbatim as exactly ONE of these five strings.
+    The separator is "·" (U+00B7) with a space either side, not a hyphen:
+      L0 · Infrastructure
+      L1 · Data
+      L2 · Model
+      L3 · Orchestration & Agent
+      L4 · Application
+    Choose the layer the attack primarily OPERATES at. Do not default to the first one, and
+    do not return the list. The value in the shape above is an example, not the answer.
+  - The framework_mapping values above are FORMAT EXAMPLES. Replace them with real
+    identifiers or use []. A placeholder string is discarded on import.
   - Keep "origin": "hypothesis" and "proposed_by": "AI Threat Modeler" exactly, so Liszt tags it.
     A specific analyst may replace proposed_by with their own name.
   - One telemetry entry per step. DO NOT include any coverage, visibility, detection or score field.
   - 4-7 distinct steps. A hypothesis may map to no framework IDs yet; an empty list is a fine answer.
   - Valid JSON only, no trailing commas, no commentary.`;
+
+const P_READINESS = String.raw`You are validating whether a mapped attack scenario is ready to be tested by an
+emulation agent in a contained lab. You are not being asked whether the attack is
+realistic. You are being asked whether each step is concrete enough to execute, safe
+enough to execute, and reproducible in a lab.
+
+For each step in attack_path, decide:
+
+1. CONCRETE. Could a competent engineer read this step and know what action to take?
+   A step that names a behavior ("reads the instance metadata service") is concrete.
+   A step that names an outcome ("gains cluster-admin") is not, unless the mechanism
+   is stated.
+2. SAFE. Would executing this in a contained lab risk damage that cannot be undone by
+   destroying the lab? Flag anything destructive, anything that touches a third party,
+   and anything requiring a real credential.
+3. REPRODUCIBLE. What would a lab need to contain for this step to be executable at
+   all? List the components. If a step depends on a specific vulnerability or a
+   specific vendor build, say so: that is usually the step that cannot be tested.
+4. OBSERVABLE. The evidence row names a source. Could that source exist in a lab, or
+   does it only exist in production? This decides whether the row's claim is testable
+   in a lab or only where the real pipeline runs.
+
+Then give an overall verdict.
+
+Return ONLY valid JSON in this shape:
+
+{
+  "scenario": "NNN",
+  "verdict": "ready" | "ready-with-exclusions" | "blocked",
+  "blockers": [
+    {"step": 1, "kind": "concrete|safe|reproducible|observable", "detail": "..."}
+  ],
+  "steps": [
+    {
+      "step": 1,
+      "testable": true,
+      "concrete": true,
+      "safe": true,
+      "lab_components": ["..."],
+      "observable_in": "lab" | "pipeline-only" | "neither",
+      "reason": "one line"
+    }
+  ],
+  "notes": "anything a reviewer should know before this is approved"
+}
+
+Rules. Do not invent framework identifiers. Do not propose exploit code or payloads:
+the spec deliberately carries none, and binds to a published emulation library at run
+time by technique id. If a step cannot be tested, say so plainly rather than proposing
+a weaker substitute test, because a substitute silently changes what the score means.
+
+PASTE THE SCENARIO RECORD BELOW THIS LINE
+`;
 
 const JOURNEYS = [
   { key: "incident", label: "Published incident", origin: "incident",
@@ -1102,6 +1187,14 @@ const JOURNEYS = [
             "Pick an incident, then run the second prompt on it.",
             "Paste the JSON into the box below and add it."],
     prompts: [ {title:"1 · Search the feeds", body: P_RESEARCH}, {title:"2 · Map the one you picked", body: P_MAP} ] },
+  { key: "readiness", label: "Agent test readiness", origin: "readiness",
+    blurb: "Is a scored scenario ready to be tested by an emulation agent in a lab?",
+    steps: ["Open the scenario you want to test and copy its record, or export it from this viewer.",
+            "Run the prompt below in any LLM with the record pasted underneath it.",
+            "Bring the JSON back to the repo and store it under readiness in the emitted spec.",
+            "Then run: python3 tools/emit_testspec.py NNN --sealed-by \"your name\"",
+            "The emitter re-checks the mechanical half itself, so this prompt covers the judgment half only."],
+    prompts: [ {title:"Validate a scenario for agent testing", body: P_READINESS} ] },
   { key: "hypothesis", label: "Analyst hypothesis", origin: "hypothesis",
     blurb: "An attack nobody has run yet. Tagged as Threat modeler proposed.",
     steps: ["Write your hypothesis into the prompt where marked, and run it in any LLM.",
@@ -1110,12 +1203,82 @@ const JOURNEYS = [
 ];
 let importJourney = null;
 
+/* The five layers, exactly as schema/scenario.schema.json enumerates them. The separator
+   is U+00B7 with spaces. Everything that reaches a record has to be one of these strings. */
+const AI_LAYERS = ["L0 · Infrastructure", "L1 · Data", "L2 · Model",
+                   "L3 · Orchestration & Agent", "L4 · Application"];
+const LAYER_COMPONENT = { L0:"Infrastructure", L1:"Data", L2:"Model", L3:"Agent", L4:"Application" };
+
+/* Canonicalize whatever a model returned into one of the five, or return "" .
+
+   Why "" rather than a default: guessing is what put this bug in the library. Every other
+   controlled field here is validated and corrected; the layer was not, so a near miss
+   ("L0 - Infrastructure" with a hyphen) or a first-option artifact rode straight into the
+   record and then failed to match anything downstream. An unresolved layer is now unknown
+   and visibly flagged, which is the same rule the coverage derivation already follows:
+   unknown is not a value, and it is never quietly filled in. */
+function resolveLayer(value) {
+  const raw = String(value == null ? "" : value).trim();
+  if (!raw) return "";
+  /* An echoed instruction string lists several options; that is not a choice. */
+  if ((raw.match(/L[0-4]/g) || []).length > 1) return "";
+  for (const l of AI_LAYERS) if (raw === l) return l;
+  const m = raw.match(/\bL\s*([0-4])\b/i);          /* "L3", "l3", "L 3", "L3 - anything" */
+  if (m) return AI_LAYERS[Number(m[1])];
+  /* Fall back to the name, so "Orchestration and Agent" or "Model" still resolve. */
+  const norm = raw.toLowerCase().replace(/&/g, "and").replace(/[^a-z]+/g, "");
+  for (let i = 0; i < AI_LAYERS.length; i++) {
+    const nameOnly = AI_LAYERS[i].slice(5).toLowerCase().replace(/&/g, "and").replace(/[^a-z]+/g, "");
+    if (norm === nameOnly) return AI_LAYERS[i];
+  }
+  return "";
+}
+
+/* Framework IDs, shaped exactly as the schema defines them. A model handed a JSON skeleton
+   will sometimes return the placeholder text as data, so anything that is not ID shaped is
+   dropped rather than carried into the record. */
+const FW_SHAPE = {
+  attack:        /^T[0-9]{4}(\.[0-9]{3})?$/,
+  attack_tactics:/^TA[0-9]{4}$/,
+  atlas:         /^AML\.(TA[0-9]{4}|T[0-9]{4}(\.[0-9]{3})?|M[0-9]{4}|CS[0-9]{4})$/,
+  owasp_llm:     /^LLM(0[1-9]|10):[0-9]{4}$/,
+  owasp_agentic: /^ASI(0[1-9]|10):[0-9]{4}$/
+};
+function sanitizeFramework(fm) {
+  const src = (fm && typeof fm === "object" && !Array.isArray(fm)) ? fm : {};
+  const out = { baseline: DATA.baseline.id }, dropped = [];
+  for (const key of Object.keys(FW_SHAPE)) {
+    const arr = Array.isArray(src[key]) ? src[key] : [];
+    const keep = [];
+    for (const v of arr) {
+      /* Identifiers are uppercase by convention in all four catalogs, so case is a typo
+         to fix rather than a reason to discard a real id. */
+      const id = String(v == null ? "" : v).trim().toUpperCase();
+      if (!id) continue;
+      if (FW_SHAPE[key].test(id)) { if (!keep.includes(id)) keep.push(id); }
+      else dropped.push(key + ": " + id);
+    }
+    out[key] = keep;
+  }
+  /* The baseline is always ours. A model does not get to declare which pinned vocabulary
+     the library speaks, and a record that names a baseline we do not hold is unverifiable. */
+  return { mapping: out, dropped };
+}
+
 /* Take whatever the mapping prompt produced and make it safe to render: fill the
    fields the views read, force draft status, and never trust a coverage the file
    claims, because coverage is computed from scores captured with the owners. */
 function normalizeImported(raw) {
   const s = (raw && typeof raw === "object") ? raw : {};
   const cls = s.classification || {};
+  const layer = resolveLayer(cls.ai_infrastructure_layer);
+  const fw = sanitizeFramework(s.framework_mapping);
+  const review = [];
+  if (!layer) review.push("ai_infrastructure_layer: " +
+    (cls.ai_infrastructure_layer ? "could not be matched to one of the five layers ("
+      + String(cls.ai_infrastructure_layer).slice(0, 60) + ")" : "not supplied"));
+  if (fw.dropped.length) review.push("framework_mapping: dropped "
+    + fw.dropped.length + " value(s) that are not valid identifiers (" + fw.dropped.join("; ").slice(0, 120) + ")");
   const out = {
     schema_version: 1, imported: true, status: "draft",
     origin: s.origin === "hypothesis" ? "hypothesis" : "incident",
@@ -1125,15 +1288,14 @@ function normalizeImported(raw) {
     title: String(s.title || "").trim(),
     one_liner: String(s.one_liner || "").trim(),
     classification: {
-      primary_layer_component: cls.primary_layer_component || "",
-      ai_infrastructure_layer: cls.ai_infrastructure_layer || "L2 \u00b7 Model",
+      primary_layer_component: cls.primary_layer_component || LAYER_COMPONENT[layer.slice(0, 2)] || "",
+      ai_infrastructure_layer: layer,
       evidence: EV[cls.evidence] ? cls.evidence
                 : (s.origin === "hypothesis" ? "seen-in-research" : "seen-in-the-wild"),
       priority: ["NOW", "NEAR-TERM", "BACKLOG"].includes(cls.priority) ? cls.priority : "NEAR-TERM",
       priority_rationale: Array.isArray(cls.priority_rationale) ? cls.priority_rationale : []
     },
-    framework_mapping: s.framework_mapping || {
-      baseline: DATA.baseline.id, attack: [], atlas: [], owasp_llm: [], owasp_agentic: [] },
+    framework_mapping: fw.mapping,
     attack_path: Array.isArray(s.attack_path) ? s.attack_path.map((a, i) => ({
       step: a.step || i + 1, layer: a.layer || "", text: a.text || "",
       attack: Array.isArray(a.attack) ? a.attack : [],
@@ -1152,6 +1314,7 @@ function normalizeImported(raw) {
   }
   if (!out.slug) out.slug = out.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   if (!out.one_liner) out.one_liner = out.title;
+  if (review.length) out.needs_review = review;
   return out;
 }
 function addImported(raw, originFallback) {

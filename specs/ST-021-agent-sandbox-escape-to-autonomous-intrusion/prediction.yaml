@@ -1,0 +1,109 @@
+prediction_version: 1
+spec_id: ST-021
+scenario: '021'
+baseline: '2026.07'
+sealed: '2026-08-05'
+sealed_by: J. Hosley
+spec_digest: 036f07713b0e6959d0795ea0d458ed37ec9c37d4132cdf315625eeb959d5f9db
+assessment: reference
+rows:
+- step: 1
+  predicted_coverage: Blind
+  predicted_visibility: 0
+  predicted_detection: -1
+  claims:
+    signal_present: false
+    signal: Agent run configuration & safeguard state
+    source: Nothing emits this today. It would have to come from the agent platform's run manifest.
+    detection_fires: false
+  testable_in:
+    signal_present: lab
+    source: lab
+    detection_fires: not-testable
+  rationale: visibility 0 and detection -1 derive Blind. Nothing is claimed to be emitted, so finding
+    any artifact falsifies this row.
+- step: 2
+  predicted_coverage: Have
+  predicted_visibility: 3
+  predicted_detection: 2
+  claims:
+    signal_present: true
+    signal: Egress from a sandboxed workload
+    source: Palo Alto NGFW traffic logs + Zscaler proxy, index=net_egress; Artifactory access.log
+    detection_fires: true
+    detection_artifact: SIEM saved search NET-EGRESS-ANOM-07; returns rows for the last 90 days
+  testable_in:
+    signal_present: lab
+    source: lab
+    detection_fires: pipeline
+  rationale: visibility 3 and detection 2 derive Have. The artifact is claimed to land in Palo Alto NGFW
+    traffic logs + Zscaler proxy, index=net_egress; Artifactory access.log, and SIEM saved search NET-EGRESS-ANOM-07;
+    returns rows for the last 90 days is claimed to fire.
+- step: 3
+  predicted_coverage: Collectable
+  predicted_visibility: 2
+  predicted_detection: 0
+  claims:
+    signal_present: true
+    signal: Untrusted artifact / config processed
+    source: dataset-worker application logs, index=app_dataproc, source=worker.jsonl
+    detection_fires: false
+  testable_in:
+    signal_present: lab
+    source: lab
+    detection_fires: not-testable
+  rationale: visibility 2 and detection 0 derive Collectable. The artifact is claimed to land in dataset-worker
+    application logs, index=app_dataproc, source=worker.jsonl, and nothing is claimed to alert on it.
+- step: 4
+  predicted_coverage: Have
+  predicted_visibility: 4
+  predicted_detection: 3
+  claims:
+    signal_present: true
+    signal: Code execution in a processing worker
+    source: CrowdStrike Falcon ProcessRollup2, index=edr_main; containerd runtime events
+    detection_fires: true
+    detection_artifact: Detection rule EDR-CONT-0113 (worker process ancestry); 3 true positives in test
+  testable_in:
+    signal_present: lab
+    source: lab
+    detection_fires: pipeline
+  rationale: visibility 4 and detection 3 derive Have. The artifact is claimed to land in CrowdStrike
+    Falcon ProcessRollup2, index=edr_main; containerd runtime events, and Detection rule EDR-CONT-0113
+    (worker process ancestry); 3 true positives in test is claimed to fire.
+- step: 5
+  predicted_coverage: Collectable
+  predicted_visibility: 2
+  predicted_detection: 0
+  claims:
+    signal_present: true
+    signal: Container escape & credential use
+    source: EKS control-plane audit log, CloudWatch group /aws/eks/prod/cluster; AWS CloudTrail
+    detection_fires: false
+  testable_in:
+    signal_present: lab
+    source: lab
+    detection_fires: not-testable
+  rationale: visibility 2 and detection 0 derive Collectable. The artifact is claimed to land in EKS control-plane
+    audit log, CloudWatch group /aws/eks/prod/cluster; AWS CloudTrail, and nothing is claimed to alert
+    on it.
+- step: 6
+  predicted_coverage: Have
+  predicted_visibility: 3
+  predicted_detection: 2
+  claims:
+    signal_present: true
+    signal: Agent-driven C2 & exfiltration
+    source: Zscaler proxy transaction logs, index=net_proxy; Symantec DLP egress events
+    detection_fires: true
+    detection_artifact: Proxy category policy + DLP rule DLP-EGR-22; blocks logged weekly
+  testable_in:
+    signal_present: lab
+    source: lab
+    detection_fires: pipeline
+  rationale: visibility 3 and detection 2 derive Have. The artifact is claimed to land in Zscaler proxy
+    transaction logs, index=net_proxy; Symantec DLP egress events, and Proxy category policy + DLP rule
+    DLP-EGR-22; blocks logged weekly is claimed to fire.
+expectations:
+  note: Add expected_surprises (an integer) before committing. Predicting zero surprises is itself a claim,
+    and usually a wrong one.

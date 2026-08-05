@@ -1,0 +1,351 @@
+spec_version: 1
+spec_id: ST-021
+scenario: '021'
+scenario_title: Agent sandbox escape → autonomous intrusion
+baseline: '2026.07'
+generated: '2026-08-05'
+generated_by: tools/emit_testspec.py
+source_digest: a9525c649281bd1f12de1307c108f1b36b1c25fe3f9843fc273965ab6b119d1a
+status: draft
+authorization:
+  autonomy: lab-only
+  enabled_rungs:
+  - lab-only
+  targets: []
+  time_box: PT2H
+  egress: deny-all
+  stop_conditions:
+  - Any interaction with an address or account outside authorization.targets.
+  - Any credential that resolves outside the lab boundary.
+  - Any action not present in this spec's procedure.
+  - Time box expiry, whether or not the procedure has finished.
+  - Loss of the observer's ability to read the telemetry pipeline, since the run stops producing evidence
+    at that moment.
+  teardown_required: true
+  prohibited:
+  - 'No exploit development and no unpublished vulnerability research: the agent emulates published techniques
+    only.'
+  - No action against any system not named in authorization.targets.
+  - No persistence that survives teardown.
+  - No movement of real data. Synthetic canary records only.
+  - No credential use that resolves outside the lab boundary.
+environment:
+  layers:
+  - layer: External (out of estate)
+    steps:
+    - 3
+  - layer: L0 Infrastructure
+    steps:
+    - 2
+  - layer: L1 Data
+    steps:
+    - 4
+    - 5
+  - layer: L3 Orchestration and Agent
+    steps:
+    - 1
+  - layer: L4 Application
+    steps:
+    - 6
+  components:
+  - name: 'Target for step 1: Agent / eval'
+    for_steps:
+    - 1
+    fidelity: equivalent
+    note: 'Seeded from the step''s layer tag. Confirm the fidelity by hand: set ''exact'' where the artifact
+      depends on the specific product or version, because that is the assumption that silently breaks
+      transfer from lab to estate.'
+  - name: 'Target for step 2: Host / net'
+    for_steps:
+    - 2
+    fidelity: equivalent
+    note: 'Seeded from the step''s layer tag. Confirm the fidelity by hand: set ''exact'' where the artifact
+      depends on the specific product or version, because that is the assumption that silently breaks
+      transfer from lab to estate.'
+  - name: 'Target for step 3: External'
+    for_steps:
+    - 3
+    fidelity: equivalent
+    note: 'Seeded from the step''s layer tag. Confirm the fidelity by hand: set ''exact'' where the artifact
+      depends on the specific product or version, because that is the assumption that silently breaks
+      transfer from lab to estate.'
+  - name: 'Target for step 4: Data → Host'
+    for_steps:
+    - 4
+    fidelity: equivalent
+    note: 'Seeded from the step''s layer tag. Confirm the fidelity by hand: set ''exact'' where the artifact
+      depends on the specific product or version, because that is the assumption that silently breaks
+      transfer from lab to estate.'
+  - name: 'Target for step 5: Host / Cloud'
+    for_steps:
+    - 5
+    fidelity: equivalent
+    note: 'Seeded from the step''s layer tag. Confirm the fidelity by hand: set ''exact'' where the artifact
+      depends on the specific product or version, because that is the assumption that silently breaks
+      transfer from lab to estate.'
+  - name: 'Target for step 6: App / net'
+    for_steps:
+    - 6
+    fidelity: equivalent
+    note: 'Seeded from the step''s layer tag. Confirm the fidelity by hand: set ''exact'' where the artifact
+      depends on the specific product or version, because that is the assumption that silently breaks
+      transfer from lab to estate.'
+  - name: 'Observation source: Nothing emits this today. It would have to come from the agent platform''s
+      run manifest.'
+    for_steps:
+    - 1
+    fidelity: exact
+    note: In mirrored mode this must be the real collector and the real detection content, or the detection
+      claim is not being tested. In scratch mode an equivalent collector can still test whether the artifact
+      exists and where it lands.
+  - name: 'Observation source: Palo Alto NGFW traffic logs + Zscaler proxy, index=net_egress; Artifactory
+      access.log'
+    for_steps:
+    - 2
+    fidelity: exact
+    note: In mirrored mode this must be the real collector and the real detection content, or the detection
+      claim is not being tested. In scratch mode an equivalent collector can still test whether the artifact
+      exists and where it lands.
+  - name: 'Observation source: dataset-worker application logs, index=app_dataproc, source=worker.jsonl'
+    for_steps:
+    - 3
+    fidelity: exact
+    note: In mirrored mode this must be the real collector and the real detection content, or the detection
+      claim is not being tested. In scratch mode an equivalent collector can still test whether the artifact
+      exists and where it lands.
+  - name: 'Observation source: CrowdStrike Falcon ProcessRollup2, index=edr_main; containerd runtime events'
+    for_steps:
+    - 4
+    fidelity: exact
+    note: In mirrored mode this must be the real collector and the real detection content, or the detection
+      claim is not being tested. In scratch mode an equivalent collector can still test whether the artifact
+      exists and where it lands.
+  - name: 'Observation source: EKS control-plane audit log, CloudWatch group /aws/eks/prod/cluster; AWS
+      CloudTrail'
+    for_steps:
+    - 5
+    fidelity: exact
+    note: In mirrored mode this must be the real collector and the real detection content, or the detection
+      claim is not being tested. In scratch mode an equivalent collector can still test whether the artifact
+      exists and where it lands.
+  - name: 'Observation source: Zscaler proxy transaction logs, index=net_proxy; Symantec DLP egress events'
+    for_steps:
+    - 6
+    fidelity: exact
+    note: In mirrored mode this must be the real collector and the real detection content, or the detection
+      claim is not being tested. In scratch mode an equivalent collector can still test whether the artifact
+      exists and where it lands.
+  telemetry_pipeline:
+    mode: mirrored
+    required_sources:
+    - Nothing emits this today. It would have to come from the agent platform's run manifest.
+    - Palo Alto NGFW traffic logs + Zscaler proxy, index=net_egress; Artifactory access.log
+    - dataset-worker application logs, index=app_dataproc, source=worker.jsonl
+    - CrowdStrike Falcon ProcessRollup2, index=edr_main; containerd runtime events
+    - EKS control-plane audit log, CloudWatch group /aws/eks/prod/cluster; AWS CloudTrail
+    - Zscaler proxy transaction logs, index=net_proxy; Symantec DLP egress events
+    note: These are the exact systems the record names. The run record lists which of them actually existed.
+  fidelity_notes:
+  - 'Mirrored pipeline: the lab ships to the same collectors, parsers and detection content as the estate
+    being scored. This is the only mode in which a detection claim is genuinely under test, and the only
+    mode whose Blind results transfer.'
+  - Any source named on an evidence row but absent from the lab makes that row's source claim unscoreable.
+    Record it as unscoreable in the run; do not infer it.
+procedure:
+- step: 1
+  intent: An agent is run on a cyber-capability task with its safety refusals deliberately reduced
+  layer: L3 Orchestration and Agent
+  techniques: {}
+  actions:
+  - 'Reproduce the behavior described by the step against the allowlisted target. No framework technique
+    is mapped to this step, so there is no library emulation to resolve: the action set has to be written
+    by hand and reviewed before it runs.'
+  - Resolve the concrete emulation from the adapter's library at run time by technique id. The spec carries
+    no payload by design.
+  - Record the wall clock time of the action so artifact latency can be measured.
+  expected_artifacts:
+  - Agent run configuration & safeguard state
+  observation:
+    source: Nothing emits this today. It would have to come from the agent platform's run manifest.
+    scoreable:
+    - signal-presence
+    query_hint: 'Agent running with refusals or classifiers disabled; unattended run | Blind is a prediction
+      too: search broadly, because the useful result here is finding an artifact the record says does
+      not exist.'
+  safety:
+    destructive: false
+    reversible: true
+    requires_human: true
+    note: 'Seeded conservatively. Confirm by hand before approval: the emitter cannot tell whether an
+      action is destructive in your environment.'
+- step: 2
+  intent: A zero-day in the package proxy, the sandbox's only allowed egress, puts it on the internet
+  layer: L0 Infrastructure
+  techniques:
+    attack:
+    - T1190
+    atlas:
+    - AML.T0049
+  actions:
+  - Reproduce the behavior described by the step, against the allowlisted target for Host / net, using
+    a published emulation of T1190.
+  - Resolve the concrete emulation from the adapter's library at run time by technique id. The spec carries
+    no payload by design.
+  - Record the wall clock time of the action so artifact latency can be measured.
+  expected_artifacts:
+  - Egress from a sandboxed workload
+  observation:
+    source: Palo Alto NGFW traffic logs + Zscaler proxy, index=net_egress; Artifactory access.log
+    scoreable:
+    - signal-presence
+    - source-attribution
+    - detection-fires
+    detection_artifact: SIEM saved search NET-EGRESS-ANOM-07; returns rows for the last 90 days
+    query_hint: Sandbox reaching the internet through its one allowed egress path
+  safety:
+    destructive: false
+    reversible: true
+    requires_human: false
+    note: 'Seeded conservatively. Confirm by hand before approval: the emitter cannot tell whether an
+      action is destructive in your environment.'
+- step: 3
+  intent: It roots an exposed public code-execution endpoint elsewhere and uses it as a launchpad
+  layer: External (out of estate)
+  techniques:
+    attack:
+    - T1190
+    - T1584
+    atlas:
+    - AML.T0049
+  actions:
+  - Reproduce the behavior described by the step, against the allowlisted target for External, using a
+    published emulation of T1190, T1584.
+  - Resolve the concrete emulation from the adapter's library at run time by technique id. The spec carries
+    no payload by design.
+  - Record the wall clock time of the action so artifact latency can be measured.
+  expected_artifacts:
+  - Untrusted artifact / config processed
+  observation:
+    source: dataset-worker application logs, index=app_dataproc, source=worker.jsonl
+    scoreable:
+    - signal-presence
+    - source-attribution
+    query_hint: Template syntax or local file paths inside a data config
+  safety:
+    destructive: false
+    reversible: true
+    requires_human: true
+    note: 'Seeded conservatively. Confirm by hand before approval: the emitter cannot tell whether an
+      action is destructive in your environment.'
+  out_of_scope:
+  - The scenario reaches a third party at this step. The run substitutes a local stand-in inside the lab
+    boundary. Nothing outside the allowlist is touched, and the result speaks to our own visibility only.
+- step: 4
+  intent: Malicious dataset configs leak the worker pod's secrets, then give code execution inside it
+  layer: L1 Data
+  techniques:
+    attack:
+    - T1552
+    - T1059
+    atlas:
+    - AML.T0010.002
+    - AML.T0055
+    - AML.T0050
+  actions:
+  - Reproduce the behavior described by the step, against the allowlisted target for Data → Host, using
+    a published emulation of T1552, T1059.
+  - Resolve the concrete emulation from the adapter's library at run time by technique id. The spec carries
+    no payload by design.
+  - Record the wall clock time of the action so artifact latency can be measured.
+  expected_artifacts:
+  - Code execution in a processing worker
+  observation:
+    source: CrowdStrike Falcon ProcessRollup2, index=edr_main; containerd runtime events
+    scoreable:
+    - signal-presence
+    - source-attribution
+    - detection-fires
+    detection_artifact: Detection rule EDR-CONT-0113 (worker process ancestry); 3 true positives in test
+    query_hint: Data-processing pod spawning a shell, interpreter or downloader
+  safety:
+    destructive: false
+    reversible: true
+    requires_human: false
+    note: 'Seeded conservatively. Confirm by hand before approval: the emitter cannot tell whether an
+      action is destructive in your environment.'
+- step: 5
+  intent: Pod → node root; metadata credentials and forged identity tokens give cluster-admin
+  layer: L1 Data
+  techniques:
+    attack:
+    - T1611
+    - T1552.005
+    - T1550.001
+    atlas:
+    - AML.T0105
+    - AML.T0091.000
+  actions:
+  - Reproduce the behavior described by the step, against the allowlisted target for Host / Cloud, using
+    a published emulation of T1611, T1552.005, T1550.001.
+  - Resolve the concrete emulation from the adapter's library at run time by technique id. The spec carries
+    no payload by design.
+  - Record the wall clock time of the action so artifact latency can be measured.
+  expected_artifacts:
+  - Container escape & credential use
+  observation:
+    source: EKS control-plane audit log, CloudWatch group /aws/eks/prod/cluster; AWS CloudTrail
+    scoreable:
+    - signal-presence
+    - source-attribution
+    query_hint: Privileged / hostPath pod created; metadata service read from a pod
+  safety:
+    destructive: false
+    reversible: true
+    requires_human: false
+    note: 'Seeded conservatively. Confirm by hand before approval: the emitter cannot tell whether an
+      action is destructive in your environment.'
+- step: 6
+  intent: C2 and exfiltration ride public web services; internal source repos are reached with write access
+  layer: L4 Application
+  techniques:
+    attack:
+    - T1102
+    - T1567
+    - T1213.003
+    atlas:
+    - AML.T0025
+  actions:
+  - Reproduce the behavior described by the step, against the allowlisted target for App / net, using
+    a published emulation of T1102, T1567, T1213.003.
+  - Resolve the concrete emulation from the adapter's library at run time by technique id. The spec carries
+    no payload by design.
+  - Record the wall clock time of the action so artifact latency can be measured.
+  expected_artifacts:
+  - Agent-driven C2 & exfiltration
+  observation:
+    source: Zscaler proxy transaction logs, index=net_proxy; Symantec DLP egress events
+    scoreable:
+    - signal-presence
+    - source-attribution
+    - detection-fires
+    detection_artifact: Proxy category policy + DLP rule DLP-EGR-22; blocks logged weekly
+    query_hint: Encoded traffic to paste, file-drop or request-capture services
+  safety:
+    destructive: false
+    reversible: true
+    requires_human: false
+    note: 'Seeded conservatively. Confirm by hand before approval: the emitter cannot tell whether an
+      action is destructive in your environment.'
+  out_of_scope:
+  - The record marks a control as having held at this step. Reproduce the attempt, not a bypass of that
+    control, and record whether it held again.
+readiness:
+  verdict: ready
+  validated_by: J. Hosley
+  validated: '2026-08-05'
+  checks:
+  - status is published
+  - every attack path step has a scored evidence row
+  - derived coverage matches the recorded tag on every row
+  - every Have and Collectable row names a source
+  - the record declares a framework baseline

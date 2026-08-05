@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.internal/liszt/schema/run-record.schema.json",
+  "title": "Run Record",
+  "description": "What the run actually did and actually found, plus the scorecard comparing it to the sealed prediction. The observations block is authored by whoever ran the test; the scorecard block is COMPUTED by tools/score_run.py and must never be hand written, for the same reason coverage is never hand written on an evidence row. A run record is immutable once committed: a correction is a new run, not an edit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_version", "run_id", "spec_id", "scenario", "prediction_digest",
+    "executed", "executed_by", "environment", "autonomy_used", "observations"
+  ],
+  "properties": {
+    "run_version": { "type": "integer", "const": 1 },
+    "run_id": {
+      "type": "string", "pattern": "^RUN-[0-9]{3}-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}$",
+      "description": "RUN, the scenario number, the date, and a two digit sequence. Immutable, never reused."
+    },
+    "spec_id": { "type": "string", "pattern": "^ST-[0-9]{3}$" },
+    "scenario": { "type": "string", "pattern": "^[0-9]{3}$" },
+    "prediction_digest": {
+      "type": "string", "pattern": "^[a-f0-9]{64}$",
+      "description": "sha256 of the prediction file this run is scored against. The scorer refuses to run if it does not match the prediction on disk, which is how a prediction quietly rewritten after the fact gets caught."
+    },
+    "spec_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "executed": { "type": "string", "format": "date" },
+    "executed_by": { "type": "string", "minLength": 3, "description": "Role or team, plus the agent build if one was used." },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adapter": { "type": "string", "description": "Which emulation runner the abstract actions were bound to, and its version. Recorded because a change of runner can move a result without anything about the estate changing." },
+        "build": { "type": "string" },
+        "model": { "type": "string", "description": "If an LLM drove the run, which one. Same reasoning: the driver is part of the experimental setup." }
+      }
+    },
+
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "telemetry_pipeline", "teardown_confirmed"],
+      "properties": {
+        "kind": { "enum": ["lab-ephemeral", "lab-persistent", "production"] },
+        "telemetry_pipeline": {
+          "enum": ["mirrored", "scratch", "none"],
+          "description": "What the pipeline ACTUALLY was, which can differ from what the spec asked for. The scorer reads this field, not the spec's, when deciding which claims may be scored."
+        },
+        "targets_used": { "type": "array", "items": { "type": "string" } },
+        "teardown_confirmed": {
+          "type": "boolean",
+          "description": "Whether the environment was destroyed and the destruction verified. False on an ephemeral target is a finding in its own right and belongs in the operational review, not just here."
+        },
+        "deviations": {
+          "type": "array", "items": { "type": "string" },
+          "description": "Every way the environment differed from the spec's requirements. These become caveats on the scorecard, and an unexplained gap between predicted and observed usually turns out to be sitting in this list."
+        }
+      }
+    },
+
+    "autonomy_used": { "enum": ["lab-only", "production-observe", "production-active"] },
+    "stop_conditions_triggered": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["condition", "at_step"],
+        "properties": {
+          "condition": { "type": "string" },
+          "at_step": { "type": "integer" },
+          "note": { "type": "string" }
+        }
+      },
+      "description": "Any guardrail that fired. A triggered stop condition is a successful guardrail, not a failed run, and the distinction should survive into the write-up."
+    },
+
+    "observations": {
+      "type": "array", "minItems": 1,
+      "description": "What was seen, per step, recorded before anyone looks at the prediction. Authored, not computed.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step", "executed", "observed"],
+        "properties": {
+          "step": { "type": "integer", "minimum": 1, "maximum": 6 },
+          "executed": {
+            "type": "boolean",
+            "description": "Whether the action set actually ran. False means the step could not be performed, which is an environment result and not evidence about our visibility."
+          },
+          "not_executed_reason": { "type": "string" },
+          "observed": {
+            "enum": ["detected", "logged-only", "absent", "unscoreable"],
+            "description": "detected: the artifact appeared AND named detection fired. logged-only: the artifact appeared in a log, nothing alerted. absent: nothing appeared anywhere that was checked. unscoreable: the venue for this claim did not exist in this environment, for example a detection claim in a scratch lab. unscoreable is a legitimate and common answer; guessing instead of recording it is what corrupts a calibration number."
+          },
+          "observed_source": {
+            "type": "string",
+            "description": "Where the artifact actually turned up, and ONLY that. This field is compared against the predicted source, so prose about where it was not found belongs in notes; a negative mention here makes a miss read as a match. Being right about visibility while naming the wrong system is a distinct defect that a coverage tag alone hides."
+          },
+          "detection_fired": { "type": ["boolean", "null"] },
+          "detection_artifact_observed": { "type": "string" },
+          "latency_seconds": { "type": ["number", "null"], "minimum": 0, "description": "Time from action to artifact being queryable. Null when nothing was observed, since there is no latency to measure. A Have that arrives an hour late is a different control from one that arrives in ten seconds, and the DeTT&CT timeliness dimension has no way to learn that without this." },
+          "artifacts": { "type": "array", "items": { "type": "string" }, "description": "Pointers to the evidence: query used, screenshot, log excerpt path. Must be re-runnable by a third party." },
+          "surprises": {
+            "type": "array", "items": { "type": "string" },
+            "description": "Anything seen that nobody predicted, including signals from sources not on the record. This is the most valuable free output of the whole exercise: it is how the evidence map learns about sources the authors did not know they had."
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+
+    "scorecard": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "COMPUTED by tools/score_run.py. Present only after scoring. Hand editing it is the same category of error as hand editing a coverage tag.",
+      "required": ["computed", "computed_by", "rows", "totals"],
+      "properties": {
+        "computed": { "type": "string", "format": "date" },
+        "computed_by": { "type": "string" },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step", "verdict"],
+            "properties": {
+              "step": { "type": "integer" },
+              "predicted_coverage": { "enum": ["Have", "Collectable", "Blind"] },
+              "observed": { "enum": ["detected", "logged-only", "absent", "unscoreable"] },
+              "delta": { "type": "integer", "minimum": -2, "maximum": 2, "description": "observed rank minus predicted rank, on Blind 0, Collectable 1, Have 2. Negative means we claimed more coverage than exists." },
+              "verdict": {
+                "enum": ["confirmed", "overestimate", "severe-overestimate", "underestimate", "unscoreable", "not-executed"],
+                "description": "severe-overestimate is reserved for a predicted Have that produced nothing at all: the case where a control everyone believed in does not exist."
+              },
+              "source_match": { "type": ["boolean", "null"], "description": "Whether the artifact appeared in the system the record named. Null when nothing appeared or the claim was unscoreable." },
+              "note": { "type": "string" }
+            }
+          }
+        },
+        "totals": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scored", "confirmed", "exact_match_rate", "optimism_index"],
+          "properties": {
+            "rows": { "type": "integer" },
+            "scored": { "type": "integer", "description": "Rows that could legitimately be scored. Always reported next to the rates, for the same reason completeness is always reported next to coverage." },
+            "unscoreable": { "type": "integer" },
+            "not_executed": { "type": "integer" },
+            "confirmed": { "type": "integer" },
+            "overestimates": { "type": "integer" },
+            "severe_overestimates": { "type": "integer" },
+            "underestimates": { "type": "integer" },
+            "exact_match_rate": { "type": "number", "minimum": 0, "maximum": 1, "description": "confirmed over scored. How often the map was exactly right." },
+            "optimism_index": {
+              "type": "number", "minimum": -2, "maximum": 2,
+              "description": "Mean predicted rank minus mean observed rank over scored rows. Positive means we systematically believe we see more than we do, which is the failure mode this whole program exists to prevent. It is a more useful number than the hit rate, because a program can be accurate on average and dangerous in one direction."
+            },
+            "source_precision": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "Of the artifacts that appeared, the share that appeared in the system the record named." },
+            "surprise_count": { "type": "integer", "description": "Signals found that nobody predicted." },
+            "mean_confidence_error": { "type": ["number", "null"], "description": "Present only when the prediction carried confidences. Brier style: mean squared error between stated confidence and outcome." }
+          }
+        },
+        "by_class": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The same totals split by claim class, because signal presence and detection wiring fail for different reasons and are tested in different venues. Reporting them merged is the fastest way to draw a confident wrong conclusion from a cheap lab.",
+          "properties": {
+            "signal_presence": { "type": "object", "additionalProperties": true },
+            "source_attribution": { "type": "object", "additionalProperties": true },
+            "detection_fires": { "type": "object", "additionalProperties": true }
+          }
+        },
+        "by_layer": { "type": "object", "additionalProperties": true, "description": "Where in the stack our predictions are weakest. Usually the most actionable cut on the whole card." },
+        "caveats": {
+          "type": "array", "items": { "type": "string" },
+          "description": "Carried forward from environment deviations and fidelity notes. A scorecard without its caveats is a number people will over-trust."
+        }
+      }
+    },
+
+    "feedback": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What this run changes. Computed as proposals, then accepted by a human; nothing here writes itself back into a record.",
+      "properties": {
+        "proposed_rescores": {
+          "type": "array",
+          "description": "Evidence rows the run says are wrong. These are PROPOSALS. Applying one is a deliberate act with the run id as its backlog reference, and it lands in the snapshot's ids_rescored_this_period so a coverage change driven by evidence is visible as such.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step", "from", "to", "reason"],
+            "properties": {
+              "step": { "type": "integer" },
+              "from": { "type": "string" },
+              "to": { "type": "string" },
+              "field": { "type": "string", "description": "Which field the run disputes: visibility, detection, or source." },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "method_findings": {
+          "type": "array", "items": { "type": "string" },
+          "description": "What this run says about how we PREDICT, rather than about the estate. The tuning signal: which layers, techniques or authors we are worst at, and which recurring assumption keeps being wrong."
+        },
+        "lab_findings": {
+          "type": "array", "items": { "type": "string" },
+          "description": "What this run says about the test environment itself, feeding the lab build."
+        },
+        "new_sources_found": {
+          "type": "array", "items": { "type": "string" },
+          "description": "Sources that produced useful artifacts and are not on any evidence row. Free coverage the library did not know it had."
+        }
+      }
+    }
+  }
+}

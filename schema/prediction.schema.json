@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.internal/liszt/schema/prediction.schema.json",
+  "title": "Sealed Prediction",
+  "description": "What we claim the run will find, written down and committed BEFORE the run executes. This is the whole point of the exercise. The scenario's coverage tags are already predictions; this file states them in falsifiable form, freezes them, and binds them to a spec. It is a separate file from the spec so that committing it is a discrete, timestamped act: git is the notary. A prediction edited after a run is not a prediction, and the run record binds to this file by digest precisely so that edit is detectable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "prediction_version", "spec_id", "scenario", "baseline",
+    "sealed", "sealed_by", "spec_digest", "assessment", "rows"
+  ],
+  "properties": {
+    "prediction_version": { "type": "integer", "const": 1 },
+    "spec_id": { "type": "string", "pattern": "^ST-[0-9]{3}$" },
+    "scenario": { "type": "string", "pattern": "^[0-9]{3}$" },
+    "baseline": { "type": "string", "pattern": "^[0-9]{4}\\.[0-9]{2}$" },
+    "sealed": {
+      "type": "string", "format": "date",
+      "description": "The date this was committed. The commit itself is the real evidence; this field is for the reader."
+    },
+    "sealed_by": {
+      "type": "string", "minLength": 3,
+      "description": "The human who stands behind the prediction. Accountability does not transfer to the emitter that generated it."
+    },
+    "spec_digest": {
+      "type": "string", "pattern": "^[a-f0-9]{64}$",
+      "description": "sha256 of the spec.yaml this prediction accompanies. Binds the claim to the exact procedure that will test it."
+    },
+    "assessment": {
+      "enum": ["reference", "org"],
+      "description": "Whose estate this predicts for. reference: the scenario record's own assessment. org: a coverage overlay was applied, and org_id names it. Mixing the two produces a calibration number for nobody."
+    },
+    "org_id": { "type": "string" },
+
+    "rows": {
+      "type": "array", "minItems": 1,
+      "description": "One entry per testable step, carrying the claims that step makes. Every field here is derived from the evidence row, never invented, so a wrong prediction is a wrong record rather than a wrong guess.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step", "predicted_coverage", "claims"],
+        "properties": {
+          "step": { "type": "integer", "minimum": 1, "maximum": 6 },
+          "predicted_coverage": {
+            "enum": ["Have", "Collectable", "Blind"],
+            "description": "The derived coverage tag from the evidence row. This is the headline prediction and the one the confusion matrix scores."
+          },
+          "predicted_visibility": { "type": "integer", "minimum": 0, "maximum": 4 },
+          "predicted_detection": { "type": "integer", "minimum": -1, "maximum": 5 },
+          "claims": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["signal_present", "source"],
+            "description": "The coverage tag decomposed into separately falsifiable claims, because they fail for different reasons and are testable in different places. Being right that we would see something while naming the wrong system is a real defect, and one a single tag hides.",
+            "properties": {
+              "signal_present": {
+                "type": "boolean",
+                "description": "Derived: visibility >= 1. Whether any artifact is claimed to exist at all. Testable in any faithful lab."
+              },
+              "signal": { "type": "string", "description": "What is claimed to be emitted, from the evidence row." },
+              "source": {
+                "type": "string",
+                "description": "The exact system it is claimed to land in. Testable in a lab only where that system exists; otherwise the claim is recorded unscoreable."
+              },
+              "detection_fires": {
+                "type": "boolean",
+                "description": "Derived: detection >= 1. Whether something is claimed to alert. Testable ONLY where the real detection pipeline runs, never in a scratch lab."
+              },
+              "detection_artifact": { "type": "string", "description": "The named rule or saved search claimed to fire, from the row's evidence field." }
+            }
+          },
+          "testable_in": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "signal_present": { "enum": ["lab", "pipeline", "not-testable"] },
+              "source": { "enum": ["lab", "pipeline", "not-testable"] },
+              "detection_fires": { "enum": ["lab", "pipeline", "not-testable"] }
+            },
+            "description": "Where each claim can legitimately be checked, computed from the spec's telemetry_pipeline mode. The scorer refuses to score a claim outside its listed venue, which is what stops a cheap lab from producing a confident wrong number."
+          },
+          "confidence": {
+            "type": "number", "minimum": 0, "maximum": 1,
+            "description": "Optional. The author's stated confidence in this row's coverage tag, which turns the scorecard from a hit rate into a calibration curve. Absent means the row was not judged, not that it was judged certain."
+          },
+          "rationale": { "type": "string", "description": "Why this prediction, in one line. Read at scoring time when the prediction was wrong; this is where the tuning signal actually comes from." }
+        }
+      }
+    },
+
+    "expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional whole-run predictions, stated up front so the scorecard can grade the library rather than only the rows.",
+      "properties": {
+        "expected_have_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "expected_surprises": { "type": "integer", "minimum": 0, "description": "How many rows the author expects to get wrong. A prediction of zero surprises is itself a claim, and usually a wrong one." },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}
