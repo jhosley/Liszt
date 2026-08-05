@@ -252,6 +252,22 @@ def resolve_layer(value):
     for layer in LAYERS:
         if text.lower() == layer.lower() or text.upper() == layer[:2]:
             return layer
+    # Tolerate the near misses a language model actually produces, and canonicalize them,
+    # rather than failing an otherwise good record on a separator. The middle dot is easy
+    # to lose: "L3 - Orchestration & Agent" and "L3 Orchestration and Agent" mean the layer
+    # the author picked. What is NOT tolerated is a string naming several layers, because
+    # that is an unanswered question rather than a typo.
+    if len(re.findall(r"L[0-4]", text.upper())) > 1:
+        raise ScaffoldError(
+            "layer names more than one layer, so it is not a choice. Pick one of: "
+            + " | ".join(LAYERS) + f". Got: {value}")
+    m = re.search(r"\bL\s*([0-4])\b", text, re.I)
+    if m:
+        return LAYERS[int(m.group(1))]
+    squash = lambda x: re.sub(r"[^a-z]+", "", x.lower().replace("&", "and"))
+    for layer in LAYERS:
+        if squash(text) == squash(layer[5:]):
+            return layer
     raise ScaffoldError("layer must be one of: " + " | ".join(LAYERS) +
                         f", or just its number such as L3. Got: {value}")
 
