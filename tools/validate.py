@@ -234,6 +234,28 @@ def check_quality_bar(rec: dict, f: Findings, incidents: set[str],
                 f.err(f"telemetry[{r['step']}]",
                       f"{dc} is an ATT&CK data SOURCE, retired in v18. Use a DCxxxx data component")
 
+    # --- over-decomposition: several steps answered by one source ------------
+    # A step is one adversary move that produces its own observable. When several
+    # attack-step rows name the SAME source, the chain has usually been split into the
+    # internal control flow of a single move, and one control then appears to cover
+    # several steps. That inflates every coverage denominator the record feeds, which is
+    # the "evidence reuse" and "splitting the denominator" pair in docs/04-measurement.md
+    # section 7. It can be legitimate, so it warns rather than errors, but it should be
+    # answered rather than ignored.
+    by_source: dict[str, list[int]] = {}
+    for r in rows:
+        src = " ".join((r.get("source") or "").lower().split())
+        if src:
+            by_source.setdefault(src, []).append(r["step"])
+    for src, steps_hit in by_source.items():
+        if len(steps_hit) > 1:
+            f.warn("telemetry",
+                   f"steps {steps_hit} all name the same source. If those moves would be seen "
+                   f"in the same log line they are one step, and splitting them makes one "
+                   f"control look like coverage of {len(steps_hit)}. Merge them, or say in "
+                   f"mapping_notes why the same source answers each separately "
+                   f"(source: {(r.get('source') or src)[:60]})")
+
     # --- use case coverage ---------------------------------------------------
     # A row that claims detection maturity says something alerts. The use case
     # record is where that alert's customer and their action live. On a published
