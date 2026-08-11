@@ -48,6 +48,11 @@ except ImportError:
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from validate import derive_coverage          # one source of truth for the rule
 from coverage import load_records, apply_overlay, scenario_metrics, QUALITY_DIMS
+# The mechanical half of the testing readiness gate, imported rather than restated. The
+# emitter refuses to write a spec when this returns blockers, so the page must agree with
+# it exactly; a second copy of the rule in JavaScript would drift the first time either
+# side was edited.
+from emit_testspec import readiness as testing_blockers, resolve_rows
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA_VERSION = 1
@@ -122,6 +127,12 @@ def build_data(include_drafts: bool, org: str | None) -> dict:
             "metrics": m,
             "counts": dict(counts),
             "use_case_ids": covered_by.get(rec["id"], []),
+            # Whether the emitter would write a spec for this record today, and if not,
+            # why. A blocked record is a normal and useful answer: knowing which scenarios
+            # cannot be tested yet, and what is missing, is the point of showing this.
+            "testing": {"blockers": testing_blockers(
+                rec, resolve_rows(rec, None),
+                ROOT / "scenarios" / f"{rec.get('id')}-{rec.get('slug')}.yaml")},
         })
         fmm = rec.get("framework_mapping", {})
         for key in ("attack", "atlas", "owasp_llm", "owasp_agentic"):
@@ -458,6 +469,29 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
 .ibtn:hover{border-color:var(--brand);background:#F3F7FA}
 .ibtn[aria-current="true"]{border-color:var(--brand);color:var(--brand);box-shadow:0 0 0 1px var(--brand)}
 .jsteps{margin:8px 0 2px;padding-left:18px;color:var(--ink-2);font-size:12.5px;line-height:1.55}
+
+/* scenario testing ---------------------------------------------------------- */
+.tsum{background:var(--surface-2);border-left:3px solid var(--brand);border-radius:0 6px 6px 0;
+      padding:10px 14px;font-size:13px;color:var(--ink-2);margin-bottom:12px}
+.tlist{border-top:1px solid var(--surface-3)}
+.trow{padding:9px 0;border-bottom:1px solid var(--surface-3);display:grid;
+      grid-template-columns:1fr auto;gap:8px 12px;align-items:start;font-size:13px}
+.trow .tv{justify-self:end}
+.trow .tbl{grid-column:1/-1;margin:2px 0 0;padding-left:18px;color:var(--muted);
+           font-size:12px;line-height:1.5}
+.trow .tbl li{margin:1px 0}
+.tflow{margin:4px 0}
+.tstep{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:10px 0;
+       border-bottom:1px solid var(--surface-3);font-size:13px;align-items:start}
+.tstep:last-child{border-bottom:0}
+.tstep .n{width:22px;height:22px;border-radius:50%;background:var(--surface-2);
+          color:var(--brand);font-size:11px;font-weight:700;display:flex;
+          align-items:center;justify-content:center}
+.tstep code{display:inline-block;margin:3px 0}
+.tstep .hint{display:block;margin-top:3px}
+.note{background:var(--surface-2);border-left:3px solid var(--collectable);
+      border-radius:0 6px 6px 0;padding:10px 14px;margin-top:14px;
+      color:var(--ink-2);font-size:12.5px;line-height:1.55}
 .pbox{margin:10px 0;border:1px solid var(--rule);border-radius:8px;padding:10px 14px;background:var(--surface)}
 .pbox .ph{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .pbox .ph .pm{min-width:0}
@@ -1408,6 +1442,310 @@ a weaker substitute test, because a substitute silently changes what the score m
 PASTE THE SCENARIO RECORD BELOW THIS LINE
 `;
 
+/* The judgment half of test DESIGN, as opposed to test readiness. The emitter writes the
+   spec mechanically from the record; this is the part it cannot do, which is deciding how
+   the chain should be broken up, what the environment has to be for a result to mean
+   anything, and what a run would not settle. */
+const P_TESTPLAN =
+`You are designing a TEST PLAN for one Liszt scenario. You are not writing the test spec:
+tools/emit_testspec.py emits that, mechanically, from the record. Your job is the judgment
+the emitter cannot make: what is worth testing, how the chain should be broken up, what the
+environment has to be for a result to mean anything, and what a run would not settle.
+
+PASTE THE SCENARIO RECORD BELOW THE LINE AT THE FOOT OF THIS PROMPT.
+
+Answer in Markdown. A person reads this and decides. Write the PIPELINE line first, then
+the sections, then the JSON block, then the self-check.
+
+FIRST LINE OF YOUR ANSWER, BEFORE ANYTHING ELSE
+
+  PIPELINE: <mirrored | scratch | none> (stated in record | assumed scratch, not stated)
+
+  State the pipeline mode as a fact about a lab that exists, not a mode you have chosen.
+  The scenario record does not carry this field; it lives in the emitted spec. Unless the
+  paste below explicitly states the lab's pipeline mode, you MUST write the plan for
+  scratch, which is the emitter's default and the honest default for a first environment,
+  and say so on that line. If a mirrored plan would be materially better, that belongs in
+  section 7 as NEEDS ENVIRONMENT with what the mirror would have to carry. Never write a
+  plan whose value depends on a mode you assumed into existence. Write this line before you
+  decide what is worth testing, because it decides what any of it is worth.
+
+THE EXIT CHECK, BEFORE YOU WRITE SECTION 3
+
+  If section 2's verdict is blocked, or the record's classification.mode is "failure", or
+  its classification.evidence is "doomsday", or its status is anything other than
+  "published", then sections 3, 4 and 5 each consist of exactly one line:
+      Not applicable: no run is recommended, see section 7.
+  and nothing else. Section 7 then carries the whole answer, and the response is complete
+  and correct at four sections. Do not design units for a chain you have just said should
+  not run: a unit plan on the page is a unit plan somebody will schedule. A short blocked
+  plan is a better artifact than a long one that has to be read carefully to discover it is
+  blocked.
+
+WHAT THE ENVIRONMENT DECIDES
+
+  This is the most misread part of the method. Apply it before you recommend anything.
+
+    - telemetry pipeline "mirrored": the lab carries the real detection pipeline. The
+      coverage verdict on Have and Collectable rows can be scored, and so can the
+      detection-fires claim. This is the only mode in which a Have row can be confirmed.
+    - telemetry pipeline "scratch": a standalone lab with its own logging. Two claims are
+      still scored on every executed row, and they are worth having: SIGNAL PRESENCE (did
+      an artifact appear at all) and SOURCE ATTRIBUTION (did it appear in the system the
+      row names). Those produce a real source-precision number, surprises, and proposed
+      source corrections. What a scratch lab CANNOT do is confirm a Have or Collectable
+      row's coverage claim, to any degree. Not partially, not indicatively, not
+      "at the source level", not as early confidence. A scratch lab can falsify a Blind
+      row. It cannot confirm a Have row.
+    - telemetry pipeline "none": nothing is scoreable. Execution only.
+
+  So do not write off a Have-heavy record as untestable in a cheap lab; say precisely which
+  CLAIM goes untested, which is the detection half, and what the run still settles.
+
+WHAT CAN ACTUALLY RUN TODAY
+
+    - lab-only: designated ephemeral lab targets. THE ONLY RUNG ENABLED.
+    - production-observe: benign signal generation against production to test the real
+      detection pipeline, no state change, no adversary action. SWITCHED OFF, and its
+      approval path is not yet defined.
+    - production-active: bounded actions against production. SWITCHED OFF.
+  The executor must refuse anything above the enabled rung even if a spec asks.
+
+  And two things that gate even lab-only work: there is NO ADAPTER, so nothing binds a
+  technique id to a runnable test yet, and there is NO LAB. Every plan is a reviewable
+  design and a build target, not a schedule. Say so rather than letting a reader assume
+  lab-only means next week.
+
+STANDING CONSTRAINTS, TRUE AT EVERY RUNG
+
+    - No payloads and no exploit code. Actions are abstract and engine agnostic:
+      "reproduce this behavior using a published emulation of T1611". An adapter binds the
+      technique id to a concrete test at run time.
+    - No exploit development and no unpublished vulnerability research.
+    - No persistence that survives teardown.
+    - No credential use that resolves outside the lab boundary. That is a stop condition,
+      not merely a safety concern.
+    - Synthetic canaries only. No real data moves.
+    - Targets are an explicit allowlist. No wildcard, no default, no category such as
+      "the lab"; an empty allowlist correctly refuses to start.
+    - Time box, deny-all egress unless a destination is named and justified, asserted
+      teardown, and stop conditions. A triggered stop condition is a guardrail working.
+    - A step marked control_held: true is one where the real chain stopped because a
+      control held. A lab without that control tests a chain that did not happen; a lab
+      with it tests the control, not the step. Say which of the two you mean. If the plan
+      needs the control removed for the step to proceed, that is not a test of the step
+      and it goes under OUT OF SCOPE. If the control stays and the step is expected to
+      stop, say the expected result is a stop, and that a stop is the control working.
+    - A telemetry row with kind: control is a verification or preventive signal, not a
+      step. Its step number is display order and may run past the end of the chain. Control
+      rows never appear in the section 2 table, in units, or in excluded steps.
+
+WRITE THE PLAN IN THESE SEVEN SECTIONS
+
+  1. WHAT THIS RUN WOULD SETTLE. Two or three sentences. Name the specific claims in this
+     record worth falsifying, and the one you would most expect to be wrong. Name it and
+     stop there. Do not say which direction it would move, do not name the tag or number it
+     would move to, and do not characterize an existing score as optimistic, generous,
+     high, low or unrealistic.
+       In scope: "the Have claim on step 4 is the one I would most expect a run to break,
+         because the evidence row's source has to carry pod identity for the claim to hold."
+       Out of scope: "expect step 4 to drop to Collectable", "visibility 4 looks generous".
+     Then state the honest ceiling: the best thing a run could establish at the pipeline
+     mode on your first line, and what it will not touch.
+
+  2. READINESS READ. The mechanical gate is computed elsewhere and is not your job. Judge
+     the four things only a reader can judge. One row per attack_path step and no others.
+       CONCRETE     could a competent engineer read this step and know what action to take?
+                    A step naming a behavior is concrete; a step naming an outcome
+                    ("gains cluster-admin") is not unless the mechanism is stated.
+       SAFE         would running this in a contained lab risk damage that destroying the
+                    lab does not undo? Name the specific hazard, never just yes or no.
+       REPRODUCIBLE what must the lab contain for this step to run at all? Name the
+                    requirement ONLY at the level of specificity the record itself states.
+                    If the record names a product, name the product. If it names a version
+                    or an advisory id, quote it. NEVER supply a version number, a version
+                    boundary, a build id, an advisory or a CVE from your own knowledge, not
+                    as an action, not as an environment requirement, not as an aside. A
+                    document that says which builds are exploitable is a targeting document
+                    whatever section it sits in, and your knowledge of version ranges is
+                    stale by construction. If a step needs a specific vulnerable build and
+                    the record does not say which, write "record does not name the build"
+                    and list the step under NEEDS RECORD WORK.
+       OBSERVABLE   the evidence row names a source. Could that source exist in a lab, or
+                    only in production? Name the specific source, never just yes or no.
+     End with a verdict: ready, ready-with-exclusions, or blocked. Blocked is a NORMAL
+     outcome in a young library, not a failure. Sections 6 and 7 must reference the
+     REPRODUCIBLE and OBSERVABLE cells here rather than restating them in new words.
+
+  3. THE UNIT PLAN. Break the chain into the smallest units that still mean something. For
+     each: the steps it covers, why they belong together, what must already be true, and
+     what the unit proves on its own.
+     Group by what a defender would see, not by what the attacker does. Two steps that land
+     in the same log, or that cannot be told apart by their observable, are one unit.
+     A step that only makes sense once an earlier step has established state is NOT
+     independently testable. Say which state it needs, then choose exactly one of two and
+     name which you chose:
+       (a) fold it into the unit that PRODUCES that state, so the test produces the state; or
+       (b) declare the step untested.
+     You may not have the lab hand a step its precondition as a fixture and still count the
+     step as covered: a fixture that supplies the state supplies the answer. Any
+     precondition established by fixture rather than by an earlier unit MUST also appear in
+     the excluded steps with the reason "state supplied by fixture, step not reproduced",
+     and you must write one plain sentence saying what the downstream unit therefore cannot
+     show. Before writing any precondition, check it against this record's hardening list:
+     if the state you are about to grant is what a listed hardening item exists to prevent,
+     granting it makes the unit silent about that control, and the unit text must say so.
+     Say plainly which units can run in isolation and which cannot. That is what makes the
+     plan usable under change control: an isolated unit fits a narrow window, a dependent
+     one does not.
+
+  4. THE FULL-PATH PLAN. Describe running the chain end to end as one exercise: the order,
+     the state each step hands the next, the total blast radius. Then answer three
+     questions honestly:
+       - What does the full path tell you that the units do not? Usually whether the
+         handoffs are observable, whether a control effective in isolation is bypassed in
+         sequence, and whether the chain leaves a correlatable trail rather than scattered
+         unrelated events. The units cannot answer that.
+       - What does it cost? A longer window, a larger blast radius, harder attribution when
+         something goes wrong, and a failure at step 2 wastes the whole run.
+       - Under change management, when is it worth it? Be concrete about the tradeoff.
+     Remember the shape this has to take: the agent reproduces the mapped behavior one step
+     at a time and stops. It does not improvise and does not pursue an objective. "Full
+     path" means every step of the mapped chain reproduced in order in one session, not an
+     agent handed a goal. If you are recommending the latter, that is out of scope and you
+     must say so.
+
+  5. THE RECOMMENDATION. Pick one and defend it in a short paragraph: units first, full
+     path, a named sequence of both, or, where the enabled rung genuinely cannot settle
+     anything worth the window, no run today. Whatever you pick MUST be executable at
+     lab-only, the only rung switched on. Blocked work is never the recommendation; it goes
+     in section 7 in full, and section 5 says in one sentence what it would add if it were
+     unblocked. State what has to be true for the recommendation to hold, and what would
+     change it.
+
+  6. ENVIRONMENT AND WHAT IT COSTS YOU. The pipeline mode from your first line, and in one
+     line each what it makes scoreable and what it forfeits. The lab components: one
+     execution target per unit, one observation component per named source in the evidence
+     rows, plus any control rows worth corroborating. Describe a component by the ROLE it
+     plays, never by the flaw that makes it usable. Name what each stands in for and what
+     it deliberately does not reproduce.
+     Close section 6 with four labelled lines a reader can carry into change control:
+       TARGETS: the named lab systems this plan would put on the allowlist, or the words
+         "cannot be derived from the record". Never "the lab", never a category, never a
+         wildcard.
+       TIME BOX: per unit and for the full path, with the reasoning in half a line.
+       EGRESS: deny-all, or each destination named with why the run needs it.
+       TEARDOWN AND STOP CONDITIONS: what specifically must be asserted destroyed, and when
+         this particular plan should stop early.
+
+  7. BLOCKED AND OUT OF SCOPE. A plain list. Everything you recommended that cannot run
+     today, each with what it needs and who would have to decide. Labels:
+       NEEDS RUNG PROMOTION   requires production-observe or production-active. State the
+                              promotion block it would need: the rung it promotes from,
+                              clean runs at the lower rung, the window, the
+                              environment-fault count read aloud, the blast radius, whether
+                              it is reversible, and the off switch. Do NOT name an approver,
+                              a role, a team or a review body, and do not invent a review
+                              cadence or an approval date. Write exactly: "Approver and
+                              review loop: undefined. The approval path for this rung does
+                              not exist yet; defining it is part of what this item asks for."
+       NEEDS ENVIRONMENT      requires a mirrored pipeline, a lab component that does not
+                              exist, a published emulation that may not exist, or the
+                              adapter and the lab themselves, neither of which is built.
+       NEEDS RECORD WORK      the scenario is not ready: unscored rows, draft status, a step
+                              with no evidence row, a build the record does not name.
+       OUT OF SCOPE           exploit development, unpublished vulnerability research,
+                              anything needing real data or a real credential, anything
+                              needing an agent to improvise toward an objective, and any
+                              step that would require removing a control that held.
+     A long list is the honest answer and it is useful. Do not shorten it by quietly
+     downgrading a recommendation.
+
+THEN THE JSON BLOCK, IN A FENCE
+
+The prose is for the reader. This block is the decision record a person applies by hand.
+Only "pipeline" corresponds to an emitter flag today (--pipeline); the rest is carried by a
+human. Keep it minimal and do not restate the plan in it.
+
+\`\`\`json
+{
+  "scenario": "NNN",
+  "verdict": "ready | ready-with-exclusions | blocked",
+  "run_recommended": true,
+  "pipeline": "mirrored | scratch | none",
+  "pipeline_stated": true,
+  "pipeline_reason": "one line on what this mode can and cannot score for this record",
+  "recommended": "none | units | full-path | units-then-full-path",
+  "units": [ { "unit": 1, "steps": [1, 2], "independent": true, "needs": "what must already be true", "emulation_known": false } ],
+  "excluded_steps": [ { "step": 4, "class": "unsafe | untestable-in-lab | third-party | not-scored | other", "reason": "one line" } ],
+  "targets": ["named lab system, or the single string cannot-derive"],
+  "time_box": { "per_unit": "ISO8601", "full_path": "ISO8601" },
+  "egress": "deny-all | named destinations",
+  "stop_conditions": ["one line each, specific to this plan"],
+  "blocked": [ { "item": "what you recommended", "label": "NEEDS RUNG PROMOTION | NEEDS ENVIRONMENT | NEEDS RECORD WORK | OUT OF SCOPE", "needs": "what would unblock it" } ]
+}
+\`\`\`
+
+If verdict is blocked, run_recommended MUST be false, recommended MUST be "none", and units
+MUST be []. Never emit a unit list you have just argued should not be run: the prose is read
+once by a person, the JSON is carried forward, and they must not disagree. excluded_steps may
+contain every step; that is a legitimate answer. Copy "scenario" exactly as the record's id
+reads; if the record has no id, or it is not three digits, do not supply one, write "MISSING"
+and say so in section 7 as NEEDS RECORD WORK.
+
+SELF-CHECK. Run these three on your own answer before you finish, fix what fails, and add
+one line at the very end reading "Self-check: pass" or naming what you corrected.
+
+  CHECK 1. THE JSON AGREES WITH THE PROSE. verdict matches section 2. recommended matches
+    section 5. Every unit in section 3 appears in units and no others. Every item in section
+    7 appears in blocked with the same label. If verdict is blocked, run_recommended is
+    false, recommended is "none", units is [], and sections 3 to 5 are the one-line form.
+
+  CHECK 2. NOTHING WAS INVENTED. No version number, build id, advisory or CVE that the
+    record does not state. No approver, role, review body or approval date. No coverage tag
+    or DeTT&CT number proposed for after the run. No pipeline mode assumed without saying so
+    on the first line. No detection rule, saved search, index or product named inside a unit
+    unless the pipeline is mirrored.
+
+  CHECK 3. NOTHING WAS LAUNDERED. No unit is described as partially confirming, giving early
+    confidence in, validating at the source level, sanity-checking, de-risking, or being a
+    first step toward confirming a Have or Collectable claim. No step counted as covered
+    whose precondition was supplied by a fixture. No weaker substitute proposed for a step
+    that cannot be tested.
+
+RULES FOR THE WHOLE ANSWER
+
+  - Do not invent framework identifiers, and do not propose exploit code, payloads, or a
+    specific vulnerability to weaponize. Bind by technique id and let the adapter resolve it.
+    When you bind a unit to a technique id, say on the same line whether a published
+    emulation is known to exist. If you do not know, write "emulation availability
+    unverified"; do not treat the adapter as a guarantee. A unit whose technique has no
+    published emulation is NEEDS ENVIRONMENT, not a ready unit. Never let it resolve to a
+    neighbouring technique that does have one: a near-neighbour emulation exercises a
+    different behaviour against the same evidence row and produces a confident number about
+    the wrong thing.
+  - Do not propose a weaker substitute when a step cannot be tested. Say it cannot be tested.
+    A substitute silently changes what the score means, which is worse than a visible gap.
+  - Do not guess or propose coverage, visibility, or detection scores. This includes
+    restating, comparing, or reasoning forward from the DeTT&CT numbers already in the
+    record, and includes coverage tags, which are derived from those numbers. Quote a row's
+    existing tag only where you need it to say what a pipeline mode can score. Never propose
+    the tag a row should have after the run. The run produces evidence; the owners rescore.
+    Recommending a score in advance corrupts the calibration this method exists to produce.
+  - Where an evidence row has no DeTT&CT block it has NO coverage determination. Do not infer
+    one from the name of the source, from the presence of an evidence field, or from how
+    mature the row sounds. Write "unscored" in the section 2 table, exclude the row from any
+    statement about what the run can settle, and list it under NEEDS RECORD WORK. Unscored
+    rows also fail the mechanical gate, so a plan that reads around them is planning a run
+    that cannot be emitted at all. Say that plainly.
+  - Before recommending any production rung anywhere, say in the same paragraph what can be
+    run at lab-only today, even if the answer is "nothing worth the window".
+  - Where the record is thin, say what is missing rather than filling it in.
+  - Plain language. A reader who does not know DeTT&CT should still follow the plan.
+
+PASTE THE SCENARIO RECORD BELOW THIS LINE
+`;
+
 /* The research prompt library. Each entry is one way of SOURCING a scenario; every one of
    them feeds the same single conversion prompt, P_CONVERT, which is what turns a finding
    into scenario JSON. Prompts added in the browser live in session.userPrompts and are
@@ -1765,28 +2103,146 @@ function intakePanel() {
     <div style="margin-top:14px">${rail}${body}</div></div>`;
 }
 
-/* The readiness check validates an EXISTING scenario for agent testing; it does not bring
-   one in, and its JSON goes to tools/emit_testspec.py, not the paste box. It is parked
-   here until it gets its own home. */
-function readinessPanel() {
-  return `<div class="panel"><h3>Validate a scenario for agent testing</h3>
-    <div class="sub">Not part of bringing a scenario in. This judges whether an
-      already-scored scenario is concrete, safe, reproducible and observable enough for an
-      emulation agent to run in a lab.</div>
-    <ol class="jsteps">
-      <li>Open the scenario you want to test and copy its record, or export it from this viewer.</li>
-      <li>Run the prompt below in any LLM with the record pasted underneath it.</li>
-      <li>Bring the JSON back to the repo and store it under readiness in the emitted spec.</li>
-      <li>Then run: python3 tools/emit_testspec.py NNN --sealed-by "your name"</li>
-      <li>The emitter re-checks the mechanical half itself, so this prompt covers the judgment half only.</li></ol>
-    ${promptBox("Validate a scenario for agent testing",
-      "Judges whether a scored scenario is concrete, safe, reproducible and observable enough for a lab run.",
-      P_READINESS, "readiness")}</div>`;
+function renderIntake() {
+  $("#intake").innerHTML = intakePanel();
+  wireIntake();
 }
 
-function renderIntake() {
-  $("#intake").innerHTML = intakePanel() + readinessPanel();
-  wireIntake();
+/* ---------- scenario testing: readiness, test design, run and rescore ---------- */
+/* Testing is the other half of the loop the catalog exists for. The record claims what a
+   defender would see; a run checks whether that claim is true, and the interesting answer
+   is the one where it is not. Nothing here executes anything: the browser carries the
+   judgment, the repo and the CLI carry the sealing and the scoring. */
+let testStep = "readiness";
+
+/* The mechanical gate, computed at build time by importing the emitter's own readiness()
+   so the page and the emitter cannot drift. A record with no blockers is one the emitter
+   would write a spec for today. */
+function testable(s) { return !((s.testing && s.testing.blockers) || []).length; }
+
+function readinessPane() {
+  const all = DATA.scenarios.slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  const ready = all.filter(testable);
+  const rows = all.map(s => {
+    const bl = (s.testing && s.testing.blockers) || [];
+    return `<div class="trow ${bl.length ? "" : "ok"}">
+      <div><a href="#/scenario/${esc(s.id)}">${esc(s.id)}</a> ${esc(s.title)}</div>
+      <div class="tv">${bl.length
+        ? `<span class="chip blind">blocked</span>`
+        : `<span class="chip have">emitter would run</span>`}</div>
+      ${bl.length ? `<ul class="tbl">${bl.map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
+    </div>`;
+  }).join("");
+  return `<div class="sub" style="margin-bottom:10px">The mechanical half of the readiness
+      gate, run over the whole library. These are the same checks
+      <code>tools/emit_testspec.py</code> recomputes before it writes a spec, so what you
+      see here is what the emitter would do. A blocked record is a normal answer in a young
+      library, and knowing which ones and why is itself a finding.</div>
+    <div class="tsum"><strong>${ready.length} of ${all.length}</strong> scenarios would emit
+      a spec today. ${ready.length ? "Ready: " + ready.map(s => esc(s.id)).join(", ") + "." : ""}</div>
+    <div class="tlist">${rows}</div>
+    <div class="sub" style="margin:14px 0 4px">The judgment half is a person's call and does
+      not come from the record. Run this against a scenario that clears the gate above.</div>
+    ${promptBox("Readiness, the judgment half",
+      "Judges per step whether it is concrete, safe, reproducible and observable enough for a lab run.",
+      P_READINESS, "readiness")}`;
+}
+
+function designPane() {
+  return `<div class="sub" style="margin-bottom:6px">The emitter writes the spec from the
+      record mechanically. This is the judgment it cannot make: how the chain should be
+      broken into test units, whether the full path is worth running as one exercise, what
+      the environment has to be for the answer to mean anything, and what a run would not
+      settle. It plans the work you cannot run today as well, and labels it.</div>
+    <ol class="jsteps">
+      <li>Copy the prompt and paste the scenario record underneath it.</li>
+      <li>Run it in any LLM. It returns a plan in prose, then a small JSON block.</li>
+      <li>Read the plan. The JSON carries the pipeline mode, the units, the steps to exclude and what is blocked.</li>
+      <li>Take those decisions to the emitter in step 3.</li></ol>
+    ${promptBox("Design a test plan",
+      "Recommends unit-level and full-attack-path testing, the environment each needs, and what is blocked today.",
+      P_TESTPLAN, "testplan")}
+    <div class="note"><strong>What can actually run today.</strong> Only the
+      <code>lab-only</code> rung is enabled; the executor refuses anything above it even if
+      a spec asks. <code>production-observe</code>, the rung that would test the real
+      detection pipeline without building a mirror, is specified and switched off, and its
+      approval path is not yet defined. There is also no runner: the spec binds to an
+      emulation library through an adapter that has not been written. So a plan is a
+      reviewable design and a build target, not a schedule.</div>`;
+}
+
+function rescorePane() {
+  return `<div class="sub" style="margin-bottom:6px">This half lives in the repository, not
+      in the browser, because it is sealed. The prediction is frozen before the run and the
+      scorer refuses to score if it moved afterwards. Nothing writes itself back into a
+      record.</div>
+    <div class="tflow">
+      <div class="tstep"><span class="n">1</span><div><strong>Emit the spec and the prediction.</strong>
+        <code>python3 tools/emit_testspec.py NNN --sealed-by "your name"</code>
+        <span class="hint">Writes <code>specs/ST-NNN-slug/</code>: <code>spec.yaml</code>, the
+        engine-agnostic OpenSpec an adapter binds by technique id; <code>spec.md</code>, the same
+        thing in the spec-driven agent convention; and <code>prediction.yaml</code>, the claim set.
+        Add <code>--check</code> to run only the readiness gate and write nothing.</span></div></div>
+      <div class="tstep"><span class="n">2</span><div><strong>Commit the prediction before the run.</strong>
+        <span class="hint">A discrete, timestamped act, so git is the notary. A prediction revised
+        after the answer is known is not a prediction.</span></div></div>
+      <div class="tstep"><span class="n">3</span><div><strong>Run it, and record what you saw.</strong>
+        <span class="hint">Author <code>runs/RUN-NNN-YYYY-MM-DD-NN.yaml</code> against
+        <code>schema/run-record.schema.json</code>. Observations are written by whoever ran the
+        test, from what was seen, <em>before</em> opening the prediction. The observer is not the
+        agent.</span></div></div>
+      <div class="tstep"><span class="n">4</span><div><strong>Score it.</strong>
+        <code>python3 tools/score_run.py runs/RUN-NNN-....yaml</code>
+        <span class="hint">Compares predicted against observed and reports four numbers: exact
+        match rate, optimism index (positive means we believe we see more than we do, and it is the
+        one that matters), source precision, and surprise count. It refuses to score if the
+        prediction digest moved, and refuses claims the environment cannot test.</span></div></div>
+      <div class="tstep"><span class="n">5</span><div><strong>Apply what it proposes, deliberately.</strong>
+        <span class="hint">The scorer only proposes: a direction and a field per row, plus any new
+        sources the run found. A person chooses the DeTT&amp;CT numbers, cites the run id as
+        <code>backlog_ref</code> so the change is visible as a rescore rather than as improvement,
+        and runs <code>./liszt validate</code> before committing.</span></div></div>
+    </div>
+    <div class="note"><strong>Where the loop is still open.</strong> Two ends are missing and
+      it is better to know it. Nothing executes a test yet, so the two records in
+      <code>runs/</code> are worked examples a person authored by hand. And the scorer's
+      proposals name a direction, <em>Have</em> to <em>Collectable</em>, while records store
+      DeTT&amp;CT integers, so applying one is still a hand translation. The source proposals
+      are the exception: they are directly applicable today.</div>`;
+}
+
+function renderTesting() {
+  const rail = `<div class="irail">${[
+      ["readiness", "1 &middot; Readiness"],
+      ["design",    "2 &middot; Test design"],
+      ["rescore",   "3 &middot; Run and rescore"]]
+    .map(([k, t]) => `<button class="ibtn" data-tstep="${k}"
+      aria-current="${testStep === k}">${t}</button>`).join("")}</div>`;
+  const body = testStep === "readiness" ? readinessPane()
+             : testStep === "design" ? designPane() : rescorePane();
+  $("#testing").innerHTML = `<div class="panel"><h3>Scenario testing</h3>
+    <div class="sub">A scenario record claims what a defender would see. Testing checks
+      whether that claim is true, and the useful answer is the one where it is not.</div>
+    <div style="margin-top:14px">${rail}${body}</div></div>`;
+  wireTesting();
+}
+
+function wireTesting() {
+  $$("#testing .ibtn[data-tstep]").forEach(b => b.onclick = () => {
+    testStep = b.dataset.tstep; renderTesting();
+  });
+  const bodies = { readiness: P_READINESS, testplan: P_TESTPLAN };
+  $$("#testing .copybtn[data-read]").forEach(b => b.onclick = () => {
+    openPrompts[b.dataset.read] = !openPrompts[b.dataset.read]; renderTesting();
+  });
+  $$("#testing .copybtn[data-copy]").forEach(b => b.onclick = () => {
+    const text = bodies[b.dataset.copy];
+    if (!text) return;
+    const done = () => { const t = b.textContent; b.textContent = "Copied"; setTimeout(() => b.textContent = t, 1200); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => { b.textContent = "Press Cmd-C"; });
+    } else { b.textContent = "Press Cmd-C"; }
+  });
 }
 
 function wireIntake() {
@@ -2196,6 +2652,7 @@ function setView(v) {
   $("#frameworks").hidden = v !== "frameworks";
   $("#reports").hidden = v !== "reports";
   $("#intake").hidden = v !== "intake";
+  $("#testing").hidden = v !== "testing";
   $("#sessionview").hidden = v !== "session";
   /* the parked tab is optional and carries its own chrome */
   const parked = $("#beyond");
@@ -2219,6 +2676,7 @@ function setView(v) {
     }
     renderIntake();
   }
+  if (v === "testing") renderTesting();
   if (v === "session") renderSession();
 }
 
@@ -2476,6 +2934,7 @@ def page(data: dict) -> str:
     <button data-view="frameworks" aria-current="false">Frameworks</button>
     <button data-view="reports" aria-current="false">Reports</button>
     <button data-view="intake" aria-current="false">Bring in a scenario</button>
+    <button data-view="testing" aria-current="false">Scenario testing</button>
     {parked_nav}
     <button data-view="session" aria-current="false" id="sessionnav" hidden>Session</button>
     <button style="margin-left:auto;color:var(--brand)" id="sessiontoggle">Start session mode</button>
@@ -2527,6 +2986,7 @@ def page(data: dict) -> str:
   <section id="frameworks" hidden></section>
   <section id="reports" hidden></section>
   <section id="intake" hidden></section>
+  <section id="testing" hidden></section>
   {parked_section}
   <section id="sessionview" hidden></section>
 

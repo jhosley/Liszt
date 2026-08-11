@@ -106,10 +106,8 @@ scenario has earned its place, an analyst turns it into a permanent
 and fill, not a rewrite. Apply the exported session with `tools/apply_session.py`, which
 recomputes rather than trusts, and keeps the validator in the loop.
 
-# Validating a scenario for agent testing
+# Testing a scenario
 
-A separate prompt, shown below the intake section, judges whether an already-scored
-scenario is concrete, safe, reproducible, and observable enough for an emulation agent to
-run in a lab. It does not bring a scenario in: its JSON goes back to the repo and is
-consumed by `tools/emit_testspec.py`, which re-checks the mechanical half itself. See
-`docs/12-agent-testing.md`.
+Bringing a scenario in is the front half of the loop; checking whether its claims are true
+is the back half, and it has its own tab, **Scenario testing**. Readiness, test design, and
+the run-and-rescore sequence live there. See `docs/12-agent-testing.md`.

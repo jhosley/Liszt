@@ -5,6 +5,8 @@
 
 **Status:** prototype. The `lab-only` rung is the only one enabled. The production rungs are fully specified and switched off.
 
+> **In the viewer.** The **Scenario testing** tab carries the judgment half of this document: the mechanical readiness gate run over the whole library, so you can see at a glance which records would emit a spec today and what blocks the rest; the readiness prompt; a test-design prompt that recommends how to break a chain into units, whether the full path is worth running as one exercise, and what is blocked at the enabled rung; and the run-and-rescore sequence with its commands. The mechanical gate shown there is `emit_testspec.readiness()` itself, imported at build time rather than restated, so the page and the emitter cannot disagree. Nothing executes from the browser: emission, sealing and scoring stay in the repository, where git is the notary.
+
 ---
 
 ## 1. What this is for, stated plainly
