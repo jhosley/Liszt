@@ -1,268 +1,115 @@
-# Prototype workflow: a scenario into Liszt, from an incident or a hypothesis
+# Prototype workflow: bringing a scenario into Liszt
 
-This is the fast, prototype-only path that gets two of the journeys running today. Both end the
-same way: a draft scenario you can open, score with the system owners, and export, without
-hand-writing a record.
+This is the fast, prototype-only path that gets a scenario into the viewer without
+hand-writing a record. It lives in the viewer under **Bring in a scenario**, a top-level
+tab, and it is one section with three panes behind a small menu:
 
-- **Path A, a published incident.** Something that really happened to someone else.
-- **Path B, an analyst hypothesis.** An attack nobody has run yet, proposed by the AI Threat
-  Modeler. Liszt tags these so they read differently from a real incident.
+1. **Research library.** A short library of research prompts. Pick one, run it in an LLM
+   with web access, and choose the finding you want to bring in.
+2. **Convert to JSON.** One conversion prompt turns any finding, a published incident or
+   an analyst hypothesis, into scenario JSON. It checks its own output before it emits.
+3. **Paste and add.** Paste the JSON. The viewer checks it again on the way in, and it
+   appears in the Scenarios list immediately as a draft.
 
-> **These prompts are built into the viewer.** In session mode, open **Readback and export →
-> Bring in a scenario**, pick a journey, and its directions and prompts are right there with a
-> Copy button and the paste box. This document is the same content for reading or editing offline.
+> **The live prompt text lives in the viewer, not here.** `tools/build_viewer.py` is the
+> source of truth for every prompt this page shows; each one has a Copy button next to the
+> paste box. This document describes the flow and the rules the prompts enforce. When the
+> two disagree, the viewer is right, and this document has the bug.
 
-Every path is: a prompt produces scenario JSON, and you paste that JSON into the viewer. The JSON
-is a faithful subset of the real scenario record, so anything you bring in this way can later
-become a permanent `scenarios/NNN-*.yaml` record with no rework.
+The JSON the conversion prompt produces is a faithful subset of the real scenario record,
+so anything brought in this way can later become a permanent `scenarios/NNN-*.yaml` record
+by copy and fill, not rework.
 
-> **What this path does and does not do.** It gets a structured, framework-tagged draft into the
-> library in minutes. It does **not** score coverage. Scoring is the job of the system owners in a
-> session, on the two questions Liszt asks, and the verdict is computed from those scores. The
-> prompts below deliberately never guess a score.
-
----
-
-# Path A — a published incident
-
-## Step A1 — Find published incidents (discovery prompt)
-
-Run this in an LLM that can browse the web. Adjust the count or the time window as you like.
-
-```
-You are a threat-intelligence researcher building a list of PUBLISHED, real-world security
-incidents that involve AI INFRASTRUCTURE. Use web search and cite a source URL for every item.
-
-Scope "AI infrastructure" broadly. Include incidents that touch any of:
-  - Model supply chain: tampered or backdoored models, poisoned weights, malicious models on
-    public hubs (Hugging Face and similar), typosquatted model or package names.
-  - Inference and serving: exploited inference servers, model-loading / deserialization code
-    execution, exposed or unauthenticated model endpoints and AI gateways.
-  - Data layer: training-data poisoning, RAG / vector-database poisoning or leakage, exposed
-    vector stores.
-  - Orchestration and agents: agent tool abuse, prompt-injection that led to real impact,
-    malicious or vulnerable MCP servers and tool connectors, agent-to-agent compromise.
-  - MLOps and pipelines: compromised training or deployment pipelines, leaked API keys or
-    credentials for AI services, exposed notebooks or experiment trackers.
-  - Guardrails and safety controls: bypasses that caused a real incident, not lab-only demos.
-
-For each incident, give me a row with:
-  1. Short name
-  2. Date (or "reported <month year>")
-  3. Who disclosed it (vendor, researcher, CISA, press)
-  4. One sentence on what actually happened
-  5. The single AI infrastructure layer it MOST affects, chosen from exactly:
-     L0 · Infrastructure | L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application
-  6. Source URL
-  7. Source tier: 1 = first-party (vendor post-mortem, CISA, the affected org),
-                  2 = reputable press or named research team,
-                  3 = community report or aggregator
-  8. One line on why it matters to a defender
-
-Rules:
-  - Prefer confirmed incidents over research demonstrations. If you include a notable
-    proof-of-concept because it is important, label it clearly as "research, not in the wild."
-  - Prefer first-party and tier-1 sources. Do not include vendor marketing.
-  - Do not speculate. If a detail is unknown, say "unknown."
-  - Spread the list across the layers above; do not return ten of the same kind.
-
-Return the 12 most relevant items as a table, most recent and most severe first.
-```
-
-Skim the list, pick one, and move to step 2.
+> **What this path does and does not do.** It gets a structured, framework-tagged draft
+> into the library in minutes. It does **not** score coverage. Scoring is the job of the
+> system owners in a session, on the two questions Liszt asks, and the verdict is computed
+> from those scores. The prompts deliberately never guess a score.
 
 ---
 
-## Step A2 — Map one incident into Liszt scenario JSON (mapping prompt)
+# The research library
 
-Paste the discovery row (or the incident's source URL) where marked, then run this. It returns
-**only JSON**, ready to paste into the viewer.
+Three prompts ship with the viewer. Each is one way of sourcing a scenario, and every one
+of them feeds the same conversion prompt afterward.
 
-```
-You are mapping ONE published incident into a Liszt scenario record. Research the incident using
-the source(s) I give you, then output a SINGLE JSON object and NOTHING else. No prose, no code
-fence, just the JSON.
+- **Published incidents.** Searches the open web for published, real-world
+  AI-infrastructure incidents and returns twelve candidates as a table: name, date,
+  discloser, what happened, the layer it most affects, source URL, and a source tier.
+- **Threat-research feeds.** The same intent, restricted to four vetted sources: Wiz,
+  JFrog, Mandiant / Google Threat Intelligence, and the AI Incident Database.
+- **Analyst hypothesis.** For an attack nobody has run yet. It sharpens a worry about our
+  own environment into an objective, a chain of concrete moves, and the signal each move
+  would produce, without writing any JSON. Its output goes into the conversion prompt's
+  hypothesis block, and the record arrives tagged as threat-modeler work.
 
-THE INCIDENT:
-<<< paste the incident name and its source URL here >>>
+**Adding a prompt.** The library pane has a form for adding a research prompt. Added
+prompts are session-only, like imports: they live in the browser and in the exported
+session file, and are never written to the repo. To make one permanent, it goes into the
+repository the same way a scenario does, as a deliberate change an analyst commits.
 
-Produce JSON with exactly this shape:
+# The conversion prompt
 
-{
-  "title": "short scenario title, an attacker-goal phrasing, e.g. 'Poisoned model on a public hub reaches our inference stack'",
-  "one_liner": "2-3 plain sentences a non-expert can follow: what the attacker does and what the damage is. Write it about OUR environment ('our', 'we'), not about the specific victim.",
-  "classification": {
-    "ai_infrastructure_layer": "the one layer it mostly happens at, chosen from exactly: L0 · Infrastructure | L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application",
-    "evidence": "seen-in-the-wild if a real incident occurred, or seen-in-research if it is a demonstrated proof of concept",
-    "priority": "NOW, NEAR-TERM, or BACKLOG, your best judgment of urgency for a defender",
-    "priority_rationale": ["3 short bullets on why it rates that priority, each a plain sentence"]
-  },
-  "attack_path": [
-    { "step": 1, "layer": "the stack layer this move lands on, using the same five-layer vocabulary or a short 'A -> B' form like 'Data / inbound' or 'Model -> App'", "text": "one move of the attack, in plain language" }
-  ],
-  "telemetry": [
-    { "step": 1, "signal": "the observable event this move would produce", "emitted_at": "where that event would be emitted from, named generically (e.g. 'EDR / container runtime logs', 'AI gateway logs', 'model registry logs')", "detection_opportunity": "what a detection could look for here" }
-  ],
-  "framework_mapping": {
-    "baseline": "2026.07",
-    "attack": ["MITRE ATT&CK technique IDs at v19.1 that apply, e.g. T1059; [] if none"],
-    "atlas": ["MITRE ATLAS technique IDs at 2026.07 that apply, e.g. AML.T0010; [] if none"],
-    "owasp_llm": ["OWASP LLM 2025 IDs like LLM03:2025; [] if none"],
-    "owasp_agentic": ["OWASP Agentic 2026 IDs like ASI02; [] if none"]
-  },
-  "incidents": [
-    { "title": "the source's title", "url": "the source URL", "tier": "1, 2, or 3" }
-  ]
-}
+One prompt converts any finding into scenario JSON. It replaces the two mapping prompts
+the earlier journeys carried, which had duplicated the same rules and drifted.
 
-Rules:
-  - One telemetry entry per attack_path step, sharing the same step number.
-  - DO NOT include any coverage, visibility, detection, or score field anywhere. Coverage is
-    scored later by the people who own the systems. You only identify the signal that WOULD exist.
-  - Use real framework identifiers only where you are confident. If a mapping is your judgment
-    rather than an official crosswalk, still include the ID but keep the list short and defensible.
-  - Keep attack_path to 4-7 steps. Every step should be a distinct move.
-  - Output valid JSON only. No trailing commas. No commentary.
-```
+The input is a two-block switch: fill in the **published incident** block or the **analyst
+hypothesis** block. Which block is filled decides the provenance fields and nothing else:
 
----
+- An incident sets `classification.evidence: "seen-in-the-wild"` and fills `incidents`,
+  where `tier` grades the source, 1 first party, 2 reputable secondary, 3 press.
+- A hypothesis adds top-level `origin: "hypothesis"` and `proposed_by: "AI Threat
+  Modeler"`, sets `classification.evidence: "seen-in-research"`, and omits `incidents`.
+  Those two strings are how Liszt tags the record so it can never be mistaken for a real
+  incident; a named analyst may put their own name in `proposed_by`.
 
-## Step A3 — Add it to Liszt
+The rules the prompt enforces, which are also the rules the importer and the validator
+check:
 
-See **"Adding any scenario to Liszt"** at the end of this document. It is the same for both paths.
+- `classification.ai_infrastructure_layer` is exactly one of the five layer strings,
+  chosen by the LAYER RULE: the layer where the attacker achieves the objective, not where
+  they got in and not who performed the move. The prompt carries the full decision
+  procedure and the anti-patterns we have actually seen.
+- `attack_path[].layer` is a different field: a short seam tag from a closed vocabulary,
+  18 characters at most, tagging where the move operates. It includes `Model / store`, the
+  model artifact at rest, so model-weight theft lands on L2 without contortion.
+- One step is one adversary move that produces its own distinct observable. Three to six
+  steps; six is a hard ceiling enforced by the schema. One telemetry row per step.
+- No coverage, visibility, detection, or score field anywhere. Owners score it later.
+- Framework values are real identifiers or an empty list; placeholders are discarded on
+  import.
 
----
+Before emitting, the prompt runs three self-checks on its own draft and records the result
+in a `_check` block: the layer lands on the chain, the steps are one move each and fit the
+render budgets, and the fields are right for the kind of input. `_check` also carries the
+model's stated reason for the layer, the runner-up it nearly chose, anything it merged,
+and its confidence. `_check` is not part of the record; the importer surfaces it to the
+reviewer and then it is dropped.
 
-# Path B — an analyst hypothesis
+# Paste and add
 
-This is the hypothesis journey: an attack nobody has run yet. The analyst has an idea; this prompt
-turns that idea into the same structured, framework-tagged scenario the system works with, and
-marks it as proposed by the AI Threat Modeler so it never gets mistaken for a real incident.
+Paste one scenario object, or an array of them, and add it. The importer normalizes and
+re-checks everything mechanical: it canonicalizes the layer, drops placeholder framework
+values, caps the chain at six steps, checks the claimed layer against the seam tags of the
+chain, and coerces source tiers. Anything questionable arrives as a `needs_review` note on
+the draft rather than being silently corrected, because in most of those cases a
+legitimate answer exists in both directions and only a person can tell which.
 
-## Step B1 — Turn a hypothesis into Liszt scenario JSON (mapping prompt)
-
-Write your hypothesis in plain language where marked. It can be a sentence or a paragraph. Then
-run this in any LLM. It returns **only JSON**, ready to paste into the viewer.
-
-```
-You are an AI threat modeler. Take the analyst hypothesis below, an attack that has NOT
-happened yet, and turn it into a rigorous Liszt scenario. Output a SINGLE JSON object and
-NOTHING else. No prose, no code fence, just the JSON.
-
-THE HYPOTHESIS:
-<<< write your hypothesis here, in plain language. What is the attacker trying to do, and
-    what makes you worried it could work against us? >>>
-
-Your job is to sharpen the idea, not to judge it. Break it into concrete moves, and for each
-move name the observable signal a defender would look for. Do not soften a real concern and do
-not inflate a weak one.
-
-Produce JSON with exactly this shape:
-
-{
-  "origin": "hypothesis",
-  "proposed_by": "AI Threat Modeler",
-  "title": "short scenario title in attacker-goal phrasing",
-  "one_liner": "2-3 plain sentences about OUR environment ('our', 'we'): what the attacker does and why it would hurt.",
-  "classification": {
-    "ai_infrastructure_layer": "the one layer it mostly happens at, chosen from exactly: L0 · Infrastructure | L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application",
-    "evidence": "seen-in-research",
-    "priority": "NOW, NEAR-TERM, or BACKLOG, the analyst's best judgment of urgency",
-    "priority_rationale": ["3 short bullets on why it rates that priority. It is honest to say 'nobody has run this yet, but ...' here."]
-  },
-  "attack_path": [
-    { "step": 1, "layer": "the stack layer this move lands on, using the five-layer vocabulary or a short 'A -> B' form", "text": "one move of the attack, in plain language" }
-  ],
-  "telemetry": [
-    { "step": 1, "signal": "the observable event this move WOULD produce if it happened", "emitted_at": "where that event would be emitted from, named generically", "detection_opportunity": "what a detection could look for here" }
-  ],
-  "framework_mapping": {
-    "baseline": "2026.07",
-    "attack": ["ATT&CK v19.1 IDs that apply; [] if none"],
-    "atlas": ["ATLAS 2026.07 IDs that apply; [] if none"],
-    "owasp_llm": ["OWASP LLM 2025 IDs; [] if none"],
-    "owasp_agentic": ["OWASP Agentic 2026 IDs; [] if none"]
-  }
-}
-
-Rules:
-  - Keep "origin": "hypothesis" and "proposed_by": "AI Threat Modeler" exactly as written, so
-    Liszt tags this as a threat-modeler scenario. If a specific analyst wants their name on it,
-    they may replace the proposed_by value with their own.
-  - One telemetry entry per attack_path step, sharing the same step number.
-  - DO NOT include any coverage, visibility, detection, or score field. The owners score it later.
-    You only identify the signal that WOULD exist.
-  - Keep attack_path to 4-7 distinct moves.
-  - Use real framework identifiers only where you are confident. A hypothesis may map to nothing
-    in the catalogs yet; an empty list is a fine and honest answer.
-  - Output valid JSON only. No trailing commas. No commentary.
-```
-
-## Step B2 — Add it to Liszt
-
-Same as any scenario, below. Once imported, it shows a purple **Threat modeler** tag in the list
-and a **Threat modeler hypothesis** tag on the record, so anyone can see at a glance that it is a
-proposed attack, not one seen in the wild.
-
----
-
-# Path C — threat-research feeds
-
-Same as Path A, but the discovery prompt searches four specific sources instead of the open web:
-**Wiz**, **JFrog**, **Mandiant / Google Threat Intelligence**, and the **AI Incident Database**.
-Use it when you want vetted, technical writeups rather than a broad sweep. After you pick one,
-run the **Path A mapping prompt** (Step A2) on it, unchanged.
-
-## Step C1 — Search the threat-research feeds (discovery prompt)
-
-```
-You are a threat-intelligence researcher. Search these SPECIFIC sources for published incidents
-and technical writeups about attacks on AI systems and AI infrastructure, and cite a link for each:
-  - Wiz research (wiz.io/blog and their research team posts)
-  - JFrog security research (jfrog.com, malicious-package and model findings)
-  - Mandiant / Google Threat Intelligence (cloud.google.com/security, Mandiant blog)
-  - The AI Incident Database (incidentdatabase.ai), a public community record of AI harms
-
-Focus on AI infrastructure: malicious or backdoored models, poisoned hubs and packages, compromised
-ML pipelines, exposed model endpoints and vector stores, agent and MCP tool abuse, prompt-injection
-with real impact, leaked AI credentials.
-
-For each item give: 1) short name  2) date  3) source (Wiz, JFrog, Mandiant, or AI Incident Database)
-and a link  4) one sentence on what happened  5) the single layer it most affects
-(L0 · Infrastructure | L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application)
-6) source tier (1 first-party, 2 reputable research, 3 community).
-
-Rules: only these four sources; if one has nothing relevant, say so and move on; prefer confirmed
-incidents and concrete technical findings over opinion; mark unknown details "unknown".
-Return the 12 most relevant items as a table, most recent and most severe first.
-```
-
-## Step C2 — Map and add
-
-Run the **Path A mapping prompt** (Step A2) on the incident you picked, then add it the same way
-as any scenario, below.
-
----
-
-# Adding any scenario to Liszt
-
-1. Run `./liszt serve` and open the page.
-2. Click **Start session mode** (top right), then **Readback and export**.
-3. In the **Imported scenarios, from an incident** panel, click **Import a scenario from JSON**.
-4. Paste the JSON and click **Add to the library**.
-
-It appears in the Scenarios list right away as a draft, with a generated id like `IMP-1`. Open it
-and you will see the attack path and the evidence rows. In session mode, score each row with the
-owners the same way you score any scenario; the coverage verdict computes from those scores.
-Hypothesis scenarios carry the threat-modeler tag through all of this.
+Open the imported scenario like any other; score it with the owners in a session the same
+way you score any scenario.
 
 ### How it persists
 
-Imported scenarios live in the browser session (they survive a reload) and in the file that
-**Export session file** produces. That keeps the prototype simple and keeps the records clean:
-nothing is written to `scenarios/` automatically. When an imported scenario has earned its place,
-an analyst turns it into a permanent `scenarios/NNN-*.yaml` record. The JSON shape here is a subset
-of that record, so it is a copy-and-fill, not a rewrite.
+Imported scenarios live in the browser session and in the file that **Export session
+file** produces. Nothing is written to `scenarios/` automatically. When an imported
+scenario has earned its place, an analyst turns it into a permanent
+`scenarios/NNN-*.yaml` record; the JSON shape is a subset of that record, so it is a copy
+and fill, not a rewrite. Apply the exported session with `tools/apply_session.py`, which
+recomputes rather than trusts, and keeps the validator in the loop.
 
-You can paste a single scenario object or a JSON array of several at once, and you can mix
-incident and hypothesis scenarios in one array.
+# Validating a scenario for agent testing
+
+A separate prompt, shown below the intake section, judges whether an already-scored
+scenario is concrete, safe, reproducible, and observable enough for an emulation agent to
+run in a lab. It does not bring a scenario in: its JSON goes back to the repo and is
+consumed by `tools/emit_testspec.py`, which re-checks the mechanical half itself. See
+`docs/12-agent-testing.md`.
