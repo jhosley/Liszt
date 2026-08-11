@@ -458,9 +458,13 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
 .ibtn:hover{border-color:var(--brand);background:#F3F7FA}
 .ibtn[aria-current="true"]{border-color:var(--brand);color:var(--brand);box-shadow:0 0 0 1px var(--brand)}
 .jsteps{margin:8px 0 2px;padding-left:18px;color:var(--ink-2);font-size:12.5px;line-height:1.55}
-.pbox{margin:12px 0}
-.pbox .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-.pbox .ph .pt{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.pbox{margin:10px 0;border:1px solid var(--rule);border-radius:8px;padding:10px 14px;background:var(--surface)}
+.pbox .ph{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.pbox .ph .pm{min-width:0}
+.pbox .ph .pt{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--brand-ink)}
+.pbox .ph .pd{display:block;color:var(--muted);font-size:12px;margin-top:2px;line-height:1.4}
+.pbox .ph .pb{display:flex;gap:6px;align-items:center;white-space:nowrap}
+.pbox pre{margin-top:10px}
 .copybtn{font:inherit;font-size:11px;border:1px solid var(--rule);background:var(--surface);
   border-radius:6px;padding:3px 11px;cursor:pointer;color:var(--brand)}
 .copybtn:hover{border-color:var(--brand)}
@@ -1078,7 +1082,48 @@ no others.
     is only ever one evidence field, and it lives inside classification).
   - Remove the "incidents" key entirely. A hypothesis has no source incident.
 
+WORKED EXAMPLE, incident form, shortened. A reference for format and granularity only; do
+not copy its content into your answer.
+{
+  "title": "Poisoned document steers the RAG assistant",
+  "one_liner": "An attacker mails us a crafted document. Our assistant ingests it, retrieval surfaces the planted passage, and answers follow the attacker's instruction.",
+  "classification": {
+    "ai_infrastructure_layer": "L1 · Data",
+    "evidence": "seen-in-the-wild",
+    "priority": "NOW",
+    "priority_rationale": ["Our assistant ingests external mail unfiltered", "Poisoning persists across sessions until the store is cleaned", "Published incidents show this in real use"]
+  },
+  "attack_path": [
+    { "step": 1, "layer": "Data / inbound", "text": "attacker emails a document carrying an embedded instruction to a monitored inbox" },
+    { "step": 2, "layer": "Data / store", "text": "the pipeline embeds the document and writes the planted passage to the vector store" },
+    { "step": 3, "layer": "Model / infer", "text": "retrieval surfaces the passage and the assistant's answer follows the instruction" }
+  ],
+  "telemetry": [
+    { "step": 1, "signal": "external document accepted for ingestion", "emitted_at": "ingestion pipeline log", "detection_opportunity": "instruction-like content in inbound documents" },
+    { "step": 2, "signal": "embedding write from an external source", "emitted_at": "vector store audit log", "detection_opportunity": "provenance tag on writes from unauthenticated senders" },
+    { "step": 3, "signal": "answer citing the planted passage", "emitted_at": "inference gateway log", "detection_opportunity": "responses whose citations trace to recent external ingests" }
+  ],
+  "framework_mapping": { "baseline": "2026.07", "attack": ["T1566"], "atlas": [], "owasp_llm": ["LLM06:2025"], "owasp_agentic": [] },
+  "incidents": [ { "title": "Vendor writeup of a RAG poisoning incident", "url": "https://example.com/writeup", "tier": 2 } ],
+  "_check": {
+    "layer_reason": "The corpus is the asset corrupted; the model behaves as designed on poisoned retrieval",
+    "layer_runner_up": "L2 · Model",
+    "steps_merged": "",
+    "confidence": "high",
+    "check_1_layer_lands": "pass, steps 1 and 2 land on L1",
+    "check_2_geometry": "pass",
+    "check_3_fields": "pass"
+  }
+}
+Note what the example gets right: the chain was written first and the layer read off it;
+a model appears in step 3 and the layer is still not L2, because the corrupted asset is
+the corpus; the atlas list is empty rather than guessed; and every step names one move
+with one observable.
+
 Rules:
+  - WORK IN THIS ORDER: understand the finding, write the attack_path, then choose
+    ai_infrastructure_layer FROM the chain you wrote, then fill everything else. A layer
+    chosen first anchors the chain to it; a chain written first is evidence.
   - ai_infrastructure_layer MUST be exactly ONE of the five strings below, copied from
     THIS list character for character. Do not re-type it from the LAYER RULE prose. The
     separator is "·" (U+00B7) with a space either side, not a hyphen and not a period.
@@ -1195,22 +1240,20 @@ what you changed) into "_check".
     move is genuinely External, the finding is about a system we do not own; return it for
     re-scoping rather than forcing a layer.
 
-  CHECK 2. THE STEPS ARE ONE MOVE EACH, AND FIT. 3 to 6 steps, numbered 1..N with no gaps,
-    one telemetry row per step sharing its number. Then check granularity in BOTH
-    directions:
+  CHECK 2. THE STEPS ARE ONE MOVE EACH, AND FIT. Steps are numbered 1..N with no gaps and
+    every count, length, and one-row-per-step rule above holds. Then check granularity in
+    BOTH directions:
       - Over-split: if two steps would be seen in the same log line, or name the same
         emission point, they are one move. Merge them.
       - Under-decomposed: if one step's text names two adversary actions that a defender
         would see at two DIFFERENT sources, it is two steps. Split it. A single telemetry
         row that cannot account for everything its step describes is the tell. If splitting
         would exceed six steps, the finding is two scenarios, not one compressed chain.
-    Confirm the length budgets from the Rules (step line <= 125; telemetry soft caps).
     Record the outcome in _check.check_2_geometry.
 
-  CHECK 3. THE FIELDS ARE RIGHT FOR THE KIND. ai_infrastructure_layer is exactly one of the
-    five strings, character for character, "·" is U+00B7 with a space either side. Every
-    framework value is a real identifier or the list is []. No coverage, visibility,
-    detection, or score field anywhere; tier and priority remain. Then the branch fields:
+  CHECK 3. THE FIELDS ARE RIGHT FOR THE KIND. Re-verify the layer-string, framework-ID and
+    no-score rules above, character for character for the layer string. Then the branch
+    fields:
       - Incident: classification.evidence == "seen-in-the-wild", and incidents is present
         with a real url and a tier of 1, 2, or 3.
       - Hypothesis: top-level origin == "hypothesis", top-level proposed_by is set,
@@ -1235,17 +1278,29 @@ inference servers, model-load code execution, exposed model endpoints and AI gat
 abuse, prompt-injection with real impact, malicious MCP servers); MLOps (compromised pipelines,
 leaked AI credentials); guardrail bypasses that caused a real incident.
 
-For each item give: 1) short name  2) date  3) who disclosed it  4) one sentence on what happened
-5) the single layer it most affects (L0 · Infrastructure | L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application)
-6) source URL  7) source tier (1 first-party, 2 reputable press/research, 3 community)  8) why it matters.
+Return a NUMBERED table with exactly these columns:
+  # | Name | Date | Disclosed by | What happened, one sentence | Layer, provisional | Source URL | Tier | Why it matters
+Example row:
+  1 | Malicious models on a public hub | 2025-03 | JFrog | Backdoored models executed code on load in downstream pipelines | L2 | https://... | 1 | The model supply chain reaches every consumer
 
-Rules: prefer confirmed incidents over demos (label any notable demo "research, not in the wild");
-prefer first-party and tier-1 sources; no marketing; do not speculate; spread across the layers.
-Return the 12 most relevant items as a table, most recent and most severe first.`;
+Rules:
+  - The 12 most relevant items from the last 24 months, most recent and most severe first. If
+    the window holds fewer than 12, widen it and say so. Relevance beats layer spread; use
+    spread only to break ties between equally relevant items.
+  - ONE ROW PER INCIDENT. If several sources cover the same incident, merge them into one row
+    and cite the most first-party source.
+  - Layer is PROVISIONAL, your quick read: L0 Infrastructure, L1 Data, L2 Model,
+    L3 Orchestration and Agent, or L4 Application. The conversion prompt re-derives it with a
+    stricter rule, so do not agonize over it.
+  - Tier grades the SOURCE: 1 first party, 2 reputable press or research, 3 community.
+  - Prefer confirmed incidents over demos, and label any notable demo "research, not in the
+    wild"; no marketing; do not speculate; mark unknown details "unknown".
+
+I will pick one row by its number and hand it to the conversion prompt.`;
 
 const P_RESEARCH =
 `You are a threat-intelligence researcher. Search these SPECIFIC sources for published incidents
-and technical writeups about attacks on AI systems and AI infrastructure, and cite a link for each:
+and technical writeups about attacks on AI systems and AI infrastructure:
   - Wiz research (wiz.io/blog and their research team posts)
   - JFrog security research (jfrog.com, malicious-package and model findings)
   - Mandiant / Google Threat Intelligence (cloud.google.com/security, Mandiant blog)
@@ -1255,16 +1310,23 @@ Focus on AI infrastructure: malicious or backdoored models, poisoned hubs and pa
 ML pipelines, exposed model endpoints and vector stores, agent and MCP tool abuse, prompt-injection
 with real impact, leaked AI credentials.
 
-For each item give: 1) short name  2) date  3) source (Wiz, JFrog, Mandiant, or AI Incident Database)
-and a link  4) one sentence on what happened  5) the single layer it most affects (L0 · Infrastructure
-| L1 · Data | L2 · Model | L3 · Orchestration & Agent | L4 · Application)  6) source tier (1 first-party,
-2 reputable research, 3 community).
+Return a NUMBERED table with exactly these columns:
+  # | Name | Date | Source and link | What happened, one sentence | Layer, provisional | Tier
+Example row:
+  1 | Exposed vector stores | 2025-06 | Wiz, https://... | Internet-exposed vector databases leaked the documents embedded in them | L1 | 1
 
-Rules: only these four sources; if one has nothing relevant, say so and move on; prefer confirmed
-incidents and concrete technical findings over opinion; mark unknown details "unknown".
-Return the 12 most relevant items as a table, most recent and most severe first.
+Rules:
+  - Only these four sources; if one has nothing relevant, say so and move on.
+  - The 12 most relevant items from the last 24 months, most recent and most severe first. If
+    the four sources yield fewer than 12 in the window, widen it and say so.
+  - ONE ROW PER INCIDENT. If two sources cover the same incident, one row naming both, citing
+    the more first-party link.
+  - Layer is PROVISIONAL, your quick read: L0 Infrastructure, L1 Data, L2 Model,
+    L3 Orchestration and Agent, or L4 Application. The conversion prompt re-derives it.
+  - Tier grades the SOURCE: 1 first party, 2 reputable research, 3 community. Prefer confirmed
+    incidents and concrete technical findings over opinion; mark unknown details "unknown".
 
-Then, once I pick one, use the conversion prompt to turn it into scenario JSON.`;
+I will pick one row by its number and hand it to the conversion prompt.`;
 
 const P_HYP_RESEARCH =
 `You are an AI threat modeler helping an analyst sharpen a worry into something concrete
@@ -1623,11 +1685,19 @@ function dropImported(i) {
   saveSession();
 }
 
-function promptBox(title, body, copyKey, extra) {
+/* A prompt renders as one summary line, name and what it asks, with the full text behind
+   a Read toggle. Copy works without opening it; nobody has to scroll a wall of prompt to
+   get on with the work. */
+const openPrompts = {};
+function promptBox(title, desc, body, copyKey, extra) {
+  const open = !!openPrompts[copyKey];
   return `<div class="pbox">
-    <div class="ph"><span class="pt">${esc(title)}</span><span>${extra || ""}
-      <button class="copybtn" data-copy="${esc(copyKey)}">Copy prompt</button></span></div>
-    <pre>${esc(body)}</pre></div>`;
+    <div class="ph"><span class="pm"><span class="pt">${esc(title)}</span>
+      <span class="pd">${esc(desc)}</span></span>
+      <span class="pb">${extra || ""}
+        <button class="copybtn" data-read="${esc(copyKey)}">${open ? "Hide" : "Read"}</button>
+        <button class="copybtn" data-copy="${esc(copyKey)}">Copy prompt</button></span></div>
+    ${open ? `<pre>${esc(body)}</pre>` : ""}</div>`;
 }
 
 function intakePanel() {
@@ -1649,7 +1719,8 @@ function intakePanel() {
 
   let body;
   if (intakeStep === "library") {
-    const prompts = allResearchPrompts().map(p => promptBox(p.title, p.body, p.key,
+    const prompts = allResearchPrompts().map(p => promptBox(p.title,
+      p.asks || "Added this session.", p.body, p.key,
       p.userIdx === undefined ? "" :
         `<button class="copybtn" data-droppr="${p.userIdx}" style="color:var(--muted)">Remove</button> `))
       .join("");
@@ -1674,7 +1745,9 @@ function intakePanel() {
         <li>Copy the prompt and paste your chosen finding, or your sharpened hypothesis, into the matching input block.</li>
         <li>Run it in any LLM. It self-checks the layer, the step geometry, and the field discipline, then emits one JSON object.</li>
         <li>Take the JSON to step 3 and paste it.</li></ol>
-      ${promptBox("Convert a finding to scenario JSON", P_CONVERT, "convert")}`;
+      ${promptBox("Convert a finding to scenario JSON",
+        "Turns one chosen finding, incident or hypothesis, into a single self-checked scenario JSON object.",
+        P_CONVERT, "convert")}`;
   } else {
     body = `<div class="sub" style="margin-bottom:6px">Paste what the conversion prompt
         produced. It is checked again on the way in; anything questionable arrives flagged
@@ -1706,7 +1779,9 @@ function readinessPanel() {
       <li>Bring the JSON back to the repo and store it under readiness in the emitted spec.</li>
       <li>Then run: python3 tools/emit_testspec.py NNN --sealed-by "your name"</li>
       <li>The emitter re-checks the mechanical half itself, so this prompt covers the judgment half only.</li></ol>
-    ${promptBox("Validate a scenario for agent testing", P_READINESS, "readiness")}</div>`;
+    ${promptBox("Validate a scenario for agent testing",
+      "Judges whether a scored scenario is concrete, safe, reproducible and observable enough for a lab run.",
+      P_READINESS, "readiness")}</div>`;
 }
 
 function renderIntake() {
@@ -1720,6 +1795,10 @@ function wireIntake() {
   });
   const copyBodies = { convert: P_CONVERT, readiness: P_READINESS };
   allResearchPrompts().forEach(p => { copyBodies[p.key] = p.body; });
+  $$("#intake .copybtn[data-read]").forEach(b => b.onclick = () => {
+    openPrompts[b.dataset.read] = !openPrompts[b.dataset.read];
+    renderIntake();
+  });
   $$("#intake .copybtn[data-copy]").forEach(b => b.onclick = () => {
     const text = copyBodies[b.dataset.copy];
     if (!text) return;
