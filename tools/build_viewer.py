@@ -52,6 +52,26 @@ from coverage import load_records, apply_overlay, scenario_metrics, QUALITY_DIMS
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA_VERSION = 1
 
+# A parked design mockup, embedded as-is in its own tab. It is not part of the
+# record library and nothing in the catalog reads it. If the file is absent the
+# tab does not appear and the rest of the page is unaffected.
+PARKED_MOCKUP = ROOT / "reference" / "mockups" / "beyond-ai-scenarios.html"
+
+
+def parked_mockup_b64() -> str:
+    """The beyond-AI mockup, base64 encoded, or '' when it is not present.
+
+    Base64 rather than an inlined string: the mockup is a whole HTML document
+    with its own script tags, and encoding sidesteps every escaping question
+    about nesting one document inside another.
+    """
+    import base64
+    try:
+        raw = PARKED_MOCKUP.read_bytes()
+    except OSError:
+        return ""
+    return base64.b64encode(raw).decode("ascii")
+
 
 def jsonable(o):
     """YAML parses unquoted dates into date objects; JSON has no date type."""
@@ -490,6 +510,21 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
 footer{color:var(--muted);font-size:12px;padding:24px 0 40px;border-top:1px solid var(--rule);
        margin-top:8px}
 [hidden]{display:none !important}
+
+/* beyond-ai tab ------------------------------------------------------------
+   A parked idea, shown as-is inside an isolated frame. Nothing in here
+   participates in the catalog, and nothing in the catalog depends on it. */
+.parked{border:1px solid var(--rule);border-left:3px solid var(--road,#5A3B9C);
+        background:var(--surface-2);border-radius:0 6px 6px 0;padding:12px 16px;margin:0 0 14px}
+.parked .k{font-size:11px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;
+           color:var(--road,#5A3B9C);display:block;margin-bottom:5px}
+.parked p{margin:0 0 6px;font-size:13px;color:var(--ink-2);line-height:1.55}
+.parked p:last-child{margin-bottom:0}
+.parked .open{font:inherit;font-size:12px;color:var(--brand);background:none;border:0;
+              padding:0;cursor:pointer;text-decoration:underline}
+.frameshell{border:1px solid var(--rule);border-radius:8px;overflow:hidden;
+            background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.frameshell iframe{display:block;width:100%;height:1180px;border:0;background:#F8F7F4}
 """
 
 JS = r"""
@@ -1940,6 +1975,60 @@ function renderFrameworks() {
         as such on each record, and must not be presented as upstream-endorsed.</div></div>`;
 }
 
+/* ---------- beyond ai, a parked idea ----------
+   A whole standalone mockup, shown as-is inside an isolated frame. It shares
+   no styles, no script and no data with this page. Rendered once so that
+   moving away from the tab and back does not reset where you were in it. */
+let parkedDrawn = false;
+function parkedHtml() {
+  return new TextDecoder().decode(
+    Uint8Array.from(atob(PARKED_B64), (c) => c.charCodeAt(0)));
+}
+function renderBeyond() {
+  const el = $("#beyond");
+  if (!el || parkedDrawn) return;
+  parkedDrawn = true;
+  el.innerHTML = `
+    <div class="parked">
+      <span class="k">Parked idea &middot; not part of the catalog</span>
+      <p>Everything else in this viewer describes attacks on our AI stack. This tab asks a
+         different question: what would it look like to propose a scenario against something
+         that is not AI at all, a web application or a population of endpoints, and still land
+         it in the same record shape.</p>
+      <p>It is a design mockup and nothing more. No schema changed, no record changed, and
+         no number anywhere else in this page comes from it. It is here so the idea can be
+         looked at and discussed without anyone having to imagine it.</p>
+      <p><button class="open" id="parkedopen">Open it full screen in a new tab</button></p>
+    </div>
+    <div class="frameshell">
+      <iframe title="Beyond AI, proposing a scenario against a described environment"
+              sandbox="allow-scripts allow-same-origin" srcdoc=""></iframe>
+    </div>`;
+  const src = parkedHtml();
+  const fr = $("#beyond iframe");
+  /* Grow the frame to whatever the mockup needs so there is no scrollbar
+     inside a scrollbar. If the browser refuses us a look inside, the fixed
+     height in the stylesheet stands and the frame scrolls on its own. */
+  fr.addEventListener("load", () => {
+    let doc = null;
+    try { doc = fr.contentDocument; } catch (e) { return; }
+    if (!doc || !doc.body) return;
+    const fit = () => {
+      const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
+      if (h > 200) fr.style.height = (h + 20) + "px";
+    };
+    fit();
+    try { new ResizeObserver(fit).observe(doc.body); } catch (e) { /* older browser */ }
+    doc.addEventListener("click", () => setTimeout(fit, 80), true);
+  });
+  fr.srcdoc = src;
+  $("#parkedopen").onclick = () => {
+    const url = URL.createObjectURL(new Blob([src], { type: "text/html" }));
+    window.open(url, "_blank", "noopener");
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  };
+}
+
 /* ---------- shell ---------- */
 function select(id) {
   state.sel = id;
@@ -1955,6 +2044,14 @@ function setView(v) {
   $("#frameworks").hidden = v !== "frameworks";
   $("#reports").hidden = v !== "reports";
   $("#sessionview").hidden = v !== "session";
+  /* the parked tab is optional and carries its own chrome */
+  const parked = $("#beyond");
+  if (parked) {
+    parked.hidden = v !== "beyond";
+    $(".wrap > .tiles").hidden = v === "beyond";
+    $(".filters").hidden = v === "beyond";
+  }
+  if (v === "beyond") renderBeyond();
   if (v === "coverage") renderCoverage();
   if (v === "usecases") renderUseCases();
   if (v === "frameworks") renderFrameworks();
@@ -2191,6 +2288,14 @@ def page(data: dict) -> str:
              "absent from the figures, not zero", "var(--muted)"),
     ])
 
+    # The parked mockup is optional. No file, no tab, and every other view is
+    # byte for byte what it was.
+    parked = parked_mockup_b64()
+    parked_nav = ('<button data-view="beyond" aria-current="false">'
+                  "New scenarios &middot; beyond AI</button>") if parked else ""
+    parked_section = '<section id="beyond" hidden></section>' if parked else ""
+    parked_js = f'<script>const PARKED_B64="{parked}";</script>' if parked else ""
+
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -2207,6 +2312,7 @@ def page(data: dict) -> str:
     <button data-view="usecases" aria-current="false">Use cases</button>
     <button data-view="frameworks" aria-current="false">Frameworks</button>
     <button data-view="reports" aria-current="false">Reports</button>
+    {parked_nav}
     <button data-view="session" aria-current="false" id="sessionnav" hidden>Session</button>
     <button style="margin-left:auto;color:var(--brand)" id="sessiontoggle">Start session mode</button>
   </nav>
@@ -2256,6 +2362,7 @@ def page(data: dict) -> str:
   <section id="usecases" hidden></section>
   <section id="frameworks" hidden></section>
   <section id="reports" hidden></section>
+  {parked_section}
   <section id="sessionview" hidden></section>
 
   <footer>
@@ -2270,6 +2377,7 @@ def page(data: dict) -> str:
 </div>
 
 <script>const DATA = {json.dumps(data, separators=(",", ":"), ensure_ascii=False, default=jsonable)};</script>
+{parked_js}
 <script>{JS}</script>
 </body></html>
 """
