@@ -1,0 +1,198 @@
+From d46f4fdbbd34d2ff5778ba1eb8f87461cc99df6f Mon Sep 17 00:00:00 2001
+From: Liszt <liszt@localhost>
+Date: Fri, 7 Aug 2026 00:08:20 +0000
+Subject: [PATCH 1/3] intake: one step is one adversary move, and warn when
+ steps share a source
+
+The import and new-scenario prompts asked for 4-7 steps while the schema caps
+attack_path at 6, and they described attack_path[].layer with the same words as
+ai_infrastructure_layer. Models filled the step layer with the canonical stack
+strings, which are 19 and 26 characters against an 18-character limit, so records
+were rejected after the fact.
+
+Both prompts now state the ceiling as 3 to 6, give the step layer its own
+vocabulary of short seam tags with worked examples, and say to tag where a move
+operates rather than who performs it. They also carry the granularity rule: one
+step is one adversary move that produces its own observable, internal control
+flow of a single request is one step, and a control that fires is a telemetry row
+rather than an attack step.
+
+validate.py gains the matching check. When several attack-step rows name the same
+source the chain has usually been split into the internals of one move, which
+makes a single control look like coverage of several steps and inflates every
+denominator the record feeds. It warns rather than errors, since the same source
+can legitimately answer more than one move, but it asks for that to be said in
+mapping_notes.
+---
+ tools/build_viewer.py | 73 +++++++++++++++++++++++++++++++++++++++----
+ tools/validate.py     | 22 +++++++++++++
+ 2 files changed, 89 insertions(+), 6 deletions(-)
+
+diff --git a/tools/build_viewer.py b/tools/build_viewer.py
+index 0a36ada..8aeab34 100644
+--- a/tools/build_viewer.py
++++ b/tools/build_viewer.py
+@@ -995,7 +995,7 @@ JSON shape:
+     "priority_rationale": ["3 short plain-sentence bullets"]
+   },
+   "attack_path": [
+-    { "step": 1, "layer": "the stack layer this move lands on", "text": "one move of the attack, plainly" }
++    { "step": 1, "layer": "Data → Host", "text": "one move of the attack, plainly" }
+   ],
+   "telemetry": [
+     { "step": 1, "signal": "the observable event this move produces", "emitted_at": "where it is emitted from, named generically", "detection_opportunity": "what a detection could look for" }
+@@ -1023,11 +1023,28 @@ Rules:
+   - The framework_mapping values above are FORMAT EXAMPLES, not answers. Replace them with
+     real identifiers, or use an empty list [] where you have none. Any value that is not a
+     real identifier is discarded on import, so a placeholder is worse than an empty list.
++  - ONE STEP IS ONE ADVERSARY MOVE that produces its own distinct observable. Do not
++    decompose a single request into the code path that handles it: a server parsing a
++    config, calling a loader, and then checking authentication is one move, not three.
++    The test: if two steps would be seen in the same log line, they are one step. Internal
++    mechanism belongs in one_liner, not in the chain. A step in which the adversary does
++    nothing is not a step; if a control fires late or fails, that is a telemetry row, not
++    an attack step.
++  - attack_path[].layer is a DIFFERENT field from ai_infrastructure_layer above, and it takes
++    a DIFFERENT kind of value. It is a short free-text reading aid, 18 characters maximum.
++    Do NOT put "L0 · Infrastructure" or any of the five canonical strings here; they are too
++    long and the record will be rejected. Write a short seam tag naming where the move lands:
++      Data / inbound    Data → Host    Host / net    Host / Cloud    Agent / eval
++      App / net         Model / Agent  Cluster / net  External
++    Tag where the move OPERATES, not who is performing it. An agent escalating privilege on a
++    node is a host move, not an agent move; the agent is the actor, the node is the layer.
+   - One telemetry entry per attack_path step, same step number.
+   - DO NOT include any coverage, visibility, detection or score field. Owners score it later; you
+     only identify the signal that WOULD exist.
+   - Real framework IDs only where you are confident; a short defensible list beats a long guess.
+-  - 4-7 distinct steps. Valid JSON only, no trailing commas, no commentary.`;
++  - 3 to 6 distinct steps. SIX IS A HARD CEILING enforced by the schema; a chain that needs
++    more is two scenarios, so merge the moves that belong together.
++  - Valid JSON only, no trailing commas, no commentary.`;
+ 
+ const P_INCIDENT =
+ `You are a threat-intelligence researcher building a list of PUBLISHED, real-world incidents that
+@@ -1094,7 +1111,7 @@ JSON shape:
+     "priority": "NOW, NEAR-TERM, or BACKLOG",
+     "priority_rationale": ["3 short bullets; it is honest to say 'nobody has run this yet, but ...'"]
+   },
+-  "attack_path": [ { "step": 1, "layer": "stack layer this move lands on", "text": "one move, plainly" } ],
++  "attack_path": [ { "step": 1, "layer": "Data → Host", "text": "one move, plainly" } ],
+   "telemetry": [ { "step": 1, "signal": "the event this move WOULD produce", "emitted_at": "where it would be emitted from", "detection_opportunity": "what a detection could look for" } ],
+   "framework_mapping": {
+     "baseline": "2026.07",
+@@ -1117,8 +1134,24 @@ Rules:
+     identifiers or use []. A placeholder string is discarded on import.
+   - Keep "origin": "hypothesis" and "proposed_by": "AI Threat Modeler" exactly, so Liszt tags it.
+     A specific analyst may replace proposed_by with their own name.
++  - ONE STEP IS ONE ADVERSARY MOVE that produces its own distinct observable. Do not
++    decompose a single request into the code path that handles it: a server parsing a
++    config, calling a loader, and then checking authentication is one move, not three.
++    The test: if two steps would be seen in the same log line, they are one step. Internal
++    mechanism belongs in one_liner, not in the chain. A step in which the adversary does
++    nothing is not a step; if a control fires late or fails, that is a telemetry row, not
++    an attack step.
++  - attack_path[].layer is a DIFFERENT field from ai_infrastructure_layer above, and it takes
++    a DIFFERENT kind of value. It is a short free-text reading aid, 18 characters maximum.
++    Do NOT put "L0 · Infrastructure" or any of the five canonical strings here; they are too
++    long and the record will be rejected. Write a short seam tag naming where the move lands:
++      Data / inbound    Data → Host    Host / net    Host / Cloud    Agent / eval
++      App / net         Model / Agent  Cluster / net  External
++    Tag where the move OPERATES, not who is performing it. An agent escalating privilege on a
++    node is a host move, not an agent move; the agent is the actor, the node is the layer.
+   - One telemetry entry per step. DO NOT include any coverage, visibility, detection or score field.
+-  - 4-7 distinct steps. A hypothesis may map to no framework IDs yet; an empty list is a fine answer.
++  - 3 to 6 distinct steps. SIX IS A HARD CEILING enforced by the schema.
++  - A hypothesis may map to no framework IDs yet; an empty list is a fine answer.
+   - Valid JSON only, no trailing commas, no commentary.`;
+ 
+ const P_READINESS = String.raw`You are validating whether a mapped attack scenario is ready to be tested by an
+@@ -1234,6 +1267,27 @@ function resolveLayer(value) {
+   return "";
+ }
+ 
++/* attack_path[].layer is a SHORT free-text reading aid capped at 18 characters, not the
++   controlled scenario-level field. Two of the five canonical strings are longer than the
++   cap ("L0 · Infrastructure" is 19, "L3 · Orchestration & Agent" is 26), so a model that
++   copies them into a step produces a record the validator rejects. Map them to the short
++   form and flag it, because the good value is a seam tag like "Data → Host" that says
++   where the move lands, and only a human can write that well. */
++const STEP_LAYER_SHORT = { "L0": "Infrastructure", "L1": "Data", "L2": "Model",
++                           "L3": "Agent", "L4": "Application" };
++const STEP_LAYER_CAP = 18;
++function shortenStepLayer(value) {
++  const raw = String(value == null ? "" : value).trim();
++  if (!raw) return { layer: "", note: "" };
++  if (raw.length <= STEP_LAYER_CAP) return { layer: raw, note: "" };
++  const canon = resolveLayer(raw);
++  if (canon) return { layer: STEP_LAYER_SHORT[canon.slice(0, 2)],
++    note: "shortened to fit the 18 character step tag; replace with a seam tag such as "
++        + "\"Data → Host\" that says where the move actually lands" };
++  return { layer: raw.slice(0, STEP_LAYER_CAP).trim(),
++           note: "truncated to 18 characters; rewrite it as a short seam tag" };
++}
++
+ /* Framework IDs, shaped exactly as the schema defines them. A model handed a JSON skeleton
+    will sometimes return the placeholder text as data, so anything that is not ID shaped is
+    dropped rather than carried into the record. */
+@@ -1273,7 +1327,14 @@ function normalizeImported(raw) {
+   const cls = s.classification || {};
+   const layer = resolveLayer(cls.ai_infrastructure_layer);
+   const fw = sanitizeFramework(s.framework_mapping);
++  const rawSteps = Array.isArray(s.attack_path) ? s.attack_path : [];
++  const stepLayers = rawSteps.slice(0, 6).map(a => shortenStepLayer(a && a.layer));
+   const review = [];
++  if (rawSteps.length > 6) review.push("attack_path: " + rawSteps.length +
++    " steps supplied, and the schema caps a chain at 6. The extra step(s) were dropped; " +
++    "merge the moves that belong together rather than losing the tail of the chain.");
++  stepLayers.forEach((sl, i) => { if (sl.note)
++    review.push("attack_path step " + (i + 1) + " layer: " + sl.note); });
+   if (!layer) review.push("ai_infrastructure_layer: " +
+     (cls.ai_infrastructure_layer ? "could not be matched to one of the five layers ("
+       + String(cls.ai_infrastructure_layer).slice(0, 60) + ")" : "not supplied"));
+@@ -1296,8 +1357,8 @@ function normalizeImported(raw) {
+       priority_rationale: Array.isArray(cls.priority_rationale) ? cls.priority_rationale : []
+     },
+     framework_mapping: fw.mapping,
+-    attack_path: Array.isArray(s.attack_path) ? s.attack_path.map((a, i) => ({
+-      step: a.step || i + 1, layer: a.layer || "", text: a.text || "",
++    attack_path: Array.isArray(s.attack_path) ? s.attack_path.slice(0, 6).map((a, i) => ({
++      step: i + 1, layer: stepLayers[i].layer, text: a.text || "",
+       attack: Array.isArray(a.attack) ? a.attack : [],
+       atlas: Array.isArray(a.atlas) ? a.atlas : [] })) : [],
+     telemetry: Array.isArray(s.telemetry) ? s.telemetry.map((t, i) => ({
+diff --git a/tools/validate.py b/tools/validate.py
+index 2978890..adadc9b 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -234,6 +234,28 @@ def check_quality_bar(rec: dict, f: Findings, incidents: set[str],
+                 f.err(f"telemetry[{r['step']}]",
+                       f"{dc} is an ATT&CK data SOURCE, retired in v18. Use a DCxxxx data component")
+ 
++    # --- over-decomposition: several steps answered by one source ------------
++    # A step is one adversary move that produces its own observable. When several
++    # attack-step rows name the SAME source, the chain has usually been split into the
++    # internal control flow of a single move, and one control then appears to cover
++    # several steps. That inflates every coverage denominator the record feeds, which is
++    # the "evidence reuse" and "splitting the denominator" pair in docs/04-measurement.md
++    # section 7. It can be legitimate, so it warns rather than errors, but it should be
++    # answered rather than ignored.
++    by_source: dict[str, list[int]] = {}
++    for r in rows:
++        src = " ".join((r.get("source") or "").lower().split())
++        if src:
++            by_source.setdefault(src, []).append(r["step"])
++    for src, steps_hit in by_source.items():
++        if len(steps_hit) > 1:
++            f.warn("telemetry",
++                   f"steps {steps_hit} all name the same source. If those moves would be seen "
++                   f"in the same log line they are one step, and splitting them makes one "
++                   f"control look like coverage of {len(steps_hit)}. Merge them, or say in "
++                   f"mapping_notes why the same source answers each separately "
++                   f"(source: {(r.get('source') or src)[:60]})")
++
+     # --- use case coverage ---------------------------------------------------
+     # A row that claims detection maturity says something alerts. The use case
+     # record is where that alert's customer and their action live. On a published
+-- 
+2.43.0
+
