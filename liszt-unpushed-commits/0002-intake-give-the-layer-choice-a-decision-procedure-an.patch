@@ -1,0 +1,387 @@
+From c3c0b12727526b0510c4d5f040870eacfafbf3de Mon Sep 17 00:00:00 2001
+From: Liszt <liszt@localhost>
+Date: Tue, 11 Aug 2026 13:47:22 +0000
+Subject: [PATCH 2/3] intake: give the layer choice a decision procedure and
+ check it against the chain
+
+The layer field kept coming back wrong in the same way: a chain that plainly
+runs on hosts, labelled L3 because an agent was the actor. The prompt said to
+choose the layer the attack operates at, but gave no procedure for choosing and
+no way to be wrong out loud.
+
+Both intake prompts now carry an ordered test for the layer, the anti-patterns
+we have actually seen, a closed seam-tag vocabulary for the per-step field, and
+a definition of what the source tiers grade. The JSON skeleton no longer shows a
+real layer value, because a model handed an example will sometimes return it.
+Each prompt ends by asking for a short justification, a runner-up and a
+confidence, which the importer puts in front of the reviewer.
+
+On import, the chosen layer is now cross-checked against the seam tags in the
+chain. When no step lands on the claimed layer, the record is flagged rather
+than corrected: both directions are legitimate answers and only a person can
+say which. Source tiers are coerced from words and placeholders, and a step tag
+that is really a stack layer is named as such.
+---
+ tools/build_viewer.py | 255 ++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 218 insertions(+), 37 deletions(-)
+
+diff --git a/tools/build_viewer.py b/tools/build_viewer.py
+index 8aeab34..3232ca8 100644
+--- a/tools/build_viewer.py
++++ b/tools/build_viewer.py
+@@ -989,13 +989,13 @@ JSON shape:
+   "title": "short scenario title, attacker-goal phrasing",
+   "one_liner": "2-3 plain sentences about OUR environment ('our', 'we'): what the attacker does and the damage.",
+   "classification": {
+-    "ai_infrastructure_layer": "L3 · Orchestration & Agent",
++    "ai_infrastructure_layer": "<<< one of the five, see LAYER RULE below >>>",
+     "evidence": "seen-in-the-wild for a real incident, or seen-in-research for a proof of concept",
+     "priority": "NOW, NEAR-TERM, or BACKLOG",
+     "priority_rationale": ["3 short plain-sentence bullets"]
+   },
+   "attack_path": [
+-    { "step": 1, "layer": "Data → Host", "text": "one move of the attack, plainly" }
++    { "step": 1, "layer": "<<< one seam tag from the list below >>>", "text": "one move of the attack, plainly" }
+   ],
+   "telemetry": [
+     { "step": 1, "signal": "the observable event this move produces", "emitted_at": "where it is emitted from, named generically", "detection_opportunity": "what a detection could look for" }
+@@ -1007,19 +1007,19 @@ JSON shape:
+     "owasp_llm": ["LLM06:2025"],
+     "owasp_agentic": ["ASI10:2026"]
+   },
+-  "incidents": [ { "title": "source title", "url": "source URL", "tier": "1, 2, or 3" } ]
++  "incidents": [ { "title": "source title", "url": "source URL", "tier": 1 } ],
++  "_check": { "layer_reason": "", "layer_runner_up": "", "steps_merged": "", "confidence": "" }
+ }
+ 
+ Rules:
+-  - ai_infrastructure_layer MUST be copied verbatim as exactly ONE of these five strings.
+-    The separator is the character "·" (U+00B7) with a space either side, not a hyphen:
++  - ai_infrastructure_layer MUST be exactly ONE of the five strings below, copied
++    character for character. The separator is "·" (U+00B7) with a space either side,
++    not a hyphen. See the LAYER RULE at the foot of this prompt before you choose.
+       L0 · Infrastructure
+       L1 · Data
+       L2 · Model
+       L3 · Orchestration & Agent
+       L4 · Application
+-    Choose the layer the attack primarily OPERATES at. Do not default to the first one, and
+-    do not return the list. The example in the shape above is an example, not the answer.
+   - The framework_mapping values above are FORMAT EXAMPLES, not answers. Replace them with
+     real identifiers, or use an empty list [] where you have none. Any value that is not a
+     real identifier is discarded on import, so a placeholder is worse than an empty list.
+@@ -1030,21 +1030,70 @@ Rules:
+     mechanism belongs in one_liner, not in the chain. A step in which the adversary does
+     nothing is not a step; if a control fires late or fails, that is a telemetry row, not
+     an attack step.
+-  - attack_path[].layer is a DIFFERENT field from ai_infrastructure_layer above, and it takes
+-    a DIFFERENT kind of value. It is a short free-text reading aid, 18 characters maximum.
+-    Do NOT put "L0 · Infrastructure" or any of the five canonical strings here; they are too
+-    long and the record will be rejected. Write a short seam tag naming where the move lands:
+-      Data / inbound    Data → Host    Host / net    Host / Cloud    Agent / eval
+-      App / net         Model / Agent  Cluster / net  External
+-    Tag where the move OPERATES, not who is performing it. An agent escalating privilege on a
+-    node is a host move, not an agent move; the agent is the actor, the node is the layer.
++  - attack_path[].layer is a DIFFERENT field from ai_infrastructure_layer and it takes a
++    DIFFERENT kind of value: a short seam tag, 18 characters maximum. Never put one of the
++    five canonical strings here; they are too long and the row will be flagged. Use one of
++    these, and only these:
++      Data / inbound    Data -> Host      Data / store      Host / net
++      Host / Cloud      Cluster / net     Model / infer     Model / Agent
++      Agent / tools     Agent / memory    Agent / eval      App / net
++      App / session     Identity          Supply chain      External
++    Tag where the move OPERATES, not who performs it.
+   - One telemetry entry per attack_path step, same step number.
+   - DO NOT include any coverage, visibility, detection or score field. Owners score it later; you
+     only identify the signal that WOULD exist.
+   - Real framework IDs only where you are confident; a short defensible list beats a long guess.
+   - 3 to 6 distinct steps. SIX IS A HARD CEILING enforced by the schema; a chain that needs
+     more is two scenarios, so merge the moves that belong together.
+-  - Valid JSON only, no trailing commas, no commentary.`;
++  - incidents[].tier grades the SOURCE, not the severity. Use the number, not a word:
++      1  first party. The affected organisation's own disclosure, or a research team's
++         own technical writeup of work they did themselves.
++      2  reputable secondary technical reporting that adds detail: a vendor research team
++         analysing someone else's incident, a national CERT advisory.
++      3  press, aggregators and summaries. Good for the fact that it happened, not for
++         technical detail.
++    If all you have is a press story, tier 3 is the honest answer.
++  - Valid JSON only, no trailing commas, no commentary.
++
++LAYER RULE. Read this before you fill in ai_infrastructure_layer.
++
++  What each layer means:
++    L0 . Infrastructure   compute, nodes, containers, the network, storage, the cloud
++                          control plane, CI and build systems. The machinery AI runs ON.
++    L1 . Data             training sets, fine-tuning data, retrieval corpora, vector
++                          stores, and the documents or content the system ingests.
++    L2 . Model            the model artifact and its weights, the inference call, the
++                          system prompt, the guardrails, the decision the model makes.
++    L3 . Orchestration & Agent
++                          agent loops, tool and function calling, planning, memory,
++                          handoffs between agents, connector and MCP plumbing.
++    L4 . Application      the product surface: the user interface, the API the business
++                          exposes, session and account handling, output rendering.
++
++  Choose it with this test, in order. Stop at the first line that answers:
++    1. At which layer does the attacker ACHIEVE THE OBJECTIVE? Not where they got in,
++       and not who performed the move. Where the damage lands.
++    2. If the objective spans layers, take the layer of the step that causes the harm.
++    3. If it is still even, take the layer that owns the asset the attacker walked away
++       with.
++
++  These are all wrong, and each one is a defect we have actually seen:
++    - Tagging L3 because an agent appears in the chain. An agent escalating privilege on
++      a node is an L0 move. The agent is the ACTOR, the node is the LAYER.
++    - Tagging L2 because a model appears in the chain. Nearly every scenario has one.
++    - Tagging L0 because you are unsure. An unexplained L0 is the most common defect in
++      this whole field. If you are unsure, pick your best answer and say why in _check.
++    - Returning the list, returning two layers, or copying the placeholder text.
++
++BEFORE YOU EMIT, fill in "_check". It is not part of the record. The person reviewing your
++output reads it and then it is discarded.
++  "_check": {
++    "layer_reason": "one sentence: why that layer and not the neighbouring one",
++    "layer_runner_up": "the layer you nearly picked, or an empty string",
++    "steps_merged": "if you merged moves to stay within six, name which ones, else empty",
++    "confidence": "high, medium or low"
++  }
++`;
+ 
+ const P_INCIDENT =
+ `You are a threat-intelligence researcher building a list of PUBLISHED, real-world incidents that
+@@ -1106,7 +1155,7 @@ JSON shape:
+   "title": "short scenario title, attacker-goal phrasing",
+   "one_liner": "2-3 plain sentences about OUR environment: what the attacker does and why it would hurt.",
+   "classification": {
+-    "ai_infrastructure_layer": "L3 · Orchestration & Agent",
++    "ai_infrastructure_layer": "<<< one of the five, see LAYER RULE below >>>",
+     "evidence": "seen-in-research",
+     "priority": "NOW, NEAR-TERM, or BACKLOG",
+     "priority_rationale": ["3 short bullets; it is honest to say 'nobody has run this yet, but ...'"]
+@@ -1117,19 +1166,19 @@ JSON shape:
+     "baseline": "2026.07",
+     "attack": ["T1190"], "atlas": ["AML.T0049"],
+     "owasp_llm": ["LLM06:2025"], "owasp_agentic": ["ASI10:2026"]
+-  }
++  },
++  "_check": { "layer_reason": "", "layer_runner_up": "", "steps_merged": "", "confidence": "" }
+ }
+ 
+ Rules:
+-  - ai_infrastructure_layer MUST be copied verbatim as exactly ONE of these five strings.
+-    The separator is "·" (U+00B7) with a space either side, not a hyphen:
++  - ai_infrastructure_layer MUST be exactly ONE of the five strings below, copied
++    character for character. The separator is "·" (U+00B7) with a space either side,
++    not a hyphen. See the LAYER RULE at the foot of this prompt before you choose.
+       L0 · Infrastructure
+       L1 · Data
+       L2 · Model
+       L3 · Orchestration & Agent
+       L4 · Application
+-    Choose the layer the attack primarily OPERATES at. Do not default to the first one, and
+-    do not return the list. The value in the shape above is an example, not the answer.
+   - The framework_mapping values above are FORMAT EXAMPLES. Replace them with real
+     identifiers or use []. A placeholder string is discarded on import.
+   - Keep "origin": "hypothesis" and "proposed_by": "AI Threat Modeler" exactly, so Liszt tags it.
+@@ -1141,18 +1190,59 @@ Rules:
+     mechanism belongs in one_liner, not in the chain. A step in which the adversary does
+     nothing is not a step; if a control fires late or fails, that is a telemetry row, not
+     an attack step.
+-  - attack_path[].layer is a DIFFERENT field from ai_infrastructure_layer above, and it takes
+-    a DIFFERENT kind of value. It is a short free-text reading aid, 18 characters maximum.
+-    Do NOT put "L0 · Infrastructure" or any of the five canonical strings here; they are too
+-    long and the record will be rejected. Write a short seam tag naming where the move lands:
+-      Data / inbound    Data → Host    Host / net    Host / Cloud    Agent / eval
+-      App / net         Model / Agent  Cluster / net  External
+-    Tag where the move OPERATES, not who is performing it. An agent escalating privilege on a
+-    node is a host move, not an agent move; the agent is the actor, the node is the layer.
++  - attack_path[].layer is a DIFFERENT field from ai_infrastructure_layer and it takes a
++    DIFFERENT kind of value: a short seam tag, 18 characters maximum. Never put one of the
++    five canonical strings here; they are too long and the row will be flagged. Use one of
++    these, and only these:
++      Data / inbound    Data -> Host      Data / store      Host / net
++      Host / Cloud      Cluster / net     Model / infer     Model / Agent
++      Agent / tools     Agent / memory    Agent / eval      App / net
++      App / session     Identity          Supply chain      External
++    Tag where the move OPERATES, not who performs it.
+   - One telemetry entry per step. DO NOT include any coverage, visibility, detection or score field.
+   - 3 to 6 distinct steps. SIX IS A HARD CEILING enforced by the schema.
+   - A hypothesis may map to no framework IDs yet; an empty list is a fine answer.
+-  - Valid JSON only, no trailing commas, no commentary.`;
++  - Valid JSON only, no trailing commas, no commentary.
++
++LAYER RULE. Read this before you fill in ai_infrastructure_layer.
++
++  What each layer means:
++    L0 . Infrastructure   compute, nodes, containers, the network, storage, the cloud
++                          control plane, CI and build systems. The machinery AI runs ON.
++    L1 . Data             training sets, fine-tuning data, retrieval corpora, vector
++                          stores, and the documents or content the system ingests.
++    L2 . Model            the model artifact and its weights, the inference call, the
++                          system prompt, the guardrails, the decision the model makes.
++    L3 . Orchestration & Agent
++                          agent loops, tool and function calling, planning, memory,
++                          handoffs between agents, connector and MCP plumbing.
++    L4 . Application      the product surface: the user interface, the API the business
++                          exposes, session and account handling, output rendering.
++
++  Choose it with this test, in order. Stop at the first line that answers:
++    1. At which layer does the attacker ACHIEVE THE OBJECTIVE? Not where they got in,
++       and not who performed the move. Where the damage lands.
++    2. If the objective spans layers, take the layer of the step that causes the harm.
++    3. If it is still even, take the layer that owns the asset the attacker walked away
++       with.
++
++  These are all wrong, and each one is a defect we have actually seen:
++    - Tagging L3 because an agent appears in the chain. An agent escalating privilege on
++      a node is an L0 move. The agent is the ACTOR, the node is the LAYER.
++    - Tagging L2 because a model appears in the chain. Nearly every scenario has one.
++    - Tagging L0 because you are unsure. An unexplained L0 is the most common defect in
++      this whole field. If you are unsure, pick your best answer and say why in _check.
++    - Returning the list, returning two layers, or copying the placeholder text.
++
++BEFORE YOU EMIT, fill in "_check". It is not part of the record. The person reviewing your
++output reads it and then it is discarded.
++  "_check": {
++    "layer_reason": "one sentence: why that layer and not the neighbouring one",
++    "layer_runner_up": "the layer you nearly picked, or an empty string",
++    "steps_merged": "if you merged moves to stay within six, name which ones, else empty",
++    "confidence": "high, medium or low"
++  }
++`;
+ 
+ const P_READINESS = String.raw`You are validating whether a mapped attack scenario is ready to be tested by an
+ emulation agent in a contained lab. You are not being asked whether the attack is
+@@ -1276,16 +1366,66 @@ function resolveLayer(value) {
+ const STEP_LAYER_SHORT = { "L0": "Infrastructure", "L1": "Data", "L2": "Model",
+                            "L3": "Agent", "L4": "Application" };
+ const STEP_LAYER_CAP = 18;
++
++/* The seam tags the intake prompts offer. A model is free to invent one, and sometimes does,
++   so anything outside this list is kept but flagged: the reviewer decides whether it is a
++   real seam we should add or a slip we should correct. The component prefix is what the
++   layer cross-check below reads, which is why the vocabulary is closed rather than free. */
++const SEAM_TAGS = ["Data / inbound", "Data -> Host", "Data / store", "Host / net",
++                   "Host / Cloud", "Cluster / net", "Model / infer", "Model / Agent",
++                   "Agent / tools", "Agent / memory", "Agent / eval", "App / net",
++                   "App / session", "Identity", "Supply chain", "External"];
++/* Which of the five layers each seam tag belongs to, for the consistency check. */
++const SEAM_LAYER = { "Data / inbound":"L1", "Data -> Host":"L1", "Data / store":"L1",
++                     "Host / net":"L0", "Host / Cloud":"L0", "Cluster / net":"L0",
++                     "Model / infer":"L2", "Model / Agent":"L2",
++                     "Agent / tools":"L3", "Agent / memory":"L3", "Agent / eval":"L3",
++                     "App / net":"L4", "App / session":"L4",
++                     "Identity":"L0", "Supply chain":"L0", "External":"" };
++
++function canonSeam(raw) {
++  const k = String(raw || "").trim().replace(/→/g, "->").replace(/\s+/g, " ");
++  for (const tag of SEAM_TAGS) if (tag.toLowerCase() === k.toLowerCase()) return tag;
++  return "";
++}
++
+ function shortenStepLayer(value) {
+   const raw = String(value == null ? "" : value).trim();
+-  if (!raw) return { layer: "", note: "" };
+-  if (raw.length <= STEP_LAYER_CAP) return { layer: raw, note: "" };
++  if (!raw) return { layer: "", note: "", seam: "" };
++  const seam = canonSeam(raw);
++  if (seam) return { layer: seam, note: "", seam: seam };
++  /* A canonical layer string in this field is the confusion the two fields invite, so it is
++     named as such whether or not it happens to fit inside the cap. */
++  const asLayer = resolveLayer(raw);
++  if (asLayer) return { layer: STEP_LAYER_SHORT[asLayer.slice(0, 2)],
++    note: "step tag \"" + raw + "\" is a stack layer, not a seam. This field says where the "
++        + "move lands, not which layer the scenario belongs to. Replace it with a seam tag "
++        + "such as \"Data -> Host\".", seam: "" };
++  if (raw.length <= STEP_LAYER_CAP) return { layer: raw, note:
++    "\"" + raw + "\" is not one of the offered seam tags. Keep it if it names a real seam, "
++    + "otherwise pick the closest from the list in the intake prompt.", seam: "" };
+   const canon = resolveLayer(raw);
+   if (canon) return { layer: STEP_LAYER_SHORT[canon.slice(0, 2)],
+-    note: "shortened to fit the 18 character step tag; replace with a seam tag such as "
+-        + "\"Data → Host\" that says where the move actually lands" };
++    note: "a canonical layer string was used as a step tag; shortened to fit the 18 character "
++        + "cap. Replace it with a seam tag such as \"Data -> Host\" that says where the move lands",
++    seam: "" };
+   return { layer: raw.slice(0, STEP_LAYER_CAP).trim(),
+-           note: "truncated to 18 characters; rewrite it as a short seam tag" };
++           note: "truncated to 18 characters; rewrite it as a short seam tag", seam: "" };
++}
++
++/* Source tiers grade the sourcing, not the severity: 1 first party, 2 reputable secondary
++   technical reporting, 3 press and aggregators. Models return these as words, as strings,
++   or as the placeholder "1, 2, or 3", so everything is coerced and anything unreadable is
++   surfaced rather than defaulted quietly. */
++function normalizeTier(v) {
++  const raw = String(v == null ? "" : v).trim().toLowerCase();
++  if (!raw) return { tier: 0, note: "no source tier given" };
++  const m = raw.match(/^[^0-9]*([123])(?![0-9])/);
++  if (m && !/,|or\b/.test(raw)) return { tier: Number(m[1]), note: "" };
++  if (/first[- ]?party|vendor own|own disclosure/.test(raw)) return { tier: 1, note: "" };
++  if (/secondary|research|cert|advisory/.test(raw))          return { tier: 2, note: "" };
++  if (/press|news|aggregat|summary|blog post/.test(raw))     return { tier: 3, note: "" };
++  return { tier: 0, note: "source tier \"" + String(v).slice(0, 40) + "\" is not 1, 2 or 3" };
+ }
+ 
+ /* Framework IDs, shaped exactly as the schema defines them. A model handed a JSON skeleton
+@@ -1338,6 +1478,39 @@ function normalizeImported(raw) {
+   if (!layer) review.push("ai_infrastructure_layer: " +
+     (cls.ai_infrastructure_layer ? "could not be matched to one of the five layers ("
+       + String(cls.ai_infrastructure_layer).slice(0, 60) + ")" : "not supplied"));
++
++  /* The layer is a claim about where the attack lands, and the chain is the evidence for
++     that claim. When no step in the chain sits on the chosen layer, one of the two is wrong.
++     This is the check that catches the failure we kept hitting: a chain that plainly runs on
++     hosts, labelled L3 because an agent was the actor. It warns rather than corrects, because
++     a legitimate answer exists in both directions and only a person can tell which. */
++  if (layer) {
++    const chainLayers = stepLayers.map(sl => SEAM_LAYER[sl.seam] || "").filter(Boolean);
++    const chosen = layer.slice(0, 2);
++    if (chainLayers.length && !chainLayers.includes(chosen)) {
++      const seen = Array.from(new Set(chainLayers)).sort().join(", ");
++      review.push("ai_infrastructure_layer: the record claims " + chosen + " but no step in "
++        + "the chain lands there. The steps sit on " + seen + ". Either the layer is wrong, "
++        + "or a step is mis-tagged, or the move that makes " + chosen + " true is missing "
++        + "from the chain.");
++    }
++  }
++
++  /* A model that has been handed a JSON skeleton will sometimes return the skeleton. */
++  if (/<<<|>>>|one of the five|see LAYER RULE/i.test(String(cls.ai_infrastructure_layer || "")))
++    review.push("ai_infrastructure_layer: the placeholder text came back as the answer, so no "
++      + "layer was chosen. Re-run the prompt.");
++
++  /* Whatever the model said about its own choice, put it in front of the reviewer. */
++  const chk = (s._check && typeof s._check === "object") ? s._check : {};
++  if (chk.layer_reason) review.push("the model's stated reason for the layer: \""
++    + String(chk.layer_reason).slice(0, 200) + "\"");
++  if (chk.layer_runner_up) review.push("the model nearly chose "
++    + String(chk.layer_runner_up).slice(0, 40) + " instead. Worth a second look.");
++  if (chk.steps_merged) review.push("moves merged to stay within six steps: "
++    + String(chk.steps_merged).slice(0, 160));
++  if (String(chk.confidence || "").toLowerCase() === "low")
++    review.push("the model reported low confidence in this mapping.");
+   if (fw.dropped.length) review.push("framework_mapping: dropped "
+     + fw.dropped.length + " value(s) that are not valid identifiers (" + fw.dropped.join("; ").slice(0, 120) + ")");
+   const out = {
+@@ -1365,7 +1538,15 @@ function normalizeImported(raw) {
+       step: t.step || i + 1, signal: t.signal || "", emitted_at: t.emitted_at || "",
+       source: t.source || "", detection_opportunity: t.detection_opportunity || "",
+       owner: t.owner || "" })) : [],
+-    incidents: Array.isArray(s.incidents) ? s.incidents : [],
++    incidents: Array.isArray(s.incidents) ? s.incidents.map((inc, i) => {
++      const src = (inc && typeof inc === "object") ? inc : {};
++      const tn = normalizeTier(src.tier);
++      if (tn.note) review.push("incidents[" + (i + 1) + "] " + tn.note
++        + ". Tier grades the sourcing: 1 first party, 2 reputable secondary technical "
++        + "reporting, 3 press or aggregator.");
++      return { title: String(src.title || "").trim(), url: String(src.url || "").trim(),
++               tier: tn.tier || 3 };
++    }) : [],
+     provenance: s.provenance || {}
+   };
+   if (!out.title) throw new Error("the scenario needs a title");
+-- 
+2.43.0
+

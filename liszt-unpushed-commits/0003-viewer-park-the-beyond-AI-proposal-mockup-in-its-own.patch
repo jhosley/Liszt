@@ -1,0 +1,1225 @@
+From 3cbea95478f14eff28a125781cd37c96b2cf146d Mon Sep 17 00:00:00 2001
+From: Liszt <liszt@localhost>
+Date: Tue, 11 Aug 2026 17:02:28 +0000
+Subject: [PATCH 3/3] viewer: park the beyond-AI proposal mockup in its own tab
+
+Leadership asked whether Liszt could catalog more than AI, and the honest
+answer is a design question rather than a code change. Rather than start
+generalizing the schema to find out, the idea goes in the viewer as a tab
+and nothing else moves.
+
+The mockup is embedded as-is inside an isolated frame, so it shares no
+styles, no script and no data with the page around it. It is labeled a
+parked idea, it says plainly that no schema and no record changed, and it
+can be opened full screen for a demo. The frame grows to fit its content
+where the browser allows a look inside, and falls back to a fixed height
+where it does not.
+
+The embed is optional by construction. With reference/mockups absent the
+tab is not emitted, and the generated viewer is byte for byte what it was
+before this commit, which is the property that makes the idea cheap to
+throw away. No record, no schema, no tool and no existing view changed.
+---
+ reference/mockups/README.md                |  30 +
+ reference/mockups/beyond-ai-scenarios.html | 983 +++++++++++++++++++++
+ tools/build_viewer.py                      | 108 +++
+ 3 files changed, 1121 insertions(+)
+ create mode 100644 reference/mockups/README.md
+ create mode 100644 reference/mockups/beyond-ai-scenarios.html
+
+diff --git a/reference/mockups/README.md b/reference/mockups/README.md
+new file mode 100644
+index 0000000..0b3b507
+--- /dev/null
++++ b/reference/mockups/README.md
+@@ -0,0 +1,30 @@
++# Mockups
++
++Design mockups that are parked, not adopted. Nothing here is a record, nothing
++here validates, and nothing in the catalog reads from this directory.
++
++A mockup lives here when an idea is worth looking at before anyone decides
++whether to build it. Putting it in the repository rather than in a slide means
++the idea can be opened, clicked and discussed on its own terms, and that it
++does not quietly become a commitment just because it looks finished.
++
++## beyond-ai-scenarios.html
++
++What proposing a scenario would look like if Liszt carried more than one kind of
++infrastructure. Walks a proposal against a described environment, a web
++application or a population of endpoints, rather than against the AI stack that
++every current record assumes.
++
++Six web application and endpoint environments are worked through, two real
++incidents are mapped into the standard record layout, and an engineering sheet
++shows how the components of an environment would be edited.
++
++`tools/build_viewer.py` embeds this file in its own tab in the viewer, inside an
++isolated frame, labeled as a parked idea. The embed is optional by construction:
++delete this file and the tab disappears, and the generated viewer is byte for
++byte what it was before.
++
++**Status: parked.** Adopting it means generalizing
++`classification.ai_infrastructure_layer`, which is a required enum of five AI
++values today. That change and its consequences are written up separately. Until
++those decisions are made, this is a picture of an idea and nothing more.
+diff --git a/reference/mockups/beyond-ai-scenarios.html b/reference/mockups/beyond-ai-scenarios.html
+new file mode 100644
+index 0000000..a929d67
+--- /dev/null
++++ b/reference/mockups/beyond-ai-scenarios.html
+@@ -0,0 +1,983 @@
++<!doctype html>
++<meta charset="utf-8">
++<title>Liszt · Propose a scenario · mockup</title>
++<style>
++:root{
++  --navy:#1F2A63; --blue:#22357A; --ink:#2B2B33; --muted:#76767F;
++  --bg:#F8F7F4; --card:#fff; --line:#E2E1DC; --tint:#EEF1F8; --tintline:#BFC9E0;
++  --green:#1E7F4B; --teal:#277885; --amber:#8A5B08; --warn:#B0463B;
++  --mono:"Consolas","SF Mono",Menlo,monospace;
++}
++*{box-sizing:border-box}
++body{margin:0;background:var(--bg);color:var(--ink);
++  font:15px/1.5 Calibri,"Segoe UI",system-ui,sans-serif}
++.wrap{max-width:1180px;margin:0 auto;padding:22px 26px 70px}
++header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px}
++h1{font-size:25px;color:var(--navy);margin:0;font-weight:700}
++.badge{font-size:10px;font-weight:700;letter-spacing:1.3px;color:#fff;background:var(--warn);
++  padding:3px 9px;border-radius:3px}
++.sub{color:var(--muted);font-style:italic;margin:4px 0 20px;font-size:13.5px}
++
++/* step rail */
++.rail{display:flex;gap:6px;margin-bottom:22px;flex-wrap:wrap}
++.rail button{flex:1;min-width:150px;text-align:left;background:var(--card);border:1px solid var(--line);
++  border-radius:6px;padding:9px 12px;cursor:pointer;font:inherit;color:var(--muted);transition:.12s}
++.rail button .n{display:inline-block;width:19px;height:19px;line-height:19px;text-align:center;
++  border-radius:50%;background:#C9CEDA;color:#fff;font-size:11px;font-weight:700;margin-right:7px}
++.rail button b{color:var(--navy);font-size:13px}
++.rail button.on{border-color:var(--blue);box-shadow:0 0 0 2px rgba(34,53,122,.10)}
++.rail button.on .n{background:var(--blue)}
++.rail button.done .n{background:var(--green)}
++.rail button:hover{border-color:var(--tintline)}
++
++.pane{display:none} .pane.on{display:block}
++.card{background:var(--card);border:1px solid var(--line);border-radius:7px;padding:16px 18px;margin-bottom:14px}
++.kick{font-size:10.5px;font-weight:700;letter-spacing:1.3px;color:var(--muted);margin:0 0 9px}
++h2{font-size:17px;color:var(--navy);margin:0 0 3px}
++h3{font-size:14px;color:var(--navy);margin:0 0 5px}
++p{margin:0 0 9px}
++.note{background:var(--tint);border:1px solid var(--tintline);border-radius:6px;padding:10px 13px;
++  font-size:13px;color:#33406e;margin-bottom:14px}
++.note b{color:var(--navy)}
++.q{background:#FBF6EC;border:1px solid #E2CFA6;border-radius:6px;padding:10px 13px;
++  font-size:13px;color:#6E4A08;margin-bottom:14px}
++.q b{color:var(--amber)}
++
++label{display:block;font-size:11px;font-weight:700;letter-spacing:.7px;color:var(--muted);
++  text-transform:uppercase;margin:12px 0 4px}
++input[type=text],textarea,select{width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);
++  border-radius:5px;background:#fff;color:var(--ink)}
++textarea{min-height:74px;resize:vertical}
++.hint{font-size:12px;color:var(--muted);font-style:italic;margin-top:4px}
++
++.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}
++.chip{font-size:12px;background:var(--tint);border:1px solid var(--tintline);color:#33406e;
++  border-radius:14px;padding:4px 11px;cursor:pointer}
++.chip:hover{background:#e2e8f6}
++
++/* environment cards */
++.envs{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
++.env{background:var(--card);border:1px solid var(--line);border-radius:7px;padding:13px 15px;cursor:pointer;
++  transition:.12s;position:relative}
++.env:hover{border-color:var(--tintline)}
++.env.on{border-color:var(--blue);box-shadow:0 0 0 2px rgba(34,53,122,.10)}
++.env .id{font:600 10.5px var(--mono);letter-spacing:.5px;color:var(--muted)}
++.env h3{margin:3px 0 6px;font-size:14.5px}
++.env .fam{position:absolute;top:12px;right:13px;font-size:9.5px;font-weight:700;letter-spacing:1px;
++  color:#fff;padding:2px 7px;border-radius:3px}
++.fam-web{background:var(--teal)} .fam-ep{background:var(--amber)}
++.layers{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0 6px}
++.lay{font:600 10.5px var(--mono);border:1px solid var(--tintline);background:var(--tint);color:#33406e;
++  border-radius:3px;padding:2px 6px}
++.lay.dead{background:#FBF2F0;border-color:#E3B5AC;color:#8a3a30;text-decoration:line-through}
++.env dl{margin:6px 0 0;font-size:12.5px;display:grid;grid-template-columns:78px 1fr;gap:2px 8px}
++.env dt{color:var(--muted);font-weight:600}
++.env dd{margin:0}
++
++table{width:100%;border-collapse:collapse;font-size:13px}
++th{text-align:left;font-size:10.5px;letter-spacing:1px;color:#fff;background:var(--navy);
++  padding:6px 9px;font-weight:700}
++td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}
++tr:last-child td{border-bottom:0}
++td select,td input[type=text]{padding:4px 6px;font-size:12.5px}
++.mono{font-family:var(--mono);font-size:12px}
++.tag{font:600 10.5px var(--mono);border:1px solid var(--tintline);background:var(--tint);color:#33406e;
++  border-radius:3px;padding:1px 5px;white-space:nowrap}
++.tag.t1{background:#F1F7F3;border-color:#A9CDB8;color:#1E7F4B}
++.tag.t3{background:#FBF6EC;border-color:#E2CFA6;color:#6E4A08}
++
++button.go{background:var(--blue);color:#fff;border:0;border-radius:5px;padding:9px 18px;
++  font:600 14px Calibri,sans-serif;cursor:pointer}
++button.go:hover{background:#2a4093}
++button.ghost{background:#fff;color:var(--blue);border:1px solid var(--tintline)}
++.row{display:flex;gap:9px;align-items:center;margin-top:14px;flex-wrap:wrap}
++
++pre{background:#1b2340;color:#dfe5f5;border-radius:6px;padding:14px 16px;overflow:auto;
++  font-family:var(--mono);font-size:12px;line-height:1.45;margin:0}
++.flag{border-left:3px solid var(--warn);background:#FBF2F0;padding:8px 11px;margin-bottom:7px;
++  font-size:12.5px;color:#6E2921;border-radius:0 4px 4px 0}
++.flag.ok{border-left-color:var(--green);background:#F1F7F3;color:#1a5c3a}
++.flag b{display:block;font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px}
++.spin{color:var(--muted);font-style:italic}
++
++.sheet{background:var(--card);border:1px solid var(--line);border-radius:7px;padding:16px 18px;margin-bottom:14px}
++.sheetbar{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:6px}
++.laygrp{border:1px solid var(--line);border-radius:6px;margin-bottom:10px;overflow:hidden}
++.layhd{background:var(--tint);border-bottom:1px solid var(--tintline);padding:6px 11px;
++  display:flex;justify-content:space-between;align-items:center}
++.layhd b{font:700 12px var(--mono);color:var(--navy);letter-spacing:.4px}
++.layhd span{font-size:11px;color:var(--muted)}
++.laygrp.dead .layhd{background:#FBF2F0;border-bottom-color:#E3B5AC}
++.laygrp.dead .layhd b{color:#8a3a30}
++.addrow{padding:6px 11px;border-top:1px dashed var(--line);font-size:12px;color:var(--blue);cursor:pointer}
++.addrow:hover{background:var(--tint)}
++.absent{background:#FBF2F0;border-color:#E3B5AC;color:#8a3a30}
++.recbar{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 12px}
++.pill{font-size:11px;font-weight:700;letter-spacing:.6px;border-radius:3px;padding:3px 9px;color:#fff}
++.p-navy{background:var(--navy)} .p-teal{background:var(--teal)} .p-amber{background:var(--amber)}
++.p-grey{background:#8C8C96}
++.rec h2{font-size:19px} .rec .one{font-size:14px;margin-bottom:12px}
++.foot{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}
++</style>
++
++<div class="wrap">
++<header>
++  <h1>Propose a scenario</h1>
++  <span class="badge">MOCKUP · NOT WIRED UP</span>
++</header>
++<p class="sub">Walkthrough of the proposal path once Liszt carries more than one kind of infrastructure. The buttons work, the data is illustrative.</p>
++
++<div class="rail" id="rail"></div>
++
++<!-- ============================================================ STEP 1 -->
++<section class="pane on" data-p="0">
++  <div class="card">
++    <p class="kick">STEP ONE</p>
++    <h2>Describe it in plain language</h2>
++    <p>No structure required. An engineer or an analyst writes the question they are actually asking. Everything after this is Liszt doing work on their behalf.</p>
++
++    <label>Working title</label>
++    <input type="text" id="f-title" placeholder="short, attacker-goal phrasing">
++
++    <label>What are you worried about?</label>
++    <textarea id="f-body" placeholder="Write it the way you would say it out loud."></textarea>
++    <p class="hint">Try one of these, they fill the form in:</p>
++    <div class="chips" id="examples"></div>
++
++    <label>Who is proposing it</label>
++    <input type="text" id="f-who" value="Security engineering">
++
++    <div class="row"><button class="go" onclick="go(1)">Next: pick the environment</button></div>
++  </div>
++
++  <div class="card">
++    <p class="kick">OR OPEN ONE THAT HAS ALREADY BEEN WORKED THROUGH</p>
++    <h2>Two published incidents, mapped into the record</h2>
++    <p>Real events rather than invented ones, so the format can be checked against something that actually happened. Every figure is drawn from a primary source and the reference list on each record says which kind.</p>
++    <div class="chips" id="realchips"></div>
++    <p class="hint">These open the record view directly. The steps in between are the same ones above.</p>
++  </div>
++</section>
++
++<!-- ============================================================ STEP 2 -->
++<section class="pane" data-p="1">
++  <div class="card">
++    <p class="kick">STEP TWO</p>
++    <h2>Say what it runs on</h2>
++    <p>This is the part that does not exist today. Liszt currently has one environment, the AI stack, so nobody has to name it. The moment there is more than one, every proposal has to stand somewhere.</p>
++    <div class="note"><b>Why a catalog rather than free text.</b> "A web app behind an API gateway" is a shape our estate takes many times over. Describe it once, carefully, with the people who own it, and every scenario against it inherits the layers, the owners and the log sources for free.</div>
++  </div>
++  <div class="envs" id="envs"></div>
++  <div class="q" style="margin-top:14px"><b>An open design question, worth further discussion.</b> The two endpoint entries below are not shapes, they are <i>conditions on a population</i>. "Hosts missing EDR" describes a state, not an architecture. Either they are environments with a filter attached, or Liszt needs a second idea alongside environment. This mockup treats them as environments so the seam is visible. The likely answer is that a shape and a condition are two different things, and the note on the engineering sheet sets out why.</div>
++  <div class="row"><button class="go" onclick="go(2)" id="b-env" disabled>Next: run the research</button>
++    <button class="go ghost" onclick="go(0)">Back</button></div>
++</section>
++
++<!-- ================================================ ENGINEERING SHEET -->
++<section class="pane" data-p="1.5">
++  <div class="card">
++    <div class="sheetbar">
++      <div>
++        <p class="kick">ENGINEERING SHEET</p>
++        <h2 id="sh-name">.</h2>
++        <p class="hint" id="sh-meta">.</p>
++      </div>
++      <button class="go ghost" onclick="go(1)">Back to the environment cards</button>
++    </div>
++    <p>What an engineer fills in once, with the people who own the platform. Every scenario against this shape then inherits the layers, the components, the log sources and the owners without anyone retyping them.</p>
++    <div class="note"><b>How to read it.</b> A component is a thing that exists and can be pointed at. What it emits is what a scenario step landing on that layer would have to work with. A layer with nothing in the emits column is a blind layer before anyone scores a single scenario.</div>
++  </div>
++  <div class="sheet" id="sh-body"></div>
++  <div class="card" id="sh-note"></div>
++  <div class="row"><button class="go ghost" onclick="go(1)">Back to the environment cards</button></div>
++</section>
++
++<!-- ============================================================ STEP 3 -->
++<section class="pane" data-p="2">
++  <div class="card">
++    <p class="kick">STEP THREE</p>
++    <h2>Run the research</h2>
++    <p>Liszt picks the prompts from the library that match this environment and runs them. These are the same prompts anybody can read, edit, version and schedule.</p>
++    <div id="promptlist"></div>
++    <div class="row"><button class="go" id="b-run" onclick="runResearch()">Run these three</button>
++      <button class="go ghost" onclick="go(1)">Back</button></div>
++  </div>
++  <div id="findings"></div>
++</section>
++
++<!-- ============================================================ STEP 4 -->
++<section class="pane" data-p="3">
++  <div class="card">
++    <p class="kick">STEP FOUR</p>
++    <h2>Review before anything is written</h2>
++    <p>Everything below is a proposal from the research, not a decision. The engineer corrects the chain, chooses the framework tags, and only then does it go to the converter.</p>
++    <div id="checks"></div>
++  </div>
++
++  <div class="card">
++    <p class="kick">PROPOSED ATTACK PATH</p>
++    <table id="chain"></table>
++    <p class="hint">Layer tags come from the environment's own vocabulary, so a reviewer picks from a list rather than inventing a string. This is what stops the tagging drift we have been fighting.</p>
++  </div>
++
++  <div class="card">
++    <p class="kick">FRAMEWORK CANDIDATES · TICK WHAT HOLDS</p>
++    <table id="fw"></table>
++  </div>
++
++  <div class="card">
++    <p class="kick">EVIDENCE THE ENVIRONMENT SAYS SHOULD EXIST</p>
++    <table id="eve"></table>
++    <p class="hint">Pre-filled from the environment record. The scoring session with the owners is where these get their two scores; nothing here is a coverage claim.</p>
++  </div>
++
++  <div class="row"><button class="go" onclick="go(4)">Send to the converter</button>
++    <button class="go ghost" onclick="go(2)">Back</button></div>
++</section>
++
++<!-- ============================================================ STEP 5 -->
++<section class="pane" data-p="4">
++  <div class="card">
++    <p class="kick">STEP FIVE</p>
++    <h2>The converter runs on a reviewed answer</h2>
++    <p>By this point the layer, the chain and the framework tags have all been chosen by a person from a closed list. The converter is doing a mechanical translation rather than a judgement call, which is the whole reason to put a review step in front of it.</p>
++    <div class="flag ok"><b>Validation</b>All step tags are in the environment vocabulary. The chosen layer appears in the chain. Every framework identifier is well formed. Source tiers are 1, 2 or 3.</div>
++  </div>
++  <div class="card"><p class="kick">DRAFT RECORD</p><pre id="json"></pre></div>
++  <div class="row"><button class="go" onclick="go(5)">See it in the Liszt record layout</button>
++    <button class="go ghost" onclick="go(3)">Back to review</button></div>
++</section>
++
++<!-- ============================================================ STEP 6 -->
++<section class="pane" data-p="5">
++  <div class="card">
++    <p class="kick">STEP SIX</p>
++    <h2>The same thing, in the Liszt record layout</h2>
++    <p>This is how the proposal renders once it is a record, using the layout every existing scenario already uses. The point of this view is to check that a web app or an endpoint proposal marries up to the format without bending it.</p>
++    <div class="note"><b>What changed and what did not.</b> The classification band gained an environment and a stack model. Everything else is the shape Liszt already has: an attack path with one move per step, an evidence map with a named source and an owner per row, and a coverage column that is computed from the two scores rather than typed. Nothing here has been scored yet, which is why the last column reads the way it does.</div>
++  </div>
++  <div class="card rec" id="rec"></div>
++  <div class="row"><button class="go ghost" onclick="go(4)">Back to the record</button></div>
++</section>
++
++<p class="foot">Illustrative prototype. The environment catalog, the layer vocabularies and the research findings are drafted for discussion and have not been reviewed with the platform owners.</p>
++</div>
++
++<script>
++/* ------------------------------------------------------------------ data */
++const ENVS = [
++ {id:"ENV-WEB-01", fam:"web", name:"Public web app behind an API gateway",
++  where:"Public cloud", owners:"Platform engineering, application team, cloud team",
++  layers:["W0 Edge","W1 Gateway","W2 Application","W3 Data","W4 Control plane"],
++  seams:["Edge / net","Gateway / auth","Gateway -> App","App / session","App -> Data","Data / store","Control plane"],
++  emits:["API gateway access and authorizer logs","Application logs","Managed database audit log","Cloud control plane audit trail"],
++  gap:"No edge inspection in front of the gateway."},
++
++ {id:"ENV-WEB-02", fam:"web", name:"Internally hosted web app behind a WAF",
++  where:"Corporate data center", owners:"Network security, platform engineering, application team",
++  layers:["W0 Edge","W1 Proxy","W2 Application","W3 Data","W4 Directory"],
++  seams:["Edge / net","WAF / rule","Proxy -> App","App / session","App -> Data","Data / store","Identity"],
++  emits:["WAF rule hits and blocks","Reverse proxy access logs","Web server and application logs","Database audit log"],
++  gap:"The WAF sees HTTP only. Anything the app does after the request is invisible to it."},
++
++ {id:"ENV-WEB-03", fam:"web", name:"Web app published through a CDN",
++  where:"Public cloud origin, third party edge", owners:"CDN owner, platform engineering, application team",
++  layers:["W0 CDN edge","W1 Origin shield","W2 Application","W3 Data","W4 CDN config"],
++  seams:["Edge / net","Edge / cache","Origin / net","App / session","App -> Data","Data / store","Control plane"],
++  emits:["CDN access logs and edge rule hits","Origin access logs","Application logs","CDN configuration change log"],
++  gap:"If the origin is reachable directly, the entire edge is optional for an attacker."},
++
++ {id:"ENV-WEB-04", fam:"web", name:"Public cloud web app behind a web application firewall",
++  where:"Public cloud", owners:"Network security, platform engineering, cloud team",
++  layers:["W0 Edge","W1 Filtering tier","W2 Application","W3 Data","W4 Control plane"],
++  seams:["Edge / net","WAF / rule","Host / Cloud","App / session","App -> Data","Data / store","Control plane"],
++  emits:["Web application firewall rule hits","Filtering tier host and access logs","Application logs","Cloud control plane audit trail","Storage access logs, if enabled"],
++  gap:"The filtering tier is a request-relaying device by design, and anything it is trusted to reach it can be made to reach on somebody else's behalf.",
++  added:"Added because a real incident arrived that did not fit any of the five shapes above."},
++
++ {id:"ENV-EP-01", fam:"ep", name:"Managed hosts missing EDR and configuration management",
++  where:"Corporate estate", owners:"Endpoint engineering, IT operations",
++  layers:["E0 Firmware","E1 Operating system","E2 Security agents","E3 Applications","E4 Identity"],
++  dead:[2],
++  seams:["Host / boot","Host / OS","Host / process","Host / app","Host / net","Identity"],
++  emits:["Network telemetry only","Identity sign-in events","Nothing from the host itself"],
++  gap:"The defining property is an absence. There is no agent to ask, so almost every step of any chain scores Blind by construction."},
++
++ {id:"ENV-EP-02", fam:"ep", name:"Managed hosts with patches over 30 days out of date",
++  where:"Corporate estate", owners:"Endpoint engineering, vulnerability management",
++  layers:["E0 Firmware","E1 Operating system","E2 Security agents","E3 Applications","E4 Identity"],
++  seams:["Host / boot","Host / OS","Host / process","Host / app","Host / net","Identity"],
++  emits:["Patch management state","Vulnerability scanner findings","Endpoint agent telemetry","Identity sign-in events"],
++  gap:"Instrumentation is present. The exposure is the window between a fix existing and it being applied."}
++];
++
++const EXAMPLES = {
++ "ENV-WEB-01":{t:"Abuse of a trusted gateway path to reach cloud data",
++   b:"What if this type of web attack went against one of our web apps that is hosted in a public cloud and behind an API gateway? I want to know how far it gets and whether the gateway logs would show it."},
++ "ENV-WEB-02":{t:"Application compromise behind a WAF that only sees HTTP",
++   b:"What if an attacker gets past the WAF on an internal app and then pivots inside? Would we see anything the WAF does not?"},
++ "ENV-WEB-03":{t:"Bypassing the edge by reaching the origin directly",
++   b:"What if somebody finds the origin behind our CDN and just goes straight at it? Do we have anything at the origin, or does all of our telemetry live at the edge?"},
++ "ENV-WEB-04":{t:"A perimeter device made to act on the attacker's behalf",
++   b:"What if the filtering tier in front of one of our cloud-hosted apps could be made to make a request for somebody else? What would it be able to reach that the app itself cannot, and would any of it show up?"},
++ "ENV-EP-01":{t:"Quiet compromise of an unmonitored host",
++   b:"What happens on a host that has no EDR and no configuration management? How far does an attacker get before anything anywhere notices?"},
++ "ENV-EP-02":{t:"Exploitation of a known but unapplied fix",
++   b:"What if a public exploit lands for something we have not patched in over a month? Which of our controls would catch it and at which step?"}
++};
++
++const RESEARCH = {
++ "ENV-WEB-01":{
++  prompts:["web-vectors: common attack vectors against a cloud-hosted app fronted by an API gateway",
++           "framework-map: candidate ATT&CK techniques for the vectors returned above",
++           "our-estate: which of our published incidents and prior scenarios touch this shape"],
++  vectors:["Authorization checked at the gateway but not re-checked at the service, so an object reference can be walked",
++           "Token validation accepting an unexpected issuer or algorithm",
++           "The origin service reachable without passing the gateway at all",
++           "Server-side request forgery from the app into the cloud metadata service",
++           "Over-scoped execution role letting the app read storage it has no business reading"],
++  chain:[["Enumerate the API surface and find an object reference that is not re-checked","Gateway / auth"],
++         ["Walk the reference to reach another tenant's records","Gateway -> App"],
++         ["Use the app's own execution role to read the backing store directly","App -> Data"],
++         ["Stage the extracted records in object storage the role can already write to","Data / store"]],
++  fw:[["T1190","Exploit public-facing application",1],["T1078.004","Valid accounts: cloud accounts",1],
++      ["T1552.005","Unsecured credentials: cloud instance metadata API",0],
++      ["T1213","Data from information repositories",1],["T1530","Data from cloud storage",1]],
++  eve:[["API gateway access and authorizer logs","Platform engineering"],
++       ["Application logs","Application team"],
++       ["Managed database audit log","Cloud team"],
++       ["Cloud control plane audit trail","Cloud team"]]},
++
++ "ENV-WEB-02":{
++  prompts:["web-vectors: common attack vectors against an internally hosted app behind a WAF",
++           "framework-map: candidate ATT&CK techniques for the vectors returned above",
++           "our-estate: which of our published incidents and prior scenarios touch this shape"],
++  vectors:["Encoding or fragmentation that a signature-based rule does not reconstruct",
++           "A vulnerability in the app itself, which the WAF was never going to see",
++           "A web shell written to a directory the web server can execute from",
++           "Reuse of the web tier's service account to reach an internal system",
++           "Direct access to the app on a port the proxy does not front"],
++  chain:[["Send a request encoded so the WAF rule does not match it","WAF / rule"],
++         ["Exploit the application flaw the request was aimed at","Proxy -> App"],
++         ["Write a web shell into a directory the server will execute","App / session"],
++         ["Use the web tier service account to reach an internal database","App -> Data"]],
++  fw:[["T1190","Exploit public-facing application",1],["T1505.003","Server software component: web shell",1],
++      ["T1027","Obfuscated files or information",0],["T1078.002","Valid accounts: domain accounts",1],
++      ["T1210","Exploitation of remote services",0]],
++  eve:[["WAF rule hits and blocks","Network security"],
++       ["Reverse proxy access logs","Platform engineering"],
++       ["Web server and application logs","Application team"],
++       ["Database audit log","Platform engineering"]]},
++
++ "ENV-WEB-03":{
++  prompts:["web-vectors: common attack vectors against an application published through a CDN",
++           "framework-map: candidate ATT&CK techniques for the vectors returned above",
++           "our-estate: which of our published incidents and prior scenarios touch this shape"],
++  vectors:["Origin address discoverable from history, certificates or a misconfigured record",
++           "Cache poisoning through an unkeyed header that the origin reflects",
++           "A stale DNS record pointing at an edge property nobody owns any more",
++           "An edge rule change that quietly exposes a path meant to be internal",
++           "Edge access control that the origin does not enforce for itself"],
++  chain:[["Find the origin address and confirm it answers without the edge","Origin / net"],
++         ["Send requests straight to the origin, skipping every edge rule","Origin / net"],
++         ["Exploit the path the edge was supposed to be protecting","App / session"],
++         ["Read the backing store using the application's own access","App -> Data"]],
++  fw:[["T1190","Exploit public-facing application",1],["T1596","Search open technical databases",1],
++      ["T1584.004","Compromise infrastructure: server",0],["T1071.001","Application layer protocol: web",0],
++      ["T1530","Data from cloud storage",1]],
++  eve:[["CDN access logs and edge rule hits","CDN owner"],
++       ["Origin access logs","Platform engineering"],
++       ["Application logs","Application team"],
++       ["CDN configuration change log","CDN owner"]]},
++
++ "ENV-WEB-04":{
++  prompts:["web-vectors: common attack vectors against a cloud-hosted app behind a filtering tier",
++           "framework-map: candidate ATT&CK techniques for the vectors returned above",
++           "our-estate: which of our published incidents and prior scenarios touch this shape"],
++  vectors:["A filtering or proxy tier that can be made to issue a request on somebody else's behalf",
++           "An instance role attached to a perimeter host with permissions well beyond that host's job",
++           "The cloud metadata service reachable from any process on the host",
++           "Storage policies that do not restrict where credentials may be used from",
++           "Object-level access logging switched off, so reads leave no per-object record"],
++  chain:[["Get a command to execute on the filtering tier host","WAF / rule"],
++         ["Have the host return the credentials of the role attached to it","Host / Cloud"],
++         ["Use those credentials from outside the cloud to enumerate storage","Control plane"],
++         ["Copy the data the role is permitted to read","Data / store"]],
++  fw:[["T1190","Exploit public-facing application",1],["T1552.005","Unsecured credentials: cloud instance metadata API",1],
++      ["T1078.004","Valid accounts: cloud accounts",1],["T1580","Cloud infrastructure discovery",1],
++      ["T1530","Data from cloud storage",1]],
++  eve:[["Web application firewall rule hits","Network security"],
++       ["Filtering tier host and access logs","Platform engineering"],
++       ["Cloud control plane audit trail","Cloud team"],
++       ["Storage access logs, if enabled","Cloud team"]]},
++
++ "ENV-EP-01":{
++  prompts:["endpoint-vectors: what an attacker can do on a host with no endpoint agent and no configuration baseline",
++           "framework-map: candidate ATT&CK techniques for the vectors returned above",
++           "our-estate: which of our published incidents and prior scenarios touch this shape"],
++  vectors:["Execution with nothing on the host watching for it",
++           "Credential material read out of memory or from disk, unobserved",
++           "Persistence through a scheduled task that no baseline would flag as new",
++           "Local configuration drift that nobody is measuring",
++           "Movement to a second host using what was taken from the first"],
++  chain:[["Gain execution on the host through a user action","Host / process"],
++         ["Read credential material from the host","Host / OS"],
++         ["Install persistence that no baseline is checking for","Host / OS"],
++         ["Authenticate onward to a second system with what was taken","Identity"]],
++  fw:[["T1204.002","User execution: malicious file",1],["T1003","OS credential dumping",1],
++      ["T1053.005","Scheduled task or job",1],["T1021","Remote services",0],
++      ["T1562.001","Impair defenses: disable or modify tools",0]],
++  eve:[["Network telemetry only","Network engineering"],
++       ["Identity sign-in events","Identity engineering"],
++       ["Nothing from the host itself","Endpoint engineering"]]},
++
++ "ENV-EP-02":{
++  prompts:["endpoint-vectors: what a published exploit reaches on a host that is 30 or more days behind on fixes",
++           "framework-map: candidate ATT&CK techniques for the vectors returned above",
++           "our-estate: which of our published incidents and prior scenarios touch this shape"],
++  vectors:["A public exploit for a fix that exists but has not been applied here",
++           "Local privilege escalation through an unpatched component",
++           "Defense evasion aimed at the agent that is present",
++           "A gap between the scanner seeing the exposure and anyone acting on it",
++           "Impact staged once the host is fully controlled"],
++  chain:[["Deliver a public exploit for a fix we have not applied","Host / app"],
++         ["Escalate locally through the unpatched component","Host / OS"],
++         ["Interfere with the endpoint agent to reduce what it reports","Host / process"],
++         ["Stage impact once the host is fully controlled","Host / OS"]],
++  fw:[["T1203","Exploitation for client execution",1],["T1068","Exploitation for privilege escalation",1],
++      ["T1562.001","Impair defenses: disable or modify tools",1],["T1486","Data encrypted for impact",0],
++      ["T1082","System information discovery",0]],
++  eve:[["Patch management state","Vulnerability management"],
++       ["Vulnerability scanner findings","Vulnerability management"],
++       ["Endpoint agent telemetry","Endpoint engineering"],
++       ["Identity sign-in events","Identity engineering"]]}
++};
++
++
++/* Component detail behind each shape. This is what an engineer would fill in once, with the
++   people who own the platform, and what every scenario against the shape then inherits. */
++const DETAIL = {
++ "ENV-WEB-01":[
++  ["W0 Edge",       [["Public DNS record","name",           "DNS query logs, partial"],
++                     ["Load balancer, TLS termination","network","Load balancer access log"]]],
++  ["W1 Gateway",    [["API gateway","gateway",              "Gateway access log"],
++                     ["Request authorizer, token validation","auth","Authorizer decision log"],
++                     ["Rate limiter and usage plan","control","Throttle and quota events"]]],
++  ["W2 Application",[["Container service","compute",        "Container runtime events"],
++                     ["Application runtime","app",          "Application log"],
++                     ["Execution role","identity",          "Role assumption events"]]],
++  ["W3 Data",       [["Managed relational database","store","Database audit log"],
++                     ["Object storage bucket","store",      "Storage access log"],
++                     ["Secrets store","store",              "Secret retrieval events"]]],
++  ["W4 Control plane",[["Cloud identity and access","identity","Control plane audit trail"],
++                     ["Deployment pipeline","pipeline",     "Pipeline run log"]]]],
++
++ "ENV-WEB-02":[
++  ["W0 Edge",       [["Perimeter firewall","network",       "Firewall session log"],
++                     ["Web application firewall","control", "Rule hits and blocks"]]],
++  ["W1 Proxy",      [["Reverse proxy","network",            "Proxy access log"],
++                     ["TLS termination","network",          "Handshake errors only"]]],
++  ["W2 Application",[["Web server","app",                   "Access and error log"],
++                     ["Application runtime","app",          "Application log"],
++                     ["Local file system","store",          "File integrity events, if deployed"]]],
++  ["W3 Data",       [["On-premises database","store",       "Database audit log"],
++                     ["File share","store",                 "Share access auditing"]]],
++  ["W4 Directory",  [["Directory service","identity",       "Authentication events"],
++                     ["Service account","identity",         "Sign-in events"],
++                     ["Group policy","control",             "Policy application events"]]]],
++
++ "ENV-WEB-03":[
++  ["W0 CDN edge",   [["CDN distribution","network",         "CDN access log"],
++                     ["Edge rules and functions","control", "Edge function log"],
++                     ["Edge cache","store",                 "Cache hit and miss counters"]]],
++  ["W1 Origin shield",[["Origin shield layer","network",    "Origin shield log"],
++                     ["Origin access identity","identity",  "Origin authentication events"]]],
++  ["W2 Application",[["Origin load balancer","network",     "Origin access log"],
++                     ["Application runtime","app",          "Application log"]]],
++  ["W3 Data",       [["Backing database","store",           "Database audit log"],
++                     ["Object storage","store",             "Storage access log"]]],
++  ["W4 CDN config", [["CDN configuration","control",        "Configuration change log"],
++                     ["Public DNS records","name",          "DNS change log"],
++                     ["Certificate management","control",   "Certificate issuance events"]]]],
++
++ "ENV-WEB-04":[
++  ["W0 Edge",       [["Public DNS record","name",           "DNS query logs, partial"],
++                     ["Internet-facing load balancer","network","Load balancer access log"]]],
++  ["W1 Filtering tier",[["Web application firewall","control","Rule hits and blocks"],
++                     ["Host the filtering tier runs on","compute","Host and access logs"],
++                     ["Instance role attached to that host","identity","Role assumption events"]]],
++  ["W2 Application",[["Application runtime","app",          "Application log"],
++                     ["Cloud instance metadata service","identity","Nothing. Metadata calls are not recorded."]]],
++  ["W3 Data",       [["Object storage buckets","store",     "Storage access logs, if data events are on"],
++                     ["Data lake prefixes","store",         "Object-level access, if data events are on"]]],
++  ["W4 Control plane",[["Cloud identity and access","identity","Control plane audit trail"],
++                     ["Key management service","control",   "Key use events"]]]],
++
++ "ENV-EP-01":[
++  ["E0 Firmware",   [["Platform firmware","firmware",       "Nothing collected"],
++                     ["Secure boot state","firmware",       "Nothing collected"]]],
++  ["E1 Operating system",[["Operating system","os",         "Local event log, not forwarded"],
++                     ["Local accounts","identity",          "Nothing collected"]]],
++  ["E2 Security agents",[["Endpoint detection agent","ABSENT","Nothing"],
++                     ["Configuration baseline agent","ABSENT","Nothing"]]],
++  ["E3 Applications",[["Installed applications","app",      "Nothing collected"],
++                     ["Unmanaged software","app",           "Nothing collected"]]],
++  ["E4 Identity",   [["Directory join","identity",          "Authentication events, from the directory"],
++                     ["Local administrator group","identity","Nothing collected"]]]],
++
++ "ENV-EP-02":[
++  ["E0 Firmware",   [["Platform firmware","firmware",       "Firmware inventory"],
++                     ["Firmware version state","firmware",  "Version state, from the agent"]]],
++  ["E1 Operating system",[["Operating system","os",         "Forwarded event log"],
++                     ["Patch level","state",                "Patch compliance state"]]],
++  ["E2 Security agents",[["Endpoint detection agent","agent","Endpoint telemetry"],
++                     ["Configuration baseline agent","agent","Baseline drift events"],
++                     ["Patch management agent","agent",     "Deployment and failure events"]]],
++  ["E3 Applications",[["Installed applications","app",      "Application inventory"],
++                     ["Known unpatched components","state", "Vulnerability scanner findings"]]],
++  ["E4 Identity",   [["Directory join","identity",          "Authentication events"],
++                     ["Local administrator group","identity","Group membership state"]]]]
++};
++const COMP_TYPES = ["network","gateway","auth","control","compute","app","store","identity",
++                    "pipeline","name","firmware","os","agent","state","ABSENT"];
++
++
++/* Two real, published incidents worked through the same path, so the format can be checked
++   against events that actually happened rather than against invented ones. Every figure below
++   is drawn from a primary source; the reference tier on each row says which kind. */
++const REAL = {
++ "capitalone":{
++  env:"ENV-WEB-04",
++  id:"SC-R01", slug:"perimeter-role-to-cloud-storage-exfiltration",
++  title:"A perimeter filtering host is made to hand over its own cloud credentials",
++  evidence:"seen-in-the-wild", priority:"NOW",
++  one_liner:"A host in the filtering tier of a cloud-hosted web application is made to issue a request on the attacker's behalf. That request reaches the cloud metadata service, which returns the temporary credentials of the role attached to the host. Those credentials are then used from outside the cloud to enumerate and read the storage the role could see. The application itself is never breached, and no customer credential is ever guessed. The whole chain runs on trust the platform grants the host by design.",
++  incident:{
++    name:"Capital One, disclosed 29 July 2019",
++    facts:[
++      ["Access occurred","22 and 23 March 2019. Two days, not the four months usually reported. March to July is dwell time before discovery, not intrusion duration."],
++      ["Discovered","17 July 2019, by an external tipster emailing the responsible disclosure address after spotting a public code gist. No internal control fired in 117 days."],
++      ["Scale","Roughly 106 million individuals. About 140,000 social security numbers, 80,000 linked bank account numbers, and 1 million Canadian social insurance numbers."],
++      ["Volume","Around 30 GB, described in the charging documents as more than 700 folders or buckets. The word 'or' is the government's, and the count is very likely mostly prefixes rather than distinct buckets."],
++      ["Outcome","An 80 million dollar regulatory penalty, a 190 million dollar consumer settlement, and a conviction on wire fraud and computer intrusion counts in June 2022."],
++      ["What regulators actually cited","Not the misconfiguration. The consent order named inadequate network security controls, inadequate data loss prevention, and, in its own words, ineffective dispositioning of alerts."]
++    ]},
++  chain:[
++   ["Reach the filtering tier host and get a command to execute there","WAF / rule",
++    ["T1190"],
++    "The charging documents say a misconfigured web application firewall permitted commands to reach and execute on the server. Neither the product nor the exact misconfiguration was ever made public."],
++   ["Have that host request the cloud metadata service and return the role credentials it holds","Host / Cloud",
++    ["T1552.005"],
++    "The metadata service at the link-local address returns temporary credentials for whichever role is attached to the host. The role in question carried the string WAF-Role in its name."],
++   ["Use those credentials from outside the cloud to enumerate the storage the role can see","Control plane",
++    ["T1078.004","T1580","T1619"],
++    "This is the first step that leaves a durable record. The credential use is written to the control plane audit trail, and the source address is not inside the cloud."],
++   ["Copy the data the role is permitted to read","Data / store",
++    ["T1530"],
++    "A single synchronise command against the storage the role could already read. Around 30 GB of credit application data."],
++   ["Launch compute in the victim account and mine cryptocurrency on it","Host / Cloud",
++    ["T1496.001"],
++    "Usually left out of retellings. It was charged and convicted, and was arguably the primary motive."]
++  ],
++  eve:[
++   ["Web application firewall rule hits and host access logs","Network security","Present. The request that started the chain would appear here as an ordinary looking inbound request."],
++   ["Cloud instance metadata service","Cloud team","Nothing. Metadata calls are not written to the cloud audit trail at all. This step of the chain has essentially no cloud-native telemetry, which is why the vendor's eventual fix was architectural rather than detective."],
++   ["Cloud control plane audit trail","Cloud team","Present and decisive. Instance role credentials being used from an address outside the cloud is the single highest-value detection in this chain, and the platform now ships a managed finding for exactly that pattern."],
++   ["Storage object-level access logs","Cloud team","Conditional. Object-level data events are off by default and billed separately, so most estates do not have them until somebody turns them on."],
++   ["Egress volume from the filtering tier","Network engineering","Present. Thirty gigabytes leaving a tier that should originate almost no outbound data is a volume anomaly, not a subtle one."]
++  ],
++  lesson:"The application was never the target and was never breached. The exposure was that a request-relaying device had a role attached to it that could read a data lake. A filtering tier exists to make requests on someone else's behalf, so it is the worst possible place to attach broad data permissions. Note also what the telemetry picture actually looks like: one step in the chain is genuinely invisible, one is decisively visible, and the organisation had the logs for the visible step and did not work the alerts.",
++  caution:"Two things are widely stated about this incident that the primary sources do not support. The specific filtering product has never been named publicly. And server-side request forgery, the mechanism almost every retelling asserts, appears in no charging document and in no statement by either company; it comes from a senatorial letter and from researcher reconstruction. It is very likely correct and it is not established fact, so the record says so.",
++  refs:[
++   ["Department of Justice, charging and conviction releases, United States v. Thompson","justice.gov",1],
++   ["Capital One, incident disclosure and facts page, 29 July 2019","capitalone.com",1],
++   ["Office of the Comptroller of the Currency, consent order EA-2020-036","occ.gov",1],
++   ["Cloud Security Alliance, technical analysis of the misconfiguration","cloudsecurityalliance.org",2],
++   ["Cloud provider guidance on the metadata service hardening released November 2019","aws.amazon.com",2]
++  ]},
++
++ "wannacry":{
++  env:"ENV-EP-02",
++  id:"SC-R02", slug:"wormable-remote-execution-through-an-unapplied-fix",
++  title:"A wormable flaw is exploited on hosts where the fix existed but was not applied",
++  evidence:"seen-in-the-wild", priority:"NOW",
++  one_liner:"A remote code execution flaw in a file sharing service is exploited across a flat network by a worm. No user has to click anything, no credential has to be stolen, and nothing has to be phished. The only precondition is a host that is reachable on the file sharing port and has not had a fix applied that was published two months earlier. The worm installs a service, scans for more hosts, destroys the recovery paths, and encrypts the files.",
++  incident:{
++    name:"WannaCry, 12 May 2017",
++    facts:[
++      ["The fix","Published 14 March 2017 as a critical update. At publication the vendor recorded the flaws as neither publicly disclosed nor exploited, which is precisely why so many estates deprioritised it."],
++      ["The exploit becomes public","14 April 2017, 31 days after the fix, when a leaked toolkit was dumped publicly."],
++      ["The outbreak","12 May 2017, first infections around 07:44 UTC. Fifty-nine days after the fix was available."],
++      ["What was actually hit","Over 98 percent of infections were one supported desktop operating system, unpatched. The much-repeated claim that end-of-life systems were the main victim is wrong twice over: they were under a tenth of a percent of infections, and where the exploit did reach them it mostly crashed them rather than encrypting them."],
++      ["One national health system","At least 80 of 236 trusts affected, 34 infected and locked out, 595 general practices infected, 6,912 appointments cancelled in the documented count and an estimated 19,494 including knock-on effects. Around 92 million pounds in total cost."],
++      ["What the attackers collected","About 130,000 dollars. With three hardcoded wallets and no per-victim payment tracking, paying largely did not produce a decryption."],
++      ["Attribution","Formally attributed by the United States in December 2017, with a criminal complaint unsealed in September 2018."]
++    ]},
++  chain:[
++   ["Find a reachable host on the file sharing port from an already infected host on the same segment","Host / net",
++    ["T1018","T1016"],
++    "The worm runs a local subnet sweep and a random internet address sweep, 128 concurrent threads. This is extremely loud in flow data and needs no agent to see."],
++   ["Exploit the file sharing flaw to execute code in the kernel of the target host","Host / OS",
++    ["T1210"],
++    "The exploit carries a hardcoded internal address string left in by the developer, which makes a near zero false positive network signature."],
++   ["Install a service and start the worm scanning for further hosts","Host / process",
++    ["T1543.003","T1570"],
++    "The service installation writes an event to the system log by default, with no configuration required. On an unmanaged host that event is written and never forwarded anywhere."],
++   ["Destroy the recovery paths before touching any file","Host / OS",
++    ["T1490","T1047","T1489"],
++    "One command line deletes shadow copies, disables recovery, and clears the backup catalog. This is the highest fidelity pre-encryption indicator in the whole chain, and it is invisible without process command line auditing."],
++   ["Encrypt the files and demand payment","Host / app",
++    ["T1486","T1222.001"],
++    "Per-file symmetric keys wrapped with a per-victim public key, which is itself wrapped with the attacker's key. Self recovery is not possible."]
++  ],
++  eve:[
++   ["Patch management state","Vulnerability management","Present in this environment and decisive. The question that determined survival was simply which hosts lacked the update, and that is an inventory question rather than a detection one."],
++   ["Endpoint agent telemetry","Endpoint engineering","Present in this environment. Process creation with command lines catches the recovery destruction command seconds before mass encryption begins."],
++   ["Network flow and DNS logs","Network engineering","Present, and the cheapest useful signal in the entire incident. The malware performs a lookup against a single unregistered domain before doing anything else, and that lookup was used in practice to find infected estates that had not yet been locked out."],
++   ["File sharing service audit","Endpoint engineering","Conditional. Auditing of the legacy file sharing protocol is off by default and needs the configuration management this environment has."],
++   ["Service installation events","Endpoint engineering","Present by default on every host. The value depends entirely on whether anything forwards and reads them."]
++  ],
++  lesson:"The exposure here is not a vulnerability, it is a window. The fix existed for fifty-nine days and the exploit was public for twenty-eight of them. That makes this a scenario about a condition rather than about an architecture, which is exactly why the environment it runs against is defined by a patch age rather than by a shape. Score this same chain against a population that is current and most of it does not start.",
++  caution:"Worth scoring this chain twice, once against this environment and once against the population with no endpoint agent and no configuration baseline. The difference is stark and it is the argument for closing that gap. On an unmanaged host the recovery destruction command produces nothing, because process command line auditing is off by default. The kernel implant leaves no file, no service, no registry key and no process, so it is locally invisible and can only be found from the network. What survives is the service installation event, written by default and forwarded nowhere, and every network signal, which needs no agent at all.",
++  refs:[
++   ["Vendor security bulletin and customer guidance, March and May 2017","microsoft.com",1],
++   ["National audit office investigation into the health service impact, October 2017","nao.org.uk",1],
++   ["National cyber agency alert and indicator list, May 2017","cisa.gov",1],
++   ["Department of Justice complaint against a named individual, unsealed September 2018","justice.gov",1],
++   ["Framework software entry and technique mappings","attack.mitre.org",2]
++  ]}
++};
++
++const STEPS = ["Describe","Environment","Research","Review","Record","Liszt record"];
++let step = 0, env = null, ran = false, fromExample = false, real = null;
++
++/* ------------------------------------------------------------------ rail */
++const rail = document.getElementById("rail");
++STEPS.forEach((s,i)=>{
++  const b=document.createElement("button");
++  b.innerHTML='<span class="n">'+(i+1)+'</span><b>'+s+'</b>';
++  b.onclick=()=>go(i); rail.appendChild(b);
++});
++function paint(){
++  [...rail.children].forEach((b,i)=>{
++    b.className = i===Math.floor(step) ? "on" : (i<step ? "done" : "");
++  });
++  document.querySelectorAll(".pane").forEach(p=>
++    p.classList.toggle("on", Number(p.dataset.p)===step));
++  window.scrollTo({top:0,behavior:"smooth"});
++}
++function go(i){
++  if(i>=2 && !env) return;
++  step=i;
++  if(i===1.5) renderSheet();
++  if(i===2) renderPrompts();
++  if(i===3){ if(!ran) runResearch(true); renderReview(); }
++  if(i===4) renderJson();
++  if(i===5){ renderJson(); renderRecord(); }
++  paint();
++}
++
++/* --------------------------------------------------------------- step one */
++const exWrap=document.getElementById("examples");
++ENVS.forEach(e=>{
++  const c=document.createElement("span"); c.className="chip";
++  c.textContent=(e.fam==="web"?"Web app · ":"Endpoint · ")+e.name.replace(/^(Public|Internally hosted|Managed hosts) /,"");
++  c.onclick=()=>{ fromExample=true; real=null; pick(e.id); };
++  exWrap.appendChild(c);
++});
++
++const realWrap=document.getElementById("realchips");
++[["capitalone","Cloud perimeter role to storage exfiltration, 2019"],
++ ["wannacry","Wormable flaw exploited through an unapplied fix, 2017"]].forEach(([k,label])=>{
++  const c=document.createElement("span"); c.className="chip";
++  c.style.borderColor="#A9CDB8"; c.style.background="#F1F7F3"; c.style.color="#1a5c3a";
++  c.innerHTML="<b>REAL</b> &nbsp;"+label;
++  c.onclick=()=>{ real=REAL[k]; pick(real.env);
++    document.getElementById("f-title").value=real.title;
++    document.getElementById("f-body").value=real.one_liner;
++    document.getElementById("f-who").value="Threat research";
++    go(5); };
++  realWrap.appendChild(c);
++});
++
++/* --------------------------------------------------------------- step two */
++const envWrap=document.getElementById("envs");
++ENVS.forEach(e=>{
++  const d=document.createElement("div"); d.className="env"; d.id="env-"+e.id;
++  d.innerHTML=
++    '<span class="fam fam-'+e.fam+'">'+(e.fam==="web"?"WEB APP":"ENDPOINT")+'</span>'+
++    '<div class="id">'+e.id+'</div><h3>'+e.name+'</h3>'+
++    '<div class="layers">'+e.layers.map((l,i)=>
++      '<span class="lay'+((e.dead||[]).includes(i)?" dead":"")+'">'+l+'</span>').join("")+'</div>'+
++    '<dl><dt>Where</dt><dd>'+e.where+'</dd>'+
++    '<dt>Owners</dt><dd>'+e.owners+'</dd>'+
++    '<dt>Emits</dt><dd>'+e.emits.join(" · ")+'</dd>'+
++    '<dt>Known gap</dt><dd>'+e.gap+'</dd></dl>'+
++    '<div class="row" style="margin-top:10px"><button class="go ghost" style="padding:5px 12px;font-size:12.5px" '+
++    'onclick="event.stopPropagation();pick(\''+e.id+'\');go(1.5)">Open engineering sheet</button></div>';
++  d.onclick=()=>{ real=null; pick(e.id); };
++  envWrap.appendChild(d);
++});
++function pick(id){
++  env=ENVS.find(e=>e.id===id); ran=false;
++  document.querySelectorAll(".env").forEach(n=>n.classList.remove("on"));
++  document.getElementById("env-"+id).classList.add("on");
++  document.getElementById("b-env").disabled=false;
++  /* The wording and the environment have to agree or the walkthrough reads as a mistake.
++     Anything the user typed themselves is left alone. */
++  const tEl=document.getElementById("f-title"), bEl=document.getElementById("f-body");
++  const ex = EXAMPLES[id];
++  const typed = tEl.value && !Object.values(EXAMPLES).some(x=>x.t===tEl.value);
++  if(ex && (fromExample || !typed)){ tEl.value=ex.t; bEl.value=ex.b; }
++}
++
++/* -------------------------------------------------- the engineering sheet */
++function renderSheet(){
++  const D = DETAIL[env.id];
++  document.getElementById("sh-name").textContent = env.name;
++  document.getElementById("sh-meta").textContent =
++    env.id + " · stack model " + (env.fam==="web"?"WEB":"ENDPOINT")
++    + " · " + env.where + " · owned by " + env.owners;
++
++  document.getElementById("sh-body").innerHTML = D.map((grp, gi) => {
++    const dead = (env.dead||[]).includes(gi);
++    const rows = grp[1].map(c =>
++      '<tr>'+
++      '<td><input type="text" value="'+c[0]+'"></td>'+
++      '<td><select>'+COMP_TYPES.map(x=>'<option'+(x===c[1]?" selected":"")+'>'+x+'</option>').join("")+'</select></td>'+
++      '<td><input type="text" value="'+c[2]+'"></td>'+
++      '<td style="text-align:center"><input type="checkbox"'+(c[2]==="Nothing"||c[2].indexOf("Nothing collected")===0?"":" checked")+'></td>'+
++      '</tr>').join("");
++    return '<div class="laygrp'+(dead?" dead":"")+'">'+
++      '<div class="layhd"><b>'+grp[0]+'</b><span>'+grp[1].length+' component'+(grp[1].length===1?"":"s")+
++      (dead?' · nothing deployed at this layer':'')+'</span></div>'+
++      '<table><tr><th>COMPONENT</th><th style="width:130px">TYPE</th><th style="width:270px">WHAT IT EMITS</th>'+
++      '<th style="width:82px">COLLECTED</th></tr>'+rows+'</table>'+
++      '<div class="addrow">+ add a component to '+grp[0]+'</div></div>';
++  }).join("") +
++  '<p class="hint">Seam vocabulary this shape offers a scenario: ' +
++  env.seams.map(s=>'<span class="tag">'+s+'</span>').join(" ") + '</p>';
++
++  document.getElementById("sh-note").innerHTML = env.dead
++    ? '<p class="kick">A NOTE ON THIS PARTICULAR ENTRY</p>'+
++      '<div class="q"><b>Area worth further discussion.</b> Look at the E2 layer above. Its components are '+
++      'not configured a certain way, they are absent. That is what makes this entry different from the three '+
++      'web app shapes: those describe an architecture, this describes a state that a population of hosts is in. '+
++      'The likely answer is that a shape and a condition are two separate things. The shape says what the '+
++      'architecture is. The condition says which control is missing or degraded. Keeping them apart lets the '+
++      'same scenario be scored twice, once against the healthy shape and once with the condition applied, and '+
++      'the difference between those two coverage numbers is the case for closing the gap.</div>'
++    : '<p class="kick">WHAT A SCENARIO INHERITS FROM THIS SHEET</p>'+
++      '<table><tr><th style="width:200px">INHERITED</th><th>FROM</th></tr>'+
++      '<tr><td>Layer vocabulary</td><td>The '+DETAIL[env.id].length+' layers above, in order</td></tr>'+
++      '<tr><td>Seam tags for each step</td><td>The closed list at the foot of the sheet, so nobody invents a tag</td></tr>'+
++      '<tr><td>Candidate evidence sources</td><td>Every populated "what it emits" cell</td></tr>'+
++      '<tr><td>Owners to score with</td><td>'+env.owners+'</td></tr>'+
++      '<tr><td>Known gap, carried as context</td><td>'+env.gap+'</td></tr></table>';
++}
++
++/* ------------------------------------------------------------- step three */
++function renderPrompts(){
++  const R=RESEARCH[env.id];
++  document.getElementById("promptlist").innerHTML =
++    '<p class="kick" style="margin-top:14px">FROM THE PROMPT LIBRARY, MATCHED TO '+env.id+'</p>'+
++    '<table><tr><th style="width:130px">PROMPT</th><th>WHAT IT ASKS</th><th style="width:78px">VERSION</th><th style="width:96px">LAST RUN</th></tr>'+
++    R.prompts.map((p,i)=>{
++      const [name,rest]=p.split(": ");
++      return '<tr><td class="mono">'+name+'</td><td>'+rest+'</td><td class="mono">v'+(i===2?"1.4":"2.1")+'</td>'+
++             '<td class="mono">'+(i===2?"scheduled":"on demand")+'</td></tr>';
++    }).join("")+'</table>'+
++    '<p class="hint">Versioned, readable and schedulable. The third one runs weekly on its own and raises a proposal when something new lands.</p>';
++  document.getElementById("findings").innerHTML="";
++  document.getElementById("b-run").textContent="Run these three";
++}
++function runResearch(silent){
++  ran=true;
++  const R=RESEARCH[env.id];
++  const html =
++    '<div class="card"><p class="kick">WHAT THE RESEARCH CAME BACK WITH</p>'+
++    '<h3>Common attack vectors against '+env.id+'</h3>'+
++    '<table>'+R.vectors.map((v,i)=>'<tr><td class="mono" style="width:26px">'+(i+1)+'</td><td>'+v+'</td></tr>').join("")+'</table>'+
++    '<p class="hint">Five vectors returned. The next step proposes a chain from them, and the engineer decides which ones the scenario is actually about.</p></div>';
++  document.getElementById("findings").innerHTML=html;
++  if(!silent){ document.getElementById("b-run").textContent="Re-run";
++    setTimeout(()=>go(3), 350); }
++}
++
++/* -------------------------------------------------------------- step four */
++function renderReview(){
++  const R=RESEARCH[env.id];
++  document.getElementById("checks").innerHTML =
++    '<div class="flag"><b>Needs a decision</b>The research proposed a four step chain from five vectors. Two vectors were not used. Confirm the chain is the attack you meant, or swap a step.</div>'+
++    (env.dead ? '<div class="flag"><b>Environment warning</b>This environment has a layer marked absent, so most steps will score Blind before anyone sits down to score them. That is a finding in itself and probably belongs on the posture report rather than in a scenario.</div>' : '')+
++    '<div class="flag ok"><b>Pre-filled from the environment</b>Layer vocabulary, evidence sources and owners all come from '+env.id+'. Nobody retypes them, and nobody invents a tag.</div>';
++
++  document.getElementById("chain").innerHTML =
++    '<tr><th style="width:34px">#</th><th>MOVE</th><th style="width:170px">WHERE IT LANDS</th><th style="width:74px">KEEP</th></tr>'+
++    R.chain.map((c,i)=>
++      '<tr><td class="mono">'+(i+1)+'</td><td><input type="text" value="'+c[0]+'"></td>'+
++      '<td><select>'+env.seams.map(s=>'<option'+(s===c[1]?" selected":"")+'>'+s+'</option>').join("")+'</select></td>'+
++      '<td style="text-align:center"><input type="checkbox" checked></td></tr>').join("");
++
++  document.getElementById("fw").innerHTML =
++    '<tr><th style="width:34px"></th><th style="width:110px">ID</th><th>NAME</th><th style="width:150px">CONFIDENCE</th></tr>'+
++    R.fw.map(f=>
++      '<tr><td style="text-align:center"><input type="checkbox"'+(f[2]?" checked":"")+'></td>'+
++      '<td class="mono">'+f[0]+'</td><td>'+f[1]+'</td>'+
++      '<td><span class="tag '+(f[2]?"t1":"t3")+'">'+(f[2]?"proposed":"low, unchecked")+'</span></td></tr>').join("");
++
++  document.getElementById("eve").innerHTML =
++    '<tr><th>SIGNAL SOURCE</th><th style="width:230px">OWNER</th><th style="width:150px">SCORED</th></tr>'+
++    R.eve.map(e=>'<tr><td>'+e[0]+'</td><td>'+e[1]+'</td>'+
++      '<td><span class="tag">not yet, in session</span></td></tr>').join("");
++}
++
++/* -------------------------------------------------------------- step five */
++function renderJson(){
++  const R=RESEARCH[env.id];
++  const rows=[...document.querySelectorAll("#chain tr")].slice(1);
++  const chain=rows.filter(r=>r.querySelector("input[type=checkbox]").checked).map((r,i)=>({
++    step:i+1, layer:r.querySelector("select").value, text:r.querySelector("input[type=text]").value }));
++  const fw=[...document.querySelectorAll("#fw tr")].slice(1)
++    .filter(r=>r.querySelector("input").checked)
++    .map(r=>r.children[1].textContent);
++  const obj={
++    schema_version:1, status:"draft", origin:"hypothesis",
++    proposed_by:document.getElementById("f-who").value||"Security engineering",
++    title:document.getElementById("f-title").value||EXAMPLES[env.id].t,
++    one_liner:document.getElementById("f-body").value||EXAMPLES[env.id].b,
++    environment:{ id:env.id, name:env.name, stack_model:env.fam==="web"?"WEB":"ENDPOINT",
++                  layers:env.layers },
++    classification:{ stack_layer:chain.length?chain[chain.length-1].layer:"", evidence:"seen-in-research",
++                     priority:"NEAR-TERM" },
++    framework_mapping:{ baseline:"2026.07", attack:fw, atlas:[], owasp_llm:[], owasp_agentic:[] },
++    attack_path:chain,
++    telemetry:R.eve.map((e,i)=>({ step:Math.min(i+1,chain.length||1), source:e[0], owner:e[1] })),
++    provenance:{ drafted_with:["web-vectors v2.1","framework-map v2.1","our-estate v1.4"],
++                 reviewed_by:"", created:"2026-08-11" }
++  };
++  document.getElementById("json").textContent=JSON.stringify(obj,null,2);
++}
++/* --------------------------------------------------- step six: the record */
++function renderRecord(){
++  if (real) return renderRealRecord();
++  const R = RESEARCH[env.id];
++  const rows = [...document.querySelectorAll("#chain tr")].slice(1);
++  const chain = rows.filter(r=>r.querySelector("input[type=checkbox]").checked).map((r,i)=>({
++    step:i+1, layer:r.querySelector("select").value, text:r.querySelector("input[type=text]").value }));
++  const fw = [...document.querySelectorAll("#fw tr")].slice(1)
++    .filter(r=>r.querySelector("input").checked)
++    .map(r=>[r.children[1].textContent, r.children[2].textContent]);
++  const title = document.getElementById("f-title").value || EXAMPLES[env.id].t;
++  const one   = document.getElementById("f-body").value  || EXAMPLES[env.id].b;
++
++  document.getElementById("rec").innerHTML =
++    '<p class="kick">SC-DRAFT · PROPOSED, NOT YET SCORED</p>'+
++    '<h2>'+title+'</h2>'+
++    '<div class="recbar">'+
++      '<span class="pill p-navy">'+env.id+'</span>'+
++      '<span class="pill p-teal">STACK MODEL '+(env.fam==="web"?"WEB":"ENDPOINT")+'</span>'+
++      '<span class="pill p-amber">SEEN IN RESEARCH</span>'+
++      '<span class="pill p-grey">PRIORITY NEAR-TERM</span>'+
++      '<span class="pill p-grey">DRAFT</span>'+
++    '</div>'+
++    '<p class="one">'+one+'</p>'+
++
++    '<p class="kick" style="margin-top:16px">THE ATTACK PATH</p>'+
++    '<table><tr><th style="width:34px">#</th><th style="width:150px">LAYER</th><th>MOVE</th></tr>'+
++    chain.map(c=>'<tr><td class="mono">'+c.step+'</td><td><span class="tag">'+c.layer+'</span></td>'+
++      '<td>'+c.text+'</td></tr>').join("")+'</table>'+
++
++    '<p class="kick" style="margin-top:18px">THE EVIDENCE AND DETECTION MAP</p>'+
++    '<table><tr><th style="width:34px">#</th><th>SIGNAL SOURCE</th><th style="width:190px">OWNER</th>'+
++    '<th style="width:62px">VIS</th><th style="width:62px">DET</th><th style="width:130px">COVERAGE</th></tr>'+
++    R.eve.map((e,i)=>'<tr><td class="mono">'+Math.min(i+1, chain.length||1)+'</td><td>'+e[0]+'</td>'+
++      '<td>'+e[1]+'</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td>'+
++      '<td><span class="tag">not scored yet</span></td></tr>').join("")+'</table>'+
++    '<p class="hint">Coverage is derived from the two scores and never typed. Until the session with the '+
++    'owners happens there is nothing to derive it from, so the column says so rather than guessing.</p>'+
++
++    '<p class="kick" style="margin-top:18px">FRAMEWORK MAPPING · BASELINE 2026.07</p>'+
++    '<table><tr><th style="width:110px">ID</th><th>NAME</th><th style="width:110px">CATALOG</th></tr>'+
++    (fw.length ? fw.map(f=>'<tr><td class="mono">'+f[0]+'</td><td>'+f[1]+'</td>'+
++      '<td><span class="tag">ATT&amp;CK</span></td></tr>').join("")
++      : '<tr><td colspan="3" class="hint">Nothing ticked on the review screen.</td></tr>')+'</table>'+
++    (env.fam==="web" || env.fam==="ep"
++      ? '<p class="hint">ATLAS carries no entries for this shape, and the OWASP lists are for AI '+
++        'applications, so those three columns are empty rather than forced. Each stack model names its own '+
++        'catalogs, which is the change the multi-domain move actually requires of the framework baseline.</p>'
++      : '')+
++
++    '<p class="kick" style="margin-top:18px">PROVENANCE</p>'+
++    '<table>'+
++    '<tr><td style="width:200px">Proposed by</td><td>'+(document.getElementById("f-who").value||"Security engineering")+'</td></tr>'+
++    '<tr><td>Drafted with</td><td class="mono">web-vectors v2.1 · framework-map v2.1 · our-estate v1.4</td></tr>'+
++    '<tr><td>Reviewed by</td><td class="hint">not yet reviewed</td></tr>'+
++    '<tr><td>Environment</td><td>'+env.id+' · '+env.name+'</td></tr>'+
++    '</table>';
++}
++/* ------------------------------ a published incident, worked into the record */
++function renderRealRecord(){
++  const r = real;
++  const fw = [...new Set(r.chain.flatMap(c=>c[2]))];
++  document.getElementById("rec").innerHTML =
++    '<p class="kick">'+r.id+' · '+r.slug+' · DRAFT, AWAITING THE SCORING SESSION</p>'+
++    '<h2>'+r.title+'</h2>'+
++    '<div class="recbar">'+
++      '<span class="pill p-navy">'+r.env+'</span>'+
++      '<span class="pill p-teal">STACK MODEL '+(env.fam==="web"?"WEB":"ENDPOINT")+'</span>'+
++      '<span class="pill p-amber">SEEN IN THE WILD</span>'+
++      '<span class="pill p-grey">PRIORITY '+r.priority+'</span>'+
++    '</div>'+
++    '<p class="one">'+r.one_liner+'</p>'+
++
++    '<p class="kick" style="margin-top:16px">THE INCIDENT BEHIND IT · '+r.incident.name.toUpperCase()+'</p>'+
++    '<table>'+r.incident.facts.map(f=>
++      '<tr><td style="width:190px"><b>'+f[0]+'</b></td><td>'+f[1]+'</td></tr>').join("")+'</table>'+
++
++    '<p class="kick" style="margin-top:18px">THE ATTACK PATH</p>'+
++    '<table><tr><th style="width:30px">#</th><th style="width:118px">LAYER</th><th>MOVE</th>'+
++    '<th style="width:150px">FRAMEWORK</th></tr>'+
++    r.chain.map((c,i)=>'<tr><td class="mono">'+(i+1)+'</td>'+
++      '<td><span class="tag">'+c[1]+'</span></td>'+
++      '<td><b>'+c[0]+'</b><div class="hint" style="margin-top:3px">'+c[3]+'</div></td>'+
++      '<td>'+c[2].map(x=>'<span class="tag" style="display:inline-block;margin:1px 1px">'+x+'</span>').join(" ")+'</td></tr>').join("")+'</table>'+
++
++    '<p class="kick" style="margin-top:18px">THE EVIDENCE AND DETECTION MAP</p>'+
++    '<table><tr><th style="width:250px">SIGNAL SOURCE</th><th style="width:170px">OWNER</th>'+
++    '<th>WHAT EXISTS HERE</th><th style="width:60px">VIS</th><th style="width:60px">DET</th></tr>'+
++    r.eve.map(e=>'<tr><td><b>'+e[0]+'</b></td><td>'+e[1]+'</td><td>'+e[2]+'</td>'+
++      '<td class="mono">&mdash;</td><td class="mono">&mdash;</td></tr>').join("")+'</table>'+
++    '<p class="hint">The two score columns stay empty until the session with the owners. Coverage is derived '+
++    'from that pair and is never typed, so a record that has not been scored has no coverage rather than a guess at one.</p>'+
++
++    '<p class="kick" style="margin-top:18px">FRAMEWORK MAPPING · BASELINE 2026.07</p>'+
++    '<p>'+fw.map(x=>'<span class="tag" style="display:inline-block;margin:2px 3px 2px 0">'+x+'</span>').join("")+'</p>'+
++    '<p class="hint">All ATT&amp;CK, checked against the pinned release. ATLAS and the OWASP lists carry nothing '+
++    'for this shape, so those fields are empty rather than forced. Each stack model naming its own catalogs is the '+
++    'change the multi-domain move actually requires of the framework baseline.</p>'+
++
++    '<p class="kick" style="margin-top:18px">WHY THIS RECORD IS WORTH KEEPING</p>'+
++    '<div class="note">'+r.lesson+'</div>'+
++
++    '<p class="kick">WHAT THE RECORD DELIBERATELY DOES NOT CLAIM</p>'+
++    '<div class="q">'+r.caution+'</div>'+
++
++    '<p class="kick" style="margin-top:14px">REFERENCES</p>'+
++    '<table><tr><th>SOURCE</th><th style="width:190px">WHERE</th><th style="width:78px">TIER</th></tr>'+
++    r.refs.map(x=>'<tr><td>'+x[0]+'</td><td class="mono">'+x[1]+'</td>'+
++      '<td><span class="tag '+(x[2]===1?"t1":"t3")+'">tier '+x[2]+'</span></td></tr>').join("")+'</table>'+
++    '<p class="hint">Tier grades the sourcing rather than the severity. One is first party, two is reputable '+
++    'secondary technical reporting, three is press and aggregators.</p>'+
++
++    '<p class="kick" style="margin-top:18px">PROVENANCE</p>'+
++    '<table>'+
++    '<tr><td style="width:200px">Proposed by</td><td>Threat research</td></tr>'+
++    '<tr><td>Environment</td><td>'+r.env+' · '+env.name+
++      (env.added?'<div class="hint" style="margin-top:3px">'+env.added+'</div>':'')+'</td></tr>'+
++    '<tr><td>Reviewed by</td><td class="hint">not yet reviewed</td></tr>'+
++    '<tr><td>Status</td><td>Draft. Nothing scored, no coverage derived, no use case built.</td></tr>'+
++    '</table>';
++}
++paint();
++</script>
+diff --git a/tools/build_viewer.py b/tools/build_viewer.py
+index 3232ca8..bec4a54 100644
+--- a/tools/build_viewer.py
++++ b/tools/build_viewer.py
+@@ -52,6 +52,26 @@ from coverage import load_records, apply_overlay, scenario_metrics, QUALITY_DIMS
+ ROOT = pathlib.Path(__file__).resolve().parent.parent
+ DATA_VERSION = 1
+ 
++# A parked design mockup, embedded as-is in its own tab. It is not part of the
++# record library and nothing in the catalog reads it. If the file is absent the
++# tab does not appear and the rest of the page is unaffected.
++PARKED_MOCKUP = ROOT / "reference" / "mockups" / "beyond-ai-scenarios.html"
++
++
++def parked_mockup_b64() -> str:
++    """The beyond-AI mockup, base64 encoded, or '' when it is not present.
++
++    Base64 rather than an inlined string: the mockup is a whole HTML document
++    with its own script tags, and encoding sidesteps every escaping question
++    about nesting one document inside another.
++    """
++    import base64
++    try:
++        raw = PARKED_MOCKUP.read_bytes()
++    except OSError:
++        return ""
++    return base64.b64encode(raw).decode("ascii")
++
+ 
+ def jsonable(o):
+     """YAML parses unquoted dates into date objects; JSON has no date type."""
+@@ -490,6 +510,21 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
+ footer{color:var(--muted);font-size:12px;padding:24px 0 40px;border-top:1px solid var(--rule);
+        margin-top:8px}
+ [hidden]{display:none !important}
++
++/* beyond-ai tab ------------------------------------------------------------
++   A parked idea, shown as-is inside an isolated frame. Nothing in here
++   participates in the catalog, and nothing in the catalog depends on it. */
++.parked{border:1px solid var(--rule);border-left:3px solid var(--road,#5A3B9C);
++        background:var(--surface-2);border-radius:0 6px 6px 0;padding:12px 16px;margin:0 0 14px}
++.parked .k{font-size:11px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;
++           color:var(--road,#5A3B9C);display:block;margin-bottom:5px}
++.parked p{margin:0 0 6px;font-size:13px;color:var(--ink-2);line-height:1.55}
++.parked p:last-child{margin-bottom:0}
++.parked .open{font:inherit;font-size:12px;color:var(--brand);background:none;border:0;
++              padding:0;cursor:pointer;text-decoration:underline}
++.frameshell{border:1px solid var(--rule);border-radius:8px;overflow:hidden;
++            background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.06)}
++.frameshell iframe{display:block;width:100%;height:1180px;border:0;background:#F8F7F4}
+ """
+ 
+ JS = r"""
+@@ -1940,6 +1975,60 @@ function renderFrameworks() {
+         as such on each record, and must not be presented as upstream-endorsed.</div></div>`;
+ }
+ 
++/* ---------- beyond ai, a parked idea ----------
++   A whole standalone mockup, shown as-is inside an isolated frame. It shares
++   no styles, no script and no data with this page. Rendered once so that
++   moving away from the tab and back does not reset where you were in it. */
++let parkedDrawn = false;
++function parkedHtml() {
++  return new TextDecoder().decode(
++    Uint8Array.from(atob(PARKED_B64), (c) => c.charCodeAt(0)));
++}
++function renderBeyond() {
++  const el = $("#beyond");
++  if (!el || parkedDrawn) return;
++  parkedDrawn = true;
++  el.innerHTML = `
++    <div class="parked">
++      <span class="k">Parked idea &middot; not part of the catalog</span>
++      <p>Everything else in this viewer describes attacks on our AI stack. This tab asks a
++         different question: what would it look like to propose a scenario against something
++         that is not AI at all, a web application or a population of endpoints, and still land
++         it in the same record shape.</p>
++      <p>It is a design mockup and nothing more. No schema changed, no record changed, and
++         no number anywhere else in this page comes from it. It is here so the idea can be
++         looked at and discussed without anyone having to imagine it.</p>
++      <p><button class="open" id="parkedopen">Open it full screen in a new tab</button></p>
++    </div>
++    <div class="frameshell">
++      <iframe title="Beyond AI, proposing a scenario against a described environment"
++              sandbox="allow-scripts allow-same-origin" srcdoc=""></iframe>
++    </div>`;
++  const src = parkedHtml();
++  const fr = $("#beyond iframe");
++  /* Grow the frame to whatever the mockup needs so there is no scrollbar
++     inside a scrollbar. If the browser refuses us a look inside, the fixed
++     height in the stylesheet stands and the frame scrolls on its own. */
++  fr.addEventListener("load", () => {
++    let doc = null;
++    try { doc = fr.contentDocument; } catch (e) { return; }
++    if (!doc || !doc.body) return;
++    const fit = () => {
++      const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
++      if (h > 200) fr.style.height = (h + 20) + "px";
++    };
++    fit();
++    try { new ResizeObserver(fit).observe(doc.body); } catch (e) { /* older browser */ }
++    doc.addEventListener("click", () => setTimeout(fit, 80), true);
++  });
++  fr.srcdoc = src;
++  $("#parkedopen").onclick = () => {
++    const url = URL.createObjectURL(new Blob([src], { type: "text/html" }));
++    window.open(url, "_blank", "noopener");
++    setTimeout(() => URL.revokeObjectURL(url), 30000);
++  };
++}
++
+ /* ---------- shell ---------- */
+ function select(id) {
+   state.sel = id;
+@@ -1955,6 +2044,14 @@ function setView(v) {
+   $("#frameworks").hidden = v !== "frameworks";
+   $("#reports").hidden = v !== "reports";
+   $("#sessionview").hidden = v !== "session";
++  /* the parked tab is optional and carries its own chrome */
++  const parked = $("#beyond");
++  if (parked) {
++    parked.hidden = v !== "beyond";
++    $(".wrap > .tiles").hidden = v === "beyond";
++    $(".filters").hidden = v === "beyond";
++  }
++  if (v === "beyond") renderBeyond();
+   if (v === "coverage") renderCoverage();
+   if (v === "usecases") renderUseCases();
+   if (v === "frameworks") renderFrameworks();
+@@ -2191,6 +2288,14 @@ def page(data: dict) -> str:
+              "absent from the figures, not zero", "var(--muted)"),
+     ])
+ 
++    # The parked mockup is optional. No file, no tab, and every other view is
++    # byte for byte what it was.
++    parked = parked_mockup_b64()
++    parked_nav = ('<button data-view="beyond" aria-current="false">'
++                  "New scenarios &middot; beyond AI</button>") if parked else ""
++    parked_section = '<section id="beyond" hidden></section>' if parked else ""
++    parked_js = f'<script>const PARKED_B64="{parked}";</script>' if parked else ""
++
+     return f"""<!DOCTYPE html>
+ <html lang="en"><head><meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+@@ -2207,6 +2312,7 @@ def page(data: dict) -> str:
+     <button data-view="usecases" aria-current="false">Use cases</button>
+     <button data-view="frameworks" aria-current="false">Frameworks</button>
+     <button data-view="reports" aria-current="false">Reports</button>
++    {parked_nav}
+     <button data-view="session" aria-current="false" id="sessionnav" hidden>Session</button>
+     <button style="margin-left:auto;color:var(--brand)" id="sessiontoggle">Start session mode</button>
+   </nav>
+@@ -2256,6 +2362,7 @@ def page(data: dict) -> str:
+   <section id="usecases" hidden></section>
+   <section id="frameworks" hidden></section>
+   <section id="reports" hidden></section>
++  {parked_section}
+   <section id="sessionview" hidden></section>
+ 
+   <footer>
+@@ -2270,6 +2377,7 @@ def page(data: dict) -> str:
+ </div>
+ 
+ <script>const DATA = {json.dumps(data, separators=(",", ":"), ensure_ascii=False, default=jsonable)};</script>
++{parked_js}
+ <script>{JS}</script>
+ </body></html>
+ """
+-- 
+2.43.0
+
