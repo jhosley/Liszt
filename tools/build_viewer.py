@@ -452,11 +452,11 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
   border-radius:6px;padding:4px 11px;cursor:pointer;color:var(--muted)}
 .prop button:hover{color:var(--blind);border-color:var(--blind)}
 .err{color:var(--blind);font-size:12px;font-weight:700;margin-top:8px}
-.jrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-.jbtn{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--rule);background:var(--surface);
-  color:var(--brand-ink);border-radius:8px;padding:9px 14px;cursor:pointer;text-align:left;max-width:220px}
-.jbtn:hover{border-color:var(--brand);background:#F3F7FA}
-.jbtn .jb{display:block;color:var(--muted);font-weight:400;font-size:11px;margin-top:3px;line-height:1.35}
+.irail{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 14px}
+.ibtn{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--rule);background:var(--surface);
+  color:var(--brand-ink);border-radius:8px;padding:8px 14px;cursor:pointer}
+.ibtn:hover{border-color:var(--brand);background:#F3F7FA}
+.ibtn[aria-current="true"]{border-color:var(--brand);color:var(--brand);box-shadow:0 0 0 1px var(--brand)}
 .jsteps{margin:8px 0 2px;padding-left:18px;color:var(--ink-2);font-size:12.5px;line-height:1.55}
 .pbox{margin:12px 0}
 .pbox .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
@@ -546,7 +546,7 @@ const state = { view: "scenarios", sel: null, q: "", priority: "", evidence: "",
    Export produces a session file; tools/apply_session.py writes it into the YAML
    with the validator in the loop. The page itself is never a system of record. */
 const SKEY = "liszt.session.v1";
-const session = { active: false, facilitator: "", recorded: "", changes: {}, newScenarios: [], importedScenarios: [] };
+const session = { active: false, facilitator: "", recorded: "", changes: {}, newScenarios: [], importedScenarios: [], userPrompts: [] };
 
 /* A scenario the room says is missing. Captured as a few plain answers, never as a
    record: tools/apply_session.py turns each one into a draft record with the next free
@@ -576,6 +576,7 @@ function loadSession() {
   // A session saved before proposals existed has no list. Absent means empty, not broken.
   if (!Array.isArray(session.newScenarios)) session.newScenarios = [];
   if (!Array.isArray(session.importedScenarios)) session.importedScenarios = [];
+  if (!Array.isArray(session.userPrompts)) session.userPrompts = [];
   mergeImported();
 }
 /* Imported scenarios live in the session only. Lay them over the built-in library so
@@ -1009,25 +1010,40 @@ function wireProposals() {
   $("#np-cancel").onclick = () => { proposeOpen = false; renderSession(); };
 }
 
-/* ---------- import a scenario from a journey: incident, research feeds, hypothesis ---------- */
+/* ---------- bring in a scenario: research library, one conversion prompt, paste ---------- */
 /* The prompts live here so they open right next to the paste box, no doc-hunting.
-   They mirror docs/PROTOTYPE-SCENARIO-INTAKE.md; keep the two in step if you edit. */
-const P_MAP =
-`You are mapping ONE incident into a Liszt scenario. Research it from the source(s) I give you,
-then output a SINGLE JSON object and NOTHING else. No prose, no code fence, just JSON.
+   This file is the source of truth for the live prompt text;
+   docs/PROTOTYPE-SCENARIO-INTAKE.md describes the flow and points here. */
+const P_CONVERT =
+`You are mapping ONE finding into a Liszt scenario. Your input is EITHER a published
+incident (something that has happened, with a source) OR an analyst hypothesis (an attack
+nobody has run yet). Read the input, research it from the source if it names one, then
+output a SINGLE JSON object and NOTHING else. No prose, no code fence, just JSON.
 
-THE INCIDENT:
-<<< paste the incident name and its source URL here >>>
+THE INPUT. Fill in exactly ONE of these two blocks and delete the other.
 
-JSON shape:
+  PUBLISHED INCIDENT
+  <<< paste the incident name and its source URL here >>>
+
+  ANALYST HYPOTHESIS
+  <<< write the attack you are worried about: what is the attacker trying to do, and
+      what makes you think it could work against us? >>>
+
+  If both blocks contain text, treat the input as a PUBLISHED INCIDENT and note the
+  ambiguity in _check. If neither contains text, output nothing at all.
+
+A hypothesis is sharpened, not judged: break it into concrete moves and name the signal
+each move would produce, even though none has fired yet.
+
+JSON shape, PUBLISHED INCIDENT form:
 {
   "title": "short scenario title, attacker-goal phrasing",
   "one_liner": "2-3 plain sentences about OUR environment ('our', 'we'): what the attacker does and the damage.",
   "classification": {
     "ai_infrastructure_layer": "<<< one of the five, see LAYER RULE below >>>",
-    "evidence": "seen-in-the-wild for a real incident, or seen-in-research for a proof of concept",
+    "evidence": "seen-in-the-wild",
     "priority": "NOW, NEAR-TERM, or BACKLOG",
-    "priority_rationale": ["3 short plain-sentence bullets"]
+    "priority_rationale": ["3 short plain-sentence bullets, one of them about our own exposure"]
   },
   "attack_path": [
     { "step": 1, "layer": "<<< one seam tag from the list below >>>", "text": "one move of the attack, plainly" }
@@ -1043,13 +1059,29 @@ JSON shape:
     "owasp_agentic": ["ASI10:2026"]
   },
   "incidents": [ { "title": "source title", "url": "source URL", "tier": 1 } ],
-  "_check": { "layer_reason": "", "layer_runner_up": "", "steps_merged": "", "confidence": "" }
+  "_check": {
+    "layer_reason": "", "layer_runner_up": "", "steps_merged": "", "confidence": "",
+    "check_1_layer_lands": "", "check_2_geometry": "", "check_3_fields": ""
+  }
 }
 
+JSON shape, ANALYST HYPOTHESIS form: the SAME object with exactly these differences, and
+no others.
+  - Add two keys at the TOP LEVEL (siblings of "title", not inside "classification"):
+        "origin": "hypothesis",
+        "proposed_by": "AI Threat Modeler",
+    "origin" must be exactly "hypothesis". "proposed_by" defaults to "AI Threat Modeler";
+    only a named analyst may replace it with their own name. These two strings are how
+    Liszt tags the record as threat-modeler work, so it can never be mistaken for a real
+    incident.
+  - Inside "classification", set  "evidence": "seen-in-research"  (edit it in place; there
+    is only ever one evidence field, and it lives inside classification).
+  - Remove the "incidents" key entirely. A hypothesis has no source incident.
+
 Rules:
-  - ai_infrastructure_layer MUST be exactly ONE of the five strings below, copied
-    character for character. The separator is "·" (U+00B7) with a space either side,
-    not a hyphen. See the LAYER RULE at the foot of this prompt before you choose.
+  - ai_infrastructure_layer MUST be exactly ONE of the five strings below, copied from
+    THIS list character for character. Do not re-type it from the LAYER RULE prose. The
+    separator is "·" (U+00B7) with a space either side, not a hyphen and not a period.
       L0 · Infrastructure
       L1 · Data
       L2 · Model
@@ -1058,6 +1090,7 @@ Rules:
   - The framework_mapping values above are FORMAT EXAMPLES, not answers. Replace them with
     real identifiers, or use an empty list [] where you have none. Any value that is not a
     real identifier is discarded on import, so a placeholder is worse than an empty list.
+    A hypothesis may map to no framework IDs yet; an empty list is a fine answer.
   - ONE STEP IS ONE ADVERSARY MOVE that produces its own distinct observable. Do not
     decompose a single request into the code path that handles it: a server parsing a
     config, calling a loader, and then checking authentication is one move, not three.
@@ -1071,39 +1104,50 @@ Rules:
     these, and only these:
       Data / inbound    Data -> Host      Data / store      Host / net
       Host / Cloud      Cluster / net     Model / infer     Model / Agent
-      Agent / tools     Agent / memory    Agent / eval      App / net
-      App / session     Identity          Supply chain      External
-    Tag where the move OPERATES, not who performs it.
-  - One telemetry entry per attack_path step, same step number.
-  - DO NOT include any coverage, visibility, detection or score field. Owners score it later; you
-    only identify the signal that WOULD exist.
-  - Real framework IDs only where you are confident; a short defensible list beats a long guess.
+      Model / store     Agent / tools     Agent / memory    Agent / eval
+      App / net         App / session     Identity          Supply chain
+      External
+    Tag where the move OPERATES, not who performs it. Model / store is the model
+    artifact at rest (weights on disk or in a bucket), as opposed to Model / infer,
+    the live inference call.
+  - One telemetry entry per attack_path step, sharing the same step number.
+  - DO NOT include any coverage, visibility, detection, or score field. Owners score it
+    later; you only identify the signal that WOULD exist. This does NOT mean stripping
+    incidents[].tier or classification.priority, which are ordinary schema fields, not
+    scores, and must stay.
+  - Keep each attack_path step short enough to render on one line: len(text) + len(layer)
+    + 7 (the "N  [layer]  " prefix the viewer adds) must be 125 characters or fewer.
+    Keep telemetry text within its soft caps too, or the row wraps: signal 55, emitted_at
+    60, detection_opportunity 95 characters.
   - 3 to 6 distinct steps. SIX IS A HARD CEILING enforced by the schema; a chain that needs
-    more is two scenarios, so merge the moves that belong together.
-  - incidents[].tier grades the SOURCE, not the severity. Use the number, not a word:
+    more is two scenarios, so split it rather than fusing unlike moves to fit.
+  - incidents[].tier grades the SOURCE, not the severity, and is filled only for a published
+    incident. Use the number, not a word:
       1  first party. The affected organisation's own disclosure, or a research team's
          own technical writeup of work they did themselves.
       2  reputable secondary technical reporting that adds detail: a vendor research team
          analysing someone else's incident, a national CERT advisory.
       3  press, aggregators and summaries. Good for the fact that it happened, not for
-         technical detail.
-    If all you have is a press story, tier 3 is the honest answer.
-  - Valid JSON only, no trailing commas, no commentary.
+         technical detail. If all you have is a press story, tier 3 is the honest answer.
+  - Valid JSON only, one object, no trailing commas, no commentary. Every key except the
+    leading-underscore "_check" is a scenario field; "_check" is read by the reviewer and
+    dropped on import, so the rest promotes to a permanent record by copy and fill.
 
-LAYER RULE. Read this before you fill in ai_infrastructure_layer.
+LAYER RULE. Read this before you fill in ai_infrastructure_layer. (Copy the exact string
+from the five-item list under Rules, not from the names below.)
 
   What each layer means:
-    L0 . Infrastructure   compute, nodes, containers, the network, storage, the cloud
-                          control plane, CI and build systems. The machinery AI runs ON.
-    L1 . Data             training sets, fine-tuning data, retrieval corpora, vector
-                          stores, and the documents or content the system ingests.
-    L2 . Model            the model artifact and its weights, the inference call, the
-                          system prompt, the guardrails, the decision the model makes.
-    L3 . Orchestration & Agent
-                          agent loops, tool and function calling, planning, memory,
-                          handoffs between agents, connector and MCP plumbing.
-    L4 . Application      the product surface: the user interface, the API the business
-                          exposes, session and account handling, output rendering.
+    L0  Infrastructure   compute, nodes, containers, the network, storage, the cloud
+                         control plane, CI and build systems. The machinery AI runs ON.
+    L1  Data             training sets, fine-tuning data, retrieval corpora, vector
+                         stores, and the documents or content the system ingests.
+    L2  Model            the model artifact and its weights, the inference call, the
+                         system prompt, the guardrails, the decision the model makes.
+    L3  Orchestration and Agent
+                         agent loops, tool and function calling, planning, memory,
+                         handoffs between agents, connector and MCP plumbing.
+    L4  Application      the product surface: the user interface, the API the business
+                         exposes, session and account handling, output rendering.
 
   Choose it with this test, in order. Stop at the first line that answers:
     1. At which layer does the attacker ACHIEVE THE OBJECTIVE? Not where they got in,
@@ -1120,14 +1164,64 @@ LAYER RULE. Read this before you fill in ai_infrastructure_layer.
       this whole field. If you are unsure, pick your best answer and say why in _check.
     - Returning the list, returning two layers, or copying the placeholder text.
 
-BEFORE YOU EMIT, fill in "_check". It is not part of the record. The person reviewing your
-output reads it and then it is discarded.
-  "_check": {
-    "layer_reason": "one sentence: why that layer and not the neighbouring one",
-    "layer_runner_up": "the layer you nearly picked, or an empty string",
-    "steps_merged": "if you merged moves to stay within six, name which ones, else empty",
-    "confidence": "high, medium or low"
-  }
+  Two tie-breakers we have had to make by hand:
+    - Identity and account abuse: if the damage is takeover of the PRODUCT account, that
+      is L4 (tag the step App / session). Identity as L0 is for the control-plane IAM of
+      the infrastructure itself.
+    - Model-weight theft is L2 by asset ownership (test 3) even though the bytes leave
+      through cloud storage. Tag the exfil step Model / store (the model artifact at rest)
+      so the L2 layer lands on the chain, rather than tagging it Host / Cloud and leaning
+      on CHECK 1's exception.
+
+SELF-CHECK. Before you emit, run these three tests on your own draft and FIX what fails,
+then run them again. Emit only when all three pass. Put a short result of each ("pass", or
+what you changed) into "_check".
+
+  CHECK 1. THE LAYER LANDS ON THE CHAIN. Map each step's seam tag to its band:
+      L0  Host / net, Host / Cloud, Cluster / net, Identity, Supply chain
+      L1  Data / inbound, Data -> Host, Data / store
+      L2  Model / infer, Model / Agent, Model / store
+      L3  Agent / tools, Agent / memory, Agent / eval
+      L4  App / net, App / session
+      External belongs to no band and never counts as landing.
+    One of these must be true, and you record which in _check.check_1_layer_lands:
+      (a) at least one step's band equals the ai_infrastructure_layer you chose; or
+      (b) no step lands there because the objective layer legitimately differs from every
+          step's operating seam under LAYER RULE test 2 or 3 (a spanning objective, or the
+          asset-ownership tie-break such as model-weight theft). Name the test that applies.
+    If neither is true, one of three things is wrong and you must fix it, not paper over
+    it: the layer is wrong, a step is mis-tagged, or the move that makes the layer true is
+    missing. Do NOT relabel an honestly-External move to manufacture a landing. If every
+    move is genuinely External, the finding is about a system we do not own; return it for
+    re-scoping rather than forcing a layer.
+
+  CHECK 2. THE STEPS ARE ONE MOVE EACH, AND FIT. 3 to 6 steps, numbered 1..N with no gaps,
+    one telemetry row per step sharing its number. Then check granularity in BOTH
+    directions:
+      - Over-split: if two steps would be seen in the same log line, or name the same
+        emission point, they are one move. Merge them.
+      - Under-decomposed: if one step's text names two adversary actions that a defender
+        would see at two DIFFERENT sources, it is two steps. Split it. A single telemetry
+        row that cannot account for everything its step describes is the tell. If splitting
+        would exceed six steps, the finding is two scenarios, not one compressed chain.
+    Confirm the length budgets from the Rules (step line <= 125; telemetry soft caps).
+    Record the outcome in _check.check_2_geometry.
+
+  CHECK 3. THE FIELDS ARE RIGHT FOR THE KIND. ai_infrastructure_layer is exactly one of the
+    five strings, character for character, "·" is U+00B7 with a space either side. Every
+    framework value is a real identifier or the list is []. No coverage, visibility,
+    detection, or score field anywhere; tier and priority remain. Then the branch fields:
+      - Incident: classification.evidence == "seen-in-the-wild", and incidents is present
+        with a real url and a tier of 1, 2, or 3.
+      - Hypothesis: top-level origin == "hypothesis", top-level proposed_by is set,
+        classification.evidence == "seen-in-research", and there is NO incidents key.
+    The output is a single JSON object: no prose, no code fence, no trailing commas. Record
+    the outcome in _check.check_3_fields.
+
+Then fill the judgment half of "_check": layer_reason (one sentence, why that layer and not
+the neighbour), layer_runner_up (the layer you nearly picked, or ""), steps_merged (if you
+merged or split moves to stay within six, which ones, else ""), confidence (high, medium or
+low). _check is not part of the record; the reviewer reads it and it is dropped on import.
 `;
 
 const P_INCIDENT =
@@ -1170,114 +1264,34 @@ Rules: only these four sources; if one has nothing relevant, say so and move on;
 incidents and concrete technical findings over opinion; mark unknown details "unknown".
 Return the 12 most relevant items as a table, most recent and most severe first.
 
-Then, once I pick one, use the mapping prompt to turn it into scenario JSON.`;
+Then, once I pick one, use the conversion prompt to turn it into scenario JSON.`;
 
-const P_HYP =
-`You are an AI threat modeler. Take the analyst hypothesis below, an attack that has NOT happened
-yet, and turn it into a rigorous Liszt scenario. Output a SINGLE JSON object and NOTHING else.
+const P_HYP_RESEARCH =
+`You are an AI threat modeler helping an analyst sharpen a worry into something concrete
+enough to map. The analyst writes a hypothesis below: an attack on our AI infrastructure
+that has NOT happened yet.
 
 THE HYPOTHESIS:
-<<< write your hypothesis here: what is the attacker trying to do, and what makes you worried it
-    could work against us? >>>
+<<< write the attack you are worried about: what is the attacker trying to do, and what
+    makes you think it could work against us? >>>
 
-Sharpen the idea, do not judge it. Break it into concrete moves; for each, name the observable
-signal a defender would look for.
+Sharpen the idea, do not judge it, and do not write any JSON yet. Return:
+  1. The attacker's objective in one sentence: what they walk away with, or what breaks.
+  2. The chain of concrete moves, 3 to 6 of them, one line each. One move is one adversary
+     action that produces its own distinct observable; internal mechanism is not a move.
+  3. For each move, the observable signal a defender would look for, and where it would be
+     emitted from, named generically.
+  4. What is uncertain: which moves are speculative, and what would have to be true for
+     them to work.
+  5. Any published research or incident that comes close to this idea, with a link, or
+     "none found".
 
-JSON shape:
-{
-  "origin": "hypothesis",
-  "proposed_by": "AI Threat Modeler",
-  "title": "short scenario title, attacker-goal phrasing",
-  "one_liner": "2-3 plain sentences about OUR environment: what the attacker does and why it would hurt.",
-  "classification": {
-    "ai_infrastructure_layer": "<<< one of the five, see LAYER RULE below >>>",
-    "evidence": "seen-in-research",
-    "priority": "NOW, NEAR-TERM, or BACKLOG",
-    "priority_rationale": ["3 short bullets; it is honest to say 'nobody has run this yet, but ...'"]
-  },
-  "attack_path": [ { "step": 1, "layer": "Data → Host", "text": "one move, plainly" } ],
-  "telemetry": [ { "step": 1, "signal": "the event this move WOULD produce", "emitted_at": "where it would be emitted from", "detection_opportunity": "what a detection could look for" } ],
-  "framework_mapping": {
-    "baseline": "2026.07",
-    "attack": ["T1190"], "atlas": ["AML.T0049"],
-    "owasp_llm": ["LLM06:2025"], "owasp_agentic": ["ASI10:2026"]
-  },
-  "_check": { "layer_reason": "", "layer_runner_up": "", "steps_merged": "", "confidence": "" }
-}
+Rules: stay concrete; prefer moves a defender could recognize in a log over abstractions;
+it is honest to say nobody has run this yet. Do not soften a real concern and do not
+inflate a weak one.
 
-Rules:
-  - ai_infrastructure_layer MUST be exactly ONE of the five strings below, copied
-    character for character. The separator is "·" (U+00B7) with a space either side,
-    not a hyphen. See the LAYER RULE at the foot of this prompt before you choose.
-      L0 · Infrastructure
-      L1 · Data
-      L2 · Model
-      L3 · Orchestration & Agent
-      L4 · Application
-  - The framework_mapping values above are FORMAT EXAMPLES. Replace them with real
-    identifiers or use []. A placeholder string is discarded on import.
-  - Keep "origin": "hypothesis" and "proposed_by": "AI Threat Modeler" exactly, so Liszt tags it.
-    A specific analyst may replace proposed_by with their own name.
-  - ONE STEP IS ONE ADVERSARY MOVE that produces its own distinct observable. Do not
-    decompose a single request into the code path that handles it: a server parsing a
-    config, calling a loader, and then checking authentication is one move, not three.
-    The test: if two steps would be seen in the same log line, they are one step. Internal
-    mechanism belongs in one_liner, not in the chain. A step in which the adversary does
-    nothing is not a step; if a control fires late or fails, that is a telemetry row, not
-    an attack step.
-  - attack_path[].layer is a DIFFERENT field from ai_infrastructure_layer and it takes a
-    DIFFERENT kind of value: a short seam tag, 18 characters maximum. Never put one of the
-    five canonical strings here; they are too long and the row will be flagged. Use one of
-    these, and only these:
-      Data / inbound    Data -> Host      Data / store      Host / net
-      Host / Cloud      Cluster / net     Model / infer     Model / Agent
-      Agent / tools     Agent / memory    Agent / eval      App / net
-      App / session     Identity          Supply chain      External
-    Tag where the move OPERATES, not who performs it.
-  - One telemetry entry per step. DO NOT include any coverage, visibility, detection or score field.
-  - 3 to 6 distinct steps. SIX IS A HARD CEILING enforced by the schema.
-  - A hypothesis may map to no framework IDs yet; an empty list is a fine answer.
-  - Valid JSON only, no trailing commas, no commentary.
-
-LAYER RULE. Read this before you fill in ai_infrastructure_layer.
-
-  What each layer means:
-    L0 . Infrastructure   compute, nodes, containers, the network, storage, the cloud
-                          control plane, CI and build systems. The machinery AI runs ON.
-    L1 . Data             training sets, fine-tuning data, retrieval corpora, vector
-                          stores, and the documents or content the system ingests.
-    L2 . Model            the model artifact and its weights, the inference call, the
-                          system prompt, the guardrails, the decision the model makes.
-    L3 . Orchestration & Agent
-                          agent loops, tool and function calling, planning, memory,
-                          handoffs between agents, connector and MCP plumbing.
-    L4 . Application      the product surface: the user interface, the API the business
-                          exposes, session and account handling, output rendering.
-
-  Choose it with this test, in order. Stop at the first line that answers:
-    1. At which layer does the attacker ACHIEVE THE OBJECTIVE? Not where they got in,
-       and not who performed the move. Where the damage lands.
-    2. If the objective spans layers, take the layer of the step that causes the harm.
-    3. If it is still even, take the layer that owns the asset the attacker walked away
-       with.
-
-  These are all wrong, and each one is a defect we have actually seen:
-    - Tagging L3 because an agent appears in the chain. An agent escalating privilege on
-      a node is an L0 move. The agent is the ACTOR, the node is the LAYER.
-    - Tagging L2 because a model appears in the chain. Nearly every scenario has one.
-    - Tagging L0 because you are unsure. An unexplained L0 is the most common defect in
-      this whole field. If you are unsure, pick your best answer and say why in _check.
-    - Returning the list, returning two layers, or copying the placeholder text.
-
-BEFORE YOU EMIT, fill in "_check". It is not part of the record. The person reviewing your
-output reads it and then it is discarded.
-  "_check": {
-    "layer_reason": "one sentence: why that layer and not the neighbouring one",
-    "layer_runner_up": "the layer you nearly picked, or an empty string",
-    "steps_merged": "if you merged moves to stay within six, name which ones, else empty",
-    "confidence": "high, medium or low"
-  }
-`;
+Then take the result to the conversion prompt, fill its ANALYST HYPOTHESIS block with it,
+and it becomes scenario JSON.`;
 
 const P_READINESS = String.raw`You are validating whether a mapped attack scenario is ready to be tested by an
 emulation agent in a contained lab. You are not being asked whether the attack is
@@ -1332,34 +1346,27 @@ a weaker substitute test, because a substitute silently changes what the score m
 PASTE THE SCENARIO RECORD BELOW THIS LINE
 `;
 
-const JOURNEYS = [
-  { key: "incident", label: "Published incident", origin: "incident",
-    blurb: "Something that really happened to someone else. Find it, then map it.",
-    steps: ["Run the first prompt in an LLM with web access and pick an incident from the list.",
-            "Run the second prompt on the one you picked.",
-            "Paste the JSON it returns into the box below and add it."],
-    prompts: [ {title:"1 · Find incidents", body: P_INCIDENT}, {title:"2 · Map the one you picked", body: P_MAP} ] },
-  { key: "research", label: "Threat-research feeds", origin: "incident",
-    blurb: "Search Wiz, JFrog, Mandiant and the AI Incident Database.",
-    steps: ["Run the first prompt in an LLM with web access; it searches those four sources.",
-            "Pick an incident, then run the second prompt on it.",
-            "Paste the JSON into the box below and add it."],
-    prompts: [ {title:"1 · Search the feeds", body: P_RESEARCH}, {title:"2 · Map the one you picked", body: P_MAP} ] },
-  { key: "readiness", label: "Agent test readiness", origin: "readiness",
-    blurb: "Is a scored scenario ready to be tested by an emulation agent in a lab?",
-    steps: ["Open the scenario you want to test and copy its record, or export it from this viewer.",
-            "Run the prompt below in any LLM with the record pasted underneath it.",
-            "Bring the JSON back to the repo and store it under readiness in the emitted spec.",
-            "Then run: python3 tools/emit_testspec.py NNN --sealed-by \"your name\"",
-            "The emitter re-checks the mechanical half itself, so this prompt covers the judgment half only."],
-    prompts: [ {title:"Validate a scenario for agent testing", body: P_READINESS} ] },
-  { key: "hypothesis", label: "Analyst hypothesis", origin: "hypothesis",
-    blurb: "An attack nobody has run yet. Tagged as Threat modeler proposed.",
-    steps: ["Write your hypothesis into the prompt where marked, and run it in any LLM.",
-            "Paste the JSON into the box below and add it. It arrives tagged Threat modeler."],
-    prompts: [ {title:"Turn a hypothesis into JSON", body: P_HYP} ] }
+/* The research prompt library. Each entry is one way of SOURCING a scenario; every one of
+   them feeds the same single conversion prompt, P_CONVERT, which is what turns a finding
+   into scenario JSON. Prompts added in the browser live in session.userPrompts and are
+   session-only, like imports: promotion to the repo is a human act. */
+const RESEARCH_PROMPTS = [
+  { key: "incident", title: "Published incidents",
+    asks: "Search the open web for published, real-world AI infrastructure incidents and return twelve candidates as a table.",
+    body: P_INCIDENT },
+  { key: "research", title: "Threat-research feeds",
+    asks: "Search Wiz, JFrog, Mandiant and the AI Incident Database, and return twelve candidates as a table.",
+    body: P_RESEARCH },
+  { key: "hypothesis", title: "Analyst hypothesis",
+    asks: "Sharpen a worry about our own environment into concrete moves and candidate signals, ready to convert. Arrives tagged Threat modeler.",
+    body: P_HYP_RESEARCH }
 ];
-let importJourney = null;
+function allResearchPrompts() {
+  return RESEARCH_PROMPTS.concat((session.userPrompts || []).map((p, i) => ({
+    key: "user-" + i, title: p.title, asks: p.asks || "", body: p.body, userIdx: i })));
+}
+/* Which pane of the intake section is open: library, convert, or paste. */
+let intakeStep = "library";
 
 /* The five layers, exactly as schema/scenario.schema.json enumerates them. The separator
    is U+00B7 with spaces. Everything that reaches a record has to be one of these strings. */
@@ -1408,12 +1415,15 @@ const STEP_LAYER_CAP = 18;
    layer cross-check below reads, which is why the vocabulary is closed rather than free. */
 const SEAM_TAGS = ["Data / inbound", "Data -> Host", "Data / store", "Host / net",
                    "Host / Cloud", "Cluster / net", "Model / infer", "Model / Agent",
-                   "Agent / tools", "Agent / memory", "Agent / eval", "App / net",
-                   "App / session", "Identity", "Supply chain", "External"];
-/* Which of the five layers each seam tag belongs to, for the consistency check. */
+                   "Model / store", "Agent / tools", "Agent / memory", "Agent / eval",
+                   "App / net", "App / session", "Identity", "Supply chain", "External"];
+/* Which of the five layers each seam tag belongs to, for the consistency check.
+   Model / store is the model artifact at rest, weights on disk or in a bucket, as opposed
+   to Model / infer, the live call. Without it, model-weight theft, an L2 objective by
+   asset ownership, had no step tag that landed on L2 and always tripped the cross-check. */
 const SEAM_LAYER = { "Data / inbound":"L1", "Data -> Host":"L1", "Data / store":"L1",
                      "Host / net":"L0", "Host / Cloud":"L0", "Cluster / net":"L0",
-                     "Model / infer":"L2", "Model / Agent":"L2",
+                     "Model / infer":"L2", "Model / Agent":"L2", "Model / store":"L2",
                      "Agent / tools":"L3", "Agent / memory":"L3", "Agent / eval":"L3",
                      "App / net":"L4", "App / session":"L4",
                      "Identity":"L0", "Supply chain":"L0", "External":"" };
@@ -1613,7 +1623,14 @@ function dropImported(i) {
   saveSession();
 }
 
-function importPanel() {
+function promptBox(title, body, copyKey, extra) {
+  return `<div class="pbox">
+    <div class="ph"><span class="pt">${esc(title)}</span><span>${extra || ""}
+      <button class="copybtn" data-copy="${esc(copyKey)}">Copy prompt</button></span></div>
+    <pre>${esc(body)}</pre></div>`;
+}
+
+function intakePanel() {
   const list = session.importedScenarios || [];
   const listHtml = list.length ? list.map((p, i) => `<div class="prop"><div>
       <div class="t">${esc(p.id)} &middot; ${esc(p.title)}</div>
@@ -1623,59 +1640,112 @@ function importPanel() {
     </div><button data-dropimp="${i}">Remove</button></div>`).join("")
     : '<div style="color:var(--muted)">None yet.</div>';
 
+  const rail = `<div class="irail">${[
+      ["library", "1 &middot; Research library"],
+      ["convert", "2 &middot; Convert to JSON"],
+      ["paste",   "3 &middot; Paste and add"]]
+    .map(([k, t]) => `<button class="ibtn" data-istep="${k}"
+      aria-current="${intakeStep === k}">${t}</button>`).join("")}</div>`;
+
   let body;
-  if (!importJourney) {
-    body = `<div class="sub" style="margin-bottom:6px">Bring in a scenario. Pick how you are sourcing
-      it, and the directions, the prompts and the paste box open right here.</div>
-      <div class="jrow">${JOURNEYS.map(j => `<button class="jbtn" data-open="${j.key}">${esc(j.label)}
-        <span class="jb">${esc(j.blurb)}</span></button>`).join("")}</div>`;
-  } else {
-    const j = JOURNEYS.find(x => x.key === importJourney) || JOURNEYS[0];
-    const prompts = j.prompts.map((p, i) => `<div class="pbox">
-      <div class="ph"><span class="pt">${esc(p.title)}</span>
-        <button class="copybtn" data-jkey="${j.key}" data-pidx="${i}">Copy prompt</button></div>
-      <pre>${esc(p.body)}</pre></div>`).join("");
-    body = `<button class="toggle" id="imp-back">&larr; all journeys</button>
-      <div class="sub" style="margin:10px 0 2px"><strong>${esc(j.label)}.</strong> ${esc(j.blurb)}</div>
-      <ol class="jsteps">${j.steps.map(t => `<li>${esc(t)}</li>`).join("")}</ol>
+  if (intakeStep === "library") {
+    const prompts = allResearchPrompts().map(p => promptBox(p.title, p.body, p.key,
+      p.userIdx === undefined ? "" :
+        `<button class="copybtn" data-droppr="${p.userIdx}" style="color:var(--muted)">Remove</button> `))
+      .join("");
+    body = `<div class="sub" style="margin-bottom:6px">Pick a research prompt, run it in an
+        LLM with web access, and choose the finding you want to bring in. Every prompt here
+        feeds the same conversion prompt in step 2.</div>
       ${prompts}
-      <div class="fld" style="margin-top:12px"><label>Paste the JSON the prompt produced</label>
+      <div class="fld" style="margin-top:14px"><label>Add a research prompt</label>
+        <input id="up-title" placeholder="short name, e.g. Vendor advisories"
+          style="width:100%;box-sizing:border-box;margin-bottom:6px">
+        <textarea id="up-body" rows="5" placeholder="the prompt text"
+          style="width:100%;box-sizing:border-box;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
+        <span class="hint">Saved in this browser's session only, like imports. To make one
+          permanent, it goes into the repo the same way a scenario does.</span></div>
+      <div><button class="toggle" id="up-save">Save to the library</button></div>
+      <div class="err" id="up-err" hidden></div>`;
+  } else if (intakeStep === "convert") {
+    body = `<div class="sub" style="margin-bottom:6px">One prompt converts any finding,
+        published incident or analyst hypothesis, into scenario JSON. Fill in ONE input
+        block, run it, and it checks its own output three ways before it emits.</div>
+      <ol class="jsteps">
+        <li>Copy the prompt and paste your chosen finding, or your sharpened hypothesis, into the matching input block.</li>
+        <li>Run it in any LLM. It self-checks the layer, the step geometry, and the field discipline, then emits one JSON object.</li>
+        <li>Take the JSON to step 3 and paste it.</li></ol>
+      ${promptBox("Convert a finding to scenario JSON", P_CONVERT, "convert")}`;
+  } else {
+    body = `<div class="sub" style="margin-bottom:6px">Paste what the conversion prompt
+        produced. It is checked again on the way in; anything questionable arrives flagged
+        for review, and everything stays in this session until it is applied to the repo.</div>
+      <div class="fld"><label>Paste the JSON the prompt produced</label>
         <textarea id="imp-json" rows="8" placeholder="paste the scenario JSON here"
           style="width:100%;box-sizing:border-box;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
         <span class="hint">One scenario object, or an array of them. It needs at least a title;
           every other field fills in with a sensible default.</span></div>
-      <div style="display:flex;gap:8px">
-        <button class="toggle" id="imp-add">Add to the library</button>
-        <button class="toggle" id="imp-cancel">Cancel</button></div>
+      <div><button class="toggle" id="imp-add">Add to the library</button></div>
       <div class="err" id="imp-err" hidden></div>`;
   }
   return `<div class="panel"><h3>Bring in a scenario (${list.length} imported)</h3>
     ${listHtml}
-    <div style="margin-top:14px">${body}</div></div>`;
+    <div style="margin-top:14px">${rail}${body}</div></div>`;
 }
 
+/* The readiness check validates an EXISTING scenario for agent testing; it does not bring
+   one in, and its JSON goes to tools/emit_testspec.py, not the paste box. It is parked
+   here until it gets its own home. */
+function readinessPanel() {
+  return `<div class="panel"><h3>Validate a scenario for agent testing</h3>
+    <div class="sub">Not part of bringing a scenario in. This judges whether an
+      already-scored scenario is concrete, safe, reproducible and observable enough for an
+      emulation agent to run in a lab.</div>
+    <ol class="jsteps">
+      <li>Open the scenario you want to test and copy its record, or export it from this viewer.</li>
+      <li>Run the prompt below in any LLM with the record pasted underneath it.</li>
+      <li>Bring the JSON back to the repo and store it under readiness in the emitted spec.</li>
+      <li>Then run: python3 tools/emit_testspec.py NNN --sealed-by "your name"</li>
+      <li>The emitter re-checks the mechanical half itself, so this prompt covers the judgment half only.</li></ol>
+    ${promptBox("Validate a scenario for agent testing", P_READINESS, "readiness")}</div>`;
+}
 
-function wireImport() {
-  $$("#sessionview .jbtn[data-open]").forEach(b => b.onclick = () => {
-    importJourney = b.dataset.open; renderSession();
+function renderIntake() {
+  $("#intake").innerHTML = intakePanel() + readinessPanel();
+  wireIntake();
+}
+
+function wireIntake() {
+  $$("#intake .ibtn[data-istep]").forEach(b => b.onclick = () => {
+    intakeStep = b.dataset.istep; renderIntake();
   });
-  const back = $("#imp-back");
-  if (back) back.onclick = () => { importJourney = null; renderSession(); };
-  const cancel = $("#imp-cancel");
-  if (cancel) cancel.onclick = () => { importJourney = null; renderSession(); };
-  $$("#sessionview .copybtn").forEach(b => b.onclick = () => {
-    const j = JOURNEYS.find(x => x.key === b.dataset.jkey);
-    const pr = j && j.prompts[Number(b.dataset.pidx)];
-    if (!pr) return;
+  const copyBodies = { convert: P_CONVERT, readiness: P_READINESS };
+  allResearchPrompts().forEach(p => { copyBodies[p.key] = p.body; });
+  $$("#intake .copybtn[data-copy]").forEach(b => b.onclick = () => {
+    const text = copyBodies[b.dataset.copy];
+    if (!text) return;
     const done = () => { const t = b.textContent; b.textContent = "Copied"; setTimeout(() => b.textContent = t, 1200); };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(pr.body).then(done).catch(() => { b.textContent = "Press Cmd-C"; });
+      navigator.clipboard.writeText(text).then(done).catch(() => { b.textContent = "Press Cmd-C"; });
     } else { b.textContent = "Press Cmd-C"; }
   });
-  $$("#sessionview .prop button[data-dropimp]").forEach(b => b.onclick = () => {
-    dropImported(Number(b.dataset.dropimp));
-    renderSession(); renderList(); renderDetail(); updateSessionCount();
+  $$("#intake [data-droppr]").forEach(b => b.onclick = () => {
+    session.userPrompts.splice(Number(b.dataset.droppr), 1);
+    saveSession(); renderIntake();
   });
+  $$("#intake .prop button[data-dropimp]").forEach(b => b.onclick = () => {
+    dropImported(Number(b.dataset.dropimp));
+    renderIntake(); renderList(); renderDetail(); updateSessionCount();
+  });
+  const save = $("#up-save");
+  if (save) save.onclick = () => {
+    const err = $("#up-err");
+    const title = $("#up-title").value.trim(), promptBody = $("#up-body").value.trim();
+    if (!title || !promptBody) {
+      err.textContent = "A prompt needs a name and a body."; err.hidden = false; return;
+    }
+    session.userPrompts.push({ title: title, asks: "", body: promptBody });
+    saveSession(); renderIntake();
+  };
   const add = $("#imp-add");
   if (!add) return;
   add.onclick = () => {
@@ -1684,10 +1754,10 @@ function wireImport() {
     try { raw = JSON.parse($("#imp-json").value); }
     catch (e) { err.textContent = "That is not valid JSON: " + e.message; err.hidden = false; return; }
     try {
-      const j = JOURNEYS.find(x => x.key === importJourney);
-      (Array.isArray(raw) ? raw : [raw]).forEach(o => addImported(o, j ? j.origin : undefined));
-      importJourney = null;
-      renderSession(); renderList(); renderDetail(); updateSessionCount();
+      /* No origin fallback: the conversion prompt writes origin into a hypothesis record
+         itself, and everything else is an incident. */
+      (Array.isArray(raw) ? raw : [raw]).forEach(o => addImported(o));
+      renderIntake(); renderList(); renderDetail(); updateSessionCount();
     } catch (e) { err.textContent = e.message; err.hidden = false; }
   };
 }
@@ -1754,8 +1824,8 @@ function renderSession() {
       : `<div class="panel"><div style="color:var(--muted)">Nothing captured yet.
           Turn on session mode, open a scenario, and work down the evidence rows.</div></div>`);
 
-  $("#sessionview").innerHTML = head + proposalsPanel() + importPanel() + body;
-  wireProposals(); wireImport();
+  $("#sessionview").innerHTML = head + proposalsPanel() + body;
+  wireProposals();
 
   $("#export").onclick = () => {
     const date = session.recorded || new Date().toISOString().slice(0, 10);
@@ -1769,7 +1839,8 @@ function renderSession() {
       new_scenarios: (session.newScenarios || []).map(p => ({
         title: p.title, mode: p.mode, layer: p.layer,
         priority: p.priority, one_liner: p.one_liner || "" })),
-      imported_scenarios: session.importedScenarios || []
+      imported_scenarios: session.importedScenarios || [],
+      user_prompts: session.userPrompts || []
       }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1789,6 +1860,7 @@ function renderSession() {
         session.changes = d.changes || {};
         session.newScenarios = Array.isArray(d.new_scenarios) ? d.new_scenarios : [];
         session.importedScenarios = Array.isArray(d.imported_scenarios) ? d.imported_scenarios : [];
+        session.userPrompts = Array.isArray(d.user_prompts) ? d.user_prompts : [];
         mergeImported();
         session.facilitator = d.facilitator || session.facilitator;
         session.recorded = d.recorded || session.recorded;
@@ -1805,7 +1877,8 @@ function renderSession() {
       if (j >= 0) DATA.scenarios.splice(j, 1);
     });
     session.changes = {}; session.newScenarios = []; session.importedScenarios = [];
-    proposeOpen = false; importJourney = null; saveSession();
+    session.userPrompts = [];
+    proposeOpen = false; intakeStep = "library"; saveSession();
     renderSession(); renderList(); renderDetail(); updateSessionCount();
   };
 }
@@ -2043,6 +2116,7 @@ function setView(v) {
   $("#usecases").hidden = v !== "usecases";
   $("#frameworks").hidden = v !== "frameworks";
   $("#reports").hidden = v !== "reports";
+  $("#intake").hidden = v !== "intake";
   $("#sessionview").hidden = v !== "session";
   /* the parked tab is optional and carries its own chrome */
   const parked = $("#beyond");
@@ -2056,6 +2130,16 @@ function setView(v) {
   if (v === "usecases") renderUseCases();
   if (v === "frameworks") renderFrameworks();
   if (v === "reports") renderReports();
+  if (v === "intake") {
+    /* Imports ride on the session plumbing: they persist in the session and leave through
+       the session export. Opening the intake turns session mode on so that is true from
+       the first paste. */
+    if (!session.active) {
+      toggleSession(true);
+      $("#sessiontoggle").textContent = "Leave session mode";
+    }
+    renderIntake();
+  }
   if (v === "session") renderSession();
 }
 
@@ -2312,6 +2396,7 @@ def page(data: dict) -> str:
     <button data-view="usecases" aria-current="false">Use cases</button>
     <button data-view="frameworks" aria-current="false">Frameworks</button>
     <button data-view="reports" aria-current="false">Reports</button>
+    <button data-view="intake" aria-current="false">Bring in a scenario</button>
     {parked_nav}
     <button data-view="session" aria-current="false" id="sessionnav" hidden>Session</button>
     <button style="margin-left:auto;color:var(--brand)" id="sessiontoggle">Start session mode</button>
@@ -2362,6 +2447,7 @@ def page(data: dict) -> str:
   <section id="usecases" hidden></section>
   <section id="frameworks" hidden></section>
   <section id="reports" hidden></section>
+  <section id="intake" hidden></section>
   {parked_section}
   <section id="sessionview" hidden></section>
 
