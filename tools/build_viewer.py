@@ -576,6 +576,33 @@ label.wide{margin-top:9px}
         color:var(--ink);font:inherit;font-size:12.5px;text-transform:none;letter-spacing:0}
 .lhead{display:flex;justify-content:space-between;align-items:center;padding:0 2px 8px;
        font-size:12.5px;color:var(--ink-2)}
+
+/* documentation */
+.dh{margin:20px 0 6px;font-size:13px;letter-spacing:.02em}
+.dh:first-child{margin-top:4px}
+.dp{margin:0 0 9px;font-size:13.5px;line-height:1.62;color:var(--ink-2);max-width:74ch}
+.dl{margin:0 0 10px;padding-left:20px;font-size:13.5px;line-height:1.62;color:var(--ink-2);max-width:74ch}
+.dl li{margin:4px 0}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:9px;margin:10px 0}
+.dgrid .card{border:1px solid var(--surface-3);border-radius:8px;padding:11px 13px;text-align:left;
+             background:var(--surface);cursor:pointer;display:block;width:100%}
+.dgrid .card:hover{border-color:var(--brand)}
+.dgrid .card .t{font-weight:600;font-size:13.5px;margin:5px 0 3px;color:var(--ink)}
+.dgrid .card .meta{color:var(--muted);font-size:12px;line-height:1.5}
+.chip.lay{background:var(--surface-2);color:var(--brand-ink);border:1px solid var(--surface-3)}
+.proc{border:1px solid var(--surface-3);border-radius:8px;margin:8px 0;background:var(--surface)}
+.prochd{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;
+        border:0;padding:11px 13px;cursor:pointer;color:var(--ink);font:inherit;font-size:13.5px}
+.prochd:hover{background:var(--surface-2)}
+.prochd .lede{display:block;color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.5}
+.procbody{padding:2px 13px 13px 40px;border-top:1px solid var(--surface-3);margin-top:2px}
+.cmds{display:flex;flex-direction:column;gap:4px;margin:8px 0}
+.cmds code{background:var(--surface-2);border:1px solid var(--surface-3);border-radius:5px;
+           padding:5px 9px;font-size:12px;overflow-x:auto}
+.watch{margin-top:10px;background:var(--surface-2);border-left:3px solid var(--collectable);
+       border-radius:0 6px 6px 0;padding:8px 13px}
+.watch ul{margin:5px 0 0;padding-left:18px;font-size:12.5px;line-height:1.55;color:var(--ink-2)}
+.watch li{margin:3px 0}
 .uc .limits .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;
                color:var(--muted);font-weight:700;display:block;margin-bottom:4px}
 
@@ -2296,9 +2323,9 @@ function intakePanel() {
     : '<div style="color:var(--muted)">None yet.</div>';
 
   const rail = `<div class="irail">${[
-      ["library", "1 &middot; Research library"],
-      ["convert", "2 &middot; Convert to JSON"],
-      ["paste",   "3 &middot; Paste and add"]]
+      ["library", "1. Research library"],
+      ["convert", "2. Convert to JSON"],
+      ["paste",   "3. Paste and add"]]
     .map(([k, t]) => `<button class="ibtn" data-istep="${k}"
       aria-current="${intakeStep === k}">${t}</button>`).join("")}</div>`;
 
@@ -2399,7 +2426,7 @@ function scenarioPicker(mode) {
              : `<span class="chip blind">none yet</span>`);
     const meta = mode === "testing"
       ? esc(s.status)
-      : `${esc((s.classification || {}).priority || "")} &middot; ${esc((s.classification || {}).evidence || "")}`;
+      : `${esc((s.classification || {}).priority || "")}, ${esc((s.classification || {}).evidence || "")}`;
     return `<button class="prow${pickedScenario === s.id ? " on" : ""}" data-pick="${esc(s.id)}">
       <span class="pid">${esc(s.id)}</span>
       <span class="ptitle">${esc(s.title)}</span>
@@ -2425,12 +2452,10 @@ function pickedBlock() {
   if (!s) return `<div class="note">Choose a scenario above to see what to paste under the prompt.</div>`;
   const unscored = (s.counts || {}).Unscored || 0;
   return `<div class="tsum"><strong>${esc(s.id)} ${esc(s.title)}</strong><br>
-    ${esc((s.classification || {}).priority || "")} &middot;
-    ${esc((s.classification || {}).evidence || "")} &middot;
-    ${esc(s.status)} &middot; ${(s.attack_path || []).length} steps &middot;
-    ${(s.telemetry || []).length} evidence rows
-    ${unscored ? ` &middot; <strong>${unscored} unscored</strong>` : ""}
-    ${(s.use_case_ids || []).length ? ` &middot; covered by ${s.use_case_ids.map(esc).join(", ")}` : ""}
+    ${esc((s.classification || {}).priority || "")},
+    ${esc((s.classification || {}).evidence || "")},
+    ${esc(s.status)}, ${(s.attack_path || []).length} steps,
+    ${(s.telemetry || []).length} evidence rows${unscored ? `, <strong>${unscored} unscored</strong>` : ""}${(s.use_case_ids || []).length ? `, covered by ${s.use_case_ids.map(esc).join(", ")}` : ""}
     <br><button class="copybtn" data-copyrec="${esc(s.id)}">Copy the record</button>
     <span class="hint">Paste it under the prompt. This is the record as the page holds it;
       the file in scenarios/ is the authority.</span></div>`;
@@ -2593,10 +2618,10 @@ function rescorePane() {
 
 function renderTesting() {
   const rail = `<div class="irail">${[
-      ["readiness", "1 &middot; Readiness"],
-      ["design",    "2 &middot; Design tests"],
-      ["usecase",   "3 &middot; Design use cases"],
-      ["rescore",   "4 &middot; Run and rescore"]]
+      ["readiness", "1. Readiness"],
+      ["design",    "2. Design tests"],
+      ["usecase",   "3. Design use cases"],
+      ["rescore",   "4. Run and rescore"]]
     .map(([k, t]) => `<button class="ibtn" data-tstep="${k}"
       aria-current="${testStep === k}">${t}</button>`).join("")}</div>`;
   const body = testStep === "readiness" ? readinessPane()
@@ -2981,7 +3006,7 @@ function renderUCDetail() {
   const chip = (arr, cls) => arr.map(i => `<span class="tag ${cls || ""}">${esc(i)}</span>`).join(" ");
   const scLink = (sid, steps) => {
     const sc = DATA.scenarios.find(x => x.id === sid);
-    const label = `${esc(sid)}${sc ? " " + esc(sc.title) : ""} &middot; step${steps.length === 1 ? "" : "s"} ${steps.join(", ")}`;
+    const label = `${esc(sid)}${sc ? " " + esc(sc.title) : ""}, step${steps.length === 1 ? "" : "s"} ${steps.join(", ")}`;
     return sc ? `<a href="#/scenario/${esc(sid)}">${label}</a>`
               : `<span style="color:var(--muted)">${label} (not in this view)</span>`;
   };
@@ -3244,6 +3269,444 @@ function wireUCNew() {
   };
 }
 
+/* ---------- documentation ---------- */
+/* Written for someone who has never seen Liszt and has to use it this week. The layer and
+   environment pages are the reference half; the procedures are the runbook half. Framework
+   identifiers on a layer page are derived from the records at that layer rather than typed
+   here, so the page cannot drift from the library. */
+let docStep = "overview";
+let docSel = null;
+const openProc = {};
+
+const AI_LAYERS_DOC = [
+  { id: "L0", name: "Infrastructure",
+    lede: "The machinery AI runs on, not the AI itself.",
+    covers: "Compute, nodes, containers, the network, storage, the cloud control plane, CI and build systems. Two things sit here that people routinely misfile: identity, but only the control plane IAM of the infrastructure itself rather than product accounts, and the supply chain.",
+    components: "GPU and CPU nodes, Kubernetes clusters and node pools, container runtimes and agent sandboxes, east west network, object storage and buckets, the cloud control plane and its IAM, CI and build systems, package registries and artifact repositories.",
+    seams: ["Host / net", "Host / Cloud", "Cluster / net", "Identity", "Supply chain"],
+    matters: "This is the only layer where classic ATT&CK Enterprise answers the question, so your existing detection engineering transfers unchanged. Two warnings. An unexplained L0 is the most common defect in this field, because it is where people put a scenario they have not thought hard about. And the actor is not the layer: an agent escalating privilege on a node is an L0 move, because the node is what the attacker reached." },
+  { id: "L1", name: "Data",
+    lede: "The corpus and everything that feeds it.",
+    covers: "Training sets, fine tuning data, retrieval corpora, vector stores, and the documents or content the system ingests. The question is whether the asset corrupted or carried away is data the system will later consume.",
+    components: "Document inboxes and ingestion pipelines, chunking and embedding jobs, the vector database, retrieval knowledge bases, labeled training sets, fine tune datasets, and the untrusted third party content that lands in any of them.",
+    seams: ["Data / inbound", "Data -> Host", "Data / store"],
+    matters: "L1 teaches the whole classification discipline. A poisoned document reaches the model, the model follows it, and the layer is still L1, because the corpus is the asset that was corrupted and the model behaved as designed on poisoned retrieval. For an engineer that is an ownership fact: an L1 finding is a data pipeline and corpus hygiene problem, provenance on ingest and write controls on the store, not something the model team fixes by tuning a guardrail." },
+  { id: "L2", name: "Model",
+    lede: "The artifact, the call, and the decision.",
+    covers: "The model artifact and its weights, the inference call, the system prompt, the guardrails, and the decision the model makes. The schema splits the artifact at rest from the live call deliberately, because they are different assets with different owners.",
+    components: "Weights files and checkpoints, model hub and registry artifacts, the serving endpoint, the system prompt and its configuration, guardrails, safety classifiers and output filters.",
+    seams: ["Model / infer", "Model / Agent", "Model / store"],
+    matters: "The trap here is tagging L2 because a model appears in the chain, and nearly every scenario has one. L2 is where the model is the asset corrupted or stolen, or where the model's decision is the damage. ATT&CK is close to silent at this layer, so these records are carried by ATLAS and the OWASP LLM list instead, and the mapping is editorial more often than it is authoritative." },
+  { id: "L3", name: "Orchestration and Agent",
+    lede: "The loop, the tools, and the handoffs.",
+    covers: "Agent loops, tool and function calling, planning, memory, handoffs between agents, and connector and MCP plumbing.",
+    components: "Agent runtimes and orchestrators, tool and function gateways, MCP servers and connectors, planner and reasoning traces, agent memory stores, evaluation harnesses, and the workload identities agents act under.",
+    seams: ["Agent / tools", "Agent / memory", "Agent / eval"],
+    matters: "This is where the least instrumentation exists today and where the most is being built. The characteristic gap is the handoff: an agent passing work to a sub agent or an external tool often crosses a seam that emits nothing at all, so the chain goes dark in the middle. The characteristic mistake is the mirror of the L2 one, tagging L3 because an agent is the actor when the damage lands somewhere else." },
+  { id: "L4", name: "Application",
+    lede: "The product surface a customer touches.",
+    covers: "The user interface, the API the business exposes, session and account handling, and output rendering.",
+    components: "Web and mobile front ends, the public API, session and token handling, account management, the rendering path that turns model output into something a browser or a downstream system executes.",
+    seams: ["App / net", "App / session"],
+    matters: "L4 is where AI risk turns back into ordinary application security, which is good news: the controls and the people already exist. The distinction worth holding is the identity one. Credential abuse whose damage is takeover of the product account is L4, and identity at L0 is for the control plane of the infrastructure itself." },
+];
+
+const BEYOND_ENVS = [
+  { id: "ENV-WEB-01", fam: "Web application", name: "Public web app behind an API gateway",
+    where: "Public cloud", owners: "Platform engineering, application team, cloud team",
+    layers: ["W0 Edge", "W1 Gateway", "W2 Application", "W3 Data", "W4 Control plane"],
+    seams: ["Edge / net", "Gateway / auth", "Gateway -> App", "App / session", "App -> Data", "Data / store", "Control plane"],
+    emits: ["API gateway access and authorizer logs", "Application logs", "Managed database audit log", "Cloud control plane audit trail"],
+    gap: "No edge inspection in front of the gateway." },
+  { id: "ENV-WEB-02", fam: "Web application", name: "Internally hosted web app behind a WAF",
+    where: "Corporate data center", owners: "Network security, platform engineering, application team",
+    layers: ["W0 Edge", "W1 Proxy", "W2 Application", "W3 Data", "W4 Directory"],
+    seams: ["Edge / net", "WAF / rule", "Proxy -> App", "App / session", "App -> Data", "Data / store", "Identity"],
+    emits: ["WAF rule hits and blocks", "Reverse proxy access logs", "Web server and application logs", "Database audit log"],
+    gap: "The WAF sees HTTP only. Anything the app does after the request is invisible to it." },
+  { id: "ENV-WEB-03", fam: "Web application", name: "Web app published through a CDN",
+    where: "Public cloud origin, third party edge", owners: "CDN owner, platform engineering, application team",
+    layers: ["W0 CDN edge", "W1 Origin shield", "W2 Application", "W3 Data", "W4 CDN config"],
+    seams: ["Edge / net", "Edge / cache", "Origin / net", "App / session", "App -> Data", "Data / store", "Control plane"],
+    emits: ["CDN access logs and edge rule hits", "Origin access logs", "Application logs", "CDN configuration change log"],
+    gap: "If the origin is reachable directly, the entire edge is optional for an attacker." },
+  { id: "ENV-WEB-04", fam: "Web application", name: "Public cloud web app behind a web application firewall",
+    where: "Public cloud", owners: "Network security, platform engineering, cloud team",
+    layers: ["W0 Edge", "W1 Filtering tier", "W2 Application", "W3 Data", "W4 Control plane"],
+    seams: ["Edge / net", "WAF / rule", "Host / Cloud", "App / session", "App -> Data", "Data / store", "Control plane"],
+    emits: ["Web application firewall rule hits", "Filtering tier host and access logs", "Application logs", "Cloud control plane audit trail", "Storage access logs, if enabled"],
+    gap: "The filtering tier is a request relaying device by design, and anything it is trusted to reach it can be made to reach on somebody else's behalf.",
+    note: "Added because a real incident arrived that did not fit any of the other shapes." },
+  { id: "ENV-EP-01", fam: "Endpoint population", name: "Managed hosts missing EDR and configuration management",
+    where: "Corporate estate", owners: "Endpoint engineering, IT operations",
+    layers: ["E0 Firmware", "E1 Operating system", "E2 Security agents", "E3 Applications", "E4 Identity"],
+    seams: ["Host / boot", "Host / OS", "Host / process", "Host / app", "Host / net", "Identity"],
+    emits: ["Network telemetry only", "Identity sign in events", "Nothing from the host itself"],
+    gap: "The defining property is an absence. There is no agent to ask, so almost every step of any chain scores Blind by construction." },
+  { id: "ENV-EP-02", fam: "Endpoint population", name: "Managed hosts with patches over 30 days out of date",
+    where: "Corporate estate", owners: "Endpoint engineering, vulnerability management",
+    layers: ["E0 Firmware", "E1 Operating system", "E2 Security agents", "E3 Applications", "E4 Identity"],
+    seams: ["Host / boot", "Host / OS", "Host / process", "Host / app", "Host / net", "Identity"],
+    emits: ["Patch management state", "Vulnerability scanner findings", "Endpoint agent telemetry", "Identity sign in events"],
+    gap: "Instrumentation is present. The exposure is the window between a fix existing and it being applied." },
+];
+
+const PROCEDURES = [
+  { key: "session", title: "Session mode, and when not to use it",
+    lede: "What changes when you turn it on, and why the read only view is the right default.",
+    steps: [
+      "Serve the page rather than opening the file. A file page shares one browser storage bucket with every other file page, so a second copy can overwrite a session in progress, and some browsers refuse storage for file pages entirely.",
+      "Press Start session mode at the right of the nav bar. A session bar appears with a facilitator box and a capture counter, a Session tab appears, and every evidence table turns into per row edit cards.",
+      "Put a name in the facilitator box. It is written into the exported file and becomes the author on anything the session proposes.",
+      "Score each row on the two questions: would we see it, and does anything alert on it. The verdict recomputes live using the same rule the repository uses.",
+      "Capture the rest as you go: source, evidence, owner, ticket, row notes, a proposed use case line, new scenarios, imported scenarios, use case edits.",
+      "Read the readback aloud on the Session tab, then export.",
+      "Leave session mode when you want the read only view back. Nothing is lost by toggling; captured work sits in browser storage until you export or discard it.",
+    ],
+    commands: ["./liszt serve", "./liszt serve --port 8765", "./liszt serve --published-only"],
+    watch: [
+      "Session mode never writes to the repository. Nothing you type touches a record until you export the file and apply it.",
+      "serve includes drafts by default, which is the opposite of viewer. The served page and a handed out build show different libraries.",
+      "Scoring only one of the two dropdowns does not score the row. It stays unscored, and an unscored row is absent rather than zero.",
+      "Storage is per origin, so a different port is a different session. If storage is unavailable a red banner says so and a refresh loses the hour.",
+      "Opening Bring in a scenario turns session mode on for you, because imports ride the same plumbing.",
+    ] },
+  { key: "add", title: "Adding a scenario",
+    lede: "A blank record, correctly named and numbered, with the teaching comments intact.",
+    steps: [
+      "Run the scaffold with no arguments and answer five questions: title, attack or failure, layer, priority, and who is writing it.",
+      "It takes the next free id, never filling gaps, builds the file name the validator expects, keeps every comment from the template, and refuses a near duplicate title.",
+      "Open the file and replace every PLACEHOLDER. The validator does not flag that word, so you are the check.",
+      "Work the gates in the methodology doc: scope line first, then research, verification, attack path, evidence map, scoring, mapping, review.",
+      "Validate the single file as you go.",
+      "In a room instead, press Propose a new scenario in the session bar and capture the few plain answers. It becomes a real record when the session file is applied.",
+    ],
+    commands: ["./liszt new", "./liszt new --title \"Poisoned vector store in a shared index\" --layer L3 --priority NEAR-TERM", "./liszt validate scenarios/022-*.yaml"],
+    watch: [
+      "Ids are never reused and never backfilled, because a retired record keeps its number forever.",
+      "The near duplicate check is deliberately blunt and will stop you on titles that are genuinely different. Read what it found before you use force.",
+      "A record is born draft and stays there until a reviewer who is not the author publishes it.",
+    ] },
+  { key: "manage", title: "Managing a scenario",
+    lede: "Scoring it, filling the gaps, and getting it to a state where it can be published and tested.",
+    steps: [
+      "Open the scenario and read what is missing. Scenario management, pane one, lists every record with the exact reasons it cannot be tested yet.",
+      "In session mode, score every evidence row on the two questions. Coverage is computed from those numbers and can never be typed.",
+      "Name a source for anything that is not Blind, evidence for anything that is Have, and an owner for every gap. A Have nobody can point a query at is not verifiable, and an unowned gap never closes.",
+      "Put a ticket in the backlog reference when a gap is real work. A coverage change with no ticket behind it is unattributable later.",
+      "Export the session and apply it, then read the diff before committing.",
+      "Publishing is a separate act by someone who is not the author, and it requires a reviewer, sources, and a clean validator run.",
+    ],
+    commands: ["./liszt validate", "./liszt coverage", "./liszt session liszt-session-2026-08-12.json --dry-run", "./liszt session liszt-session-2026-08-12.json"],
+    watch: [
+      "The validator is the bar: zero errors. Warnings are numerous and expected in a young library.",
+      "Coverage is recomputed on apply. If a label in the browser disagreed with the scores, the scores win.",
+      "A field can be set or overwritten by a session file but never cleared.",
+    ] },
+  { key: "bring", title: "Bringing in a scenario",
+    lede: "From a published incident or an analyst hypothesis to a draft record, without hand writing YAML.",
+    steps: [
+      "Open Bring in a scenario. Pane one is a small library of research prompts: published incidents, threat research feeds, and analyst hypothesis.",
+      "Copy one, run it in any assistant with web access, and pick a candidate from the numbered table it returns.",
+      "Move to pane two and copy the conversion prompt. Paste your chosen finding under it. It returns a single scenario JSON object and runs three self checks before it emits.",
+      "Paste that JSON into pane three and add it. The importer re-checks everything mechanically, canonicalizes the layer, caps the chain at six steps, and flags anything it had to correct.",
+      "The import lands as a draft in the session only. Promoting it to a permanent record is a deliberate act with a human assigned id.",
+    ],
+    commands: ["./liszt serve"],
+    watch: [
+      "Imported scenarios live in the session and the exported file. They are not written to the repository by applying a session.",
+      "The conversion prompt never emits a score. Coverage is scored later by the people who own the systems.",
+      "Framework identifiers that are not real identifiers are discarded on import, so an empty list is a better answer than a placeholder.",
+    ] },
+  { key: "propose-uc", title: "Proposing a use case",
+    lede: "Turning a scenario's evidence rows into a decision somebody acts on.",
+    steps: [
+      "Open Scenario management, pane three, and pick a scenario. The list is ordered by need: uncovered first, then priority, then evidence.",
+      "Copy the record, then copy the first prompt and paste the record under it. It returns four to ten candidate compositions, each with what it reads and what it cannot tell you.",
+      "Pick the one worth building. The candidates are written to be compared.",
+      "Copy the second prompt, paste the record and your chosen candidate, and run it. It returns a record stub.",
+      "Save the stub under use-cases, fill in every TODO, and validate.",
+      "For a quicker capture, the Add a use case form on the Use cases tab records the decision in the session and hands back YAML.",
+    ],
+    commands: ["./liszt validate"],
+    watch: [
+      "The stub deliberately leaves the id, the owner, the destination, the consumer and the author as TODO. Those are decisions about your organization, and a plausible invention is worse than a blank.",
+      "TODO is used rather than PLACEHOLDER because the validator flags one and not the other.",
+      "Autonomy is always notify in a stub. Anything higher needs a promotion block with a measured true positive rate and a named approver.",
+      "Designing a use case needs no scores, so every record in the library is workable here today.",
+    ] },
+  { key: "manage-uc", title: "Managing a use case",
+    lede: "Reading it, moving it through delivery, and keeping the record honest.",
+    steps: [
+      "Open the Use cases tab. The list shows status, delivery phase and outcome kind; clicking a row opens the card.",
+      "Read the top of the card first. It states why the use case exists, which scenarios and steps it serves, and the framework identifiers derived from those steps.",
+      "Use the engineering fields at the foot of the card to move it: phase and the date it entered that phase, status, outcome kind, who operates it, and the ticket.",
+      "Keep status and phase apart in your head. Phase is where the engineering work is; status is whether the thing runs and has been tuned against live volume.",
+      "Press Copy YAML and paste the result back into the record under use-cases, then validate.",
+    ],
+    commands: ["./liszt validate", "./liszt viewer --include-drafts"],
+    watch: [
+      "Edits are held in the session. The viewer has never written to use-cases and does not start here.",
+      "One trigger per use case. If two signals could each start it, that is two use cases.",
+      "Every use case needs a stated blind side. A use case with no limits written down will be trusted past its range.",
+    ] },
+  { key: "export", title: "Exporting the results from a session",
+    lede: "Getting an hour of scoring out of a browser and into the records, with a human in the middle.",
+    steps: [
+      "On the Session tab, read the readback. It lists every row you touched, every proposal, and every import.",
+      "Press Export session file. It downloads a dated JSON file.",
+      "Run the apply step with dry run first and read what it says it will do.",
+      "Run it for real, then read the git diff. Comments and formatting in the records are preserved.",
+      "Validate, then commit. Nothing in this chain commits for you.",
+    ],
+    commands: ["./liszt session liszt-session-2026-08-12.json --dry-run", "./liszt session liszt-session-2026-08-12.json", "./liszt validate", "git diff"],
+    watch: [
+      "Applying with an org flag writes an overlay under coverage instead of the shared records. Exporting from an org view and applying without the flag writes that org's answers into the reference records.",
+      "Imported scenarios, added research prompts and use case edits ride in the file but are not applied. They are session material, and the honest handoff for a use case is Copy YAML.",
+      "Scoring a control row in the browser is dropped on apply, because the apply step indexes attack steps only.",
+    ] },
+  { key: "emit", title: "Emitting an OpenSpec and a testing case",
+    lede: "From a scored record to a sealed spec, a frozen prediction, a run, and a calibration number.",
+    steps: [
+      "Check the record clears the mechanical gate. Scenario management, pane one, shows this for the whole library, and the emitter recomputes it every time.",
+      "Run the readiness prompt for the judgment half: is each step concrete, safe, reproducible and observable.",
+      "Design the test. Pane two returns a plan that breaks the chain into units, weighs the full path, and labels what cannot run today.",
+      "Emit the spec. It writes an engine agnostic spec, the same thing rendered in the spec driven convention, and a prediction of what each row will show.",
+      "Commit the prediction before the run. That is a timestamped act, and the scorer refuses to score if the prediction moved afterward.",
+      "Run the procedure, then record what you actually saw in a run record, before opening the prediction.",
+      "Score the run. It reports the exact match rate, the optimism index, source precision and the surprise count, and proposes rescores.",
+      "Apply what it proposes deliberately, citing the run id as the ticket so the change reads as a rescore rather than as improvement.",
+    ],
+    commands: ["python3 tools/emit_testspec.py 021 --check", "python3 tools/emit_testspec.py 021 --sealed-by \"your name\"", "python3 tools/score_run.py runs/RUN-021-2026-08-05-01.yaml"],
+    watch: [
+      "Only the lab rung is enabled. Production rungs are specified and switched off, and the executor refuses anything above the enabled rung even if a spec asks.",
+      "There is no runner yet. The spec binds to an emulation library through an adapter that has not been written, so a spec is a build target rather than a schedule.",
+      "The environment decides what a run can prove. Without a mirrored pipeline, a Have row cannot be confirmed at all.",
+      "The scorer proposes a direction while the record stores DeTT&CT numbers, so applying a rescore is still a hand translation.",
+    ] },
+  { key: "first", title: "Before any of the above",
+    lede: "The three things that waste an afternoon if nobody tells you.",
+    steps: [
+      "Run the environment check once. It tells you whether the tooling can run at all.",
+      "Validate before and after every change that touches a record, the schema or the tools. Zero errors is the bar.",
+      "Rebuild the page after any change. The viewer is a build artifact and merging or pulling never updates it.",
+    ],
+    commands: ["./liszt doctor", "./liszt validate", "./liszt viewer --include-drafts", "./liszt serve"],
+    watch: [
+      "viewer excludes drafts by default and serve includes them. Ask for drafts explicitly when you build a page to look at.",
+      "The build directory is not tracked, so there is nothing to pull.",
+      "Warnings are expected and numerous. Errors are not.",
+    ] },
+];
+
+/* Techniques for a layer are read out of the records at that layer rather than written
+   down here, so the page cannot drift from the library. */
+function layerFrameworks(lid) {
+  const out = { attack: new Set(), atlas: new Set(), owasp_llm: new Set(), owasp_agentic: new Set(), scenarios: [] };
+  DATA.scenarios.forEach(s => {
+    const lay = (s.classification || {}).ai_infrastructure_layer || "";
+    if (lay.slice(0, 2) !== lid) return;
+    out.scenarios.push(s);
+    const fm = s.framework_mapping || {};
+    ["attack", "atlas", "owasp_llm", "owasp_agentic"].forEach(k => (fm[k] || []).forEach(i => out[k].add(i)));
+    (s.attack_path || []).forEach(st => {
+      (st.attack || []).forEach(i => out.attack.add(i));
+      (st.atlas || []).forEach(i => out.atlas.add(i));
+    });
+  });
+  ["attack", "atlas", "owasp_llm", "owasp_agentic"].forEach(k => { out[k] = [...out[k]].sort(); });
+  return out;
+}
+
+function renderDocs() {
+  const rail = `<div class="irail">${[
+      ["overview", "Overview"], ["envs", "Environments"], ["how", "How to"]]
+    .map(([k, t]) => `<button class="ibtn" data-dstep="${k}" aria-current="${docStep === k}">${t}</button>`).join("")}</div>`;
+  const body = docStep === "overview" ? docOverview()
+             : docStep === "envs" ? docEnvs() : docHow();
+  $("#docs").innerHTML = `<div class="panel"><h3>Documentation</h3>
+    <div class="sub">What Liszt is, how the environments it reasons about are put together, and
+      how to do each job in the tool.</div>
+    <div style="margin-top:14px">${rail}${body}</div></div>`;
+  wireDocs();
+}
+
+function docOverview() {
+  const n = DATA.scenarios.length, uc = (DATA.use_cases || []).length;
+  return `<div class="why" style="margin-bottom:14px">Liszt answers one question and refuses to
+      guess at it: if this attack happened to us, would we actually see it, at which step, and
+      who owns the part we cannot see.</div>
+
+    <h4 class="dh">What it is</h4>
+    <p class="dp">A repeatable way of turning an AI attack or failure scenario into two things a
+      defender can act on: an attack path of three to six adversary moves, and an evidence map
+      naming the signal each move would produce. One record per scenario, held as a file in a
+      repository and checked by a validator. The library carries ${n} scenarios and ${uc} use
+      cases today.</p>
+    <p class="dp">The load bearing decision is an inversion. The repository is the system of
+      record and the slide deck is a build artifact you can delete and regenerate. Everything
+      you see in this page is rendered from those records.</p>
+
+    <h4 class="dh">What it does</h4>
+    <p class="dp">It asks two questions of every step in every chain, and computes the answer
+      rather than accepting one:</p>
+    <ol class="dl">
+      <li><strong>Would we see it?</strong> Visibility, scored 0 to 4.</li>
+      <li><strong>Does anything alert on it?</strong> Detection maturity, scored -1 to 5.</li>
+    </ol>
+    <p class="dp">From those two numbers one function derives the verdict, the same way every
+      time. Visibility of 0 is <strong>Blind</strong>, nothing produces the signal. Visibility of
+      at least 1 with detection of at least 1 is <strong>Have</strong>, it is emitted and
+      something is watching. Anything else is <strong>Collectable</strong>, the source exists but
+      nothing is wired to it. Detection scored 0 means logged for forensics only, which is
+      Collectable and not Have, and that distinction is the whole point of the tag.</p>
+    <p class="dp">Three separate numbers come out, because they answer different questions for
+      different people. <strong>Coverage</strong> is how much of a chain we can see, which is an
+      engineering question. <strong>Exposure</strong> is which urgent scenarios still have blind
+      steps, which is a risk question. <strong>Maturity</strong> is whether the process is
+      working at all: reviewed, scored, owned, evidenced, funded. A scenario can be entirely
+      blind and fully mature, meaning we know exactly what we cannot see, who owns it, and it is
+      on somebody's backlog.</p>
+
+    <h4 class="dh">Why it is worth the effort</h4>
+    <p class="dp">A coverage percentage on a slide can be authored, and usually is. A tag here
+      cannot: it is computed from two scores, and the validator recomputes it on every row and
+      fails the build if the stored label disagrees. That is the difference between a maturity
+      trend and a measure of analyst optimism.</p>
+    <p class="dp">It also makes improvement attributable. The metric that matters is a tag
+      flipping from Blind to Have, and a flip only counts when it carries evidence a third party
+      can re-run and a ticket naming the work that caused it. A flip without evidence is a
+      rescore. A flip without a ticket is unattributable, and that is the question a budget
+      holder actually asks: what did we get for the instrumentation we paid for.</p>
+    <p class="dp">And it is honest about what it does not know. An unscored row is absent rather
+      than zero, so it is never averaged into a number that would look better for its absence.</p>
+
+    <h4 class="dh">Where to start</h4>
+    <ol class="dl">
+      <li>Read one scenario end to end on the Scenarios tab. Scenario 021 is the worked example.</li>
+      <li>Look at Coverage to see the same records as a picture.</li>
+      <li>Open Scenario management to see which records could be tested today and what blocks the rest.</li>
+      <li>Read a use case to see what the evidence is actually for.</li>
+      <li>When you are ready to change something, turn on session mode and read the procedure under How to.</li>
+    </ol>`;
+}
+
+function docEnvs() {
+  if (docSel) {
+    const L = AI_LAYERS_DOC.find(x => x.id === docSel);
+    if (L) return docLayerPage(L);
+    const E = BEYOND_ENVS.find(x => x.id === docSel);
+    if (E) return docEnvPage(E);
+  }
+  const layerCards = AI_LAYERS_DOC.map(L => {
+    const f = layerFrameworks(L.id);
+    return `<button class="card" data-doc="${L.id}">
+      <div class="chips"><span class="chip lay">${L.id}</span>
+        <span class="tag">${f.scenarios.length} scenario${f.scenarios.length === 1 ? "" : "s"}</span></div>
+      <div class="t">${esc(L.name)}</div>
+      <div class="meta">${esc(L.lede)}</div></button>`;
+  }).join("");
+  const envCards = BEYOND_ENVS.map(E => `<button class="card" data-doc="${E.id}">
+      <div class="chips"><span class="chip lay">${esc(E.id)}</span>
+        <span class="tag">${esc(E.fam)}</span></div>
+      <div class="t">${esc(E.name)}</div>
+      <div class="meta">${esc(E.where)}</div></button>`).join("");
+
+  return `<h4 class="dh">The AI stack</h4>
+    <p class="dp">Five layers, and every scenario in the library is classified at exactly one of
+      them. The layer is where the attacker achieves the objective, which is not the same as
+      where they got in and not the same as who performed the move. Click a layer to read what
+      sits there and which techniques apply to it.</p>
+    <div class="dgrid">${layerCards}</div>
+
+    <h4 class="dh" style="margin-top:22px">Beyond the AI stack</h4>
+    <p class="dp">Six environment shapes from the parked proposal for cataloging things other
+      than AI: four web application shapes and two endpoint populations. They are here as
+      reference, not as part of the catalog. Nothing in the library is classified against them,
+      and adopting them would mean answering the open questions on the
+      <strong>New scenarios, beyond AI</strong> tab first.</p>
+    <div class="dgrid">${envCards}</div>`;
+}
+
+function docLayerPage(L) {
+  const f = layerFrameworks(L.id);
+  const chips = a => a.length ? a.map(i => `<span class="tag">${esc(i)}</span>`).join(" ")
+                              : '<span style="color:var(--muted)">none in the library yet</span>';
+  return `<button class="toggle" data-docback="1">Back to environments</button>
+    <div class="uc sel" style="margin-top:10px">
+      <div class="hdr"><span class="id">${L.id}</span>
+        <span class="chip lay">${esc(L.name)}</span></div>
+      <h4>${esc(L.lede)}</h4>
+      <div class="ucrow"><div class="k">What sits here</div><div>${esc(L.covers)}</div></div>
+      <div class="ucrow"><div class="k">Components</div><div>${esc(L.components)}</div></div>
+      <div class="ucrow"><div class="k">Seam tags</div><div>${L.seams.map(t => `<span class="tag">${esc(t)}</span>`).join(" ")}</div></div>
+      <div class="ucrow"><div class="k">Why it matters</div><div>${esc(L.matters)}</div></div>
+      <div class="ucrow"><div class="k">ATT&amp;CK</div><div>${chips(f.attack)}</div></div>
+      <div class="ucrow"><div class="k">ATLAS</div><div>${chips(f.atlas)}</div></div>
+      <div class="ucrow"><div class="k">OWASP LLM</div><div>${chips(f.owasp_llm)}</div></div>
+      <div class="ucrow"><div class="k">OWASP Agentic</div><div>${chips(f.owasp_agentic)}</div></div>
+      <div class="ucrow"><div class="k">Scenarios here</div><div>${f.scenarios.length
+        ? f.scenarios.map(s => `<div><a href="#/scenario/${esc(s.id)}">${esc(s.id)} ${esc(s.title)}</a></div>`).join("")
+        : '<span style="color:var(--muted)">None classified at this layer. That is itself a finding rather than proof the layer is unreachable.</span>'}</div></div>
+      <div class="note">Framework identifiers above are read out of the records at this layer
+        rather than written into this page, so the list cannot drift from the library. Where it
+        looks thin, the mapping work has not been done yet.</div>
+    </div>`;
+}
+
+function docEnvPage(E) {
+  const list = a => a.map(i => `<div>${esc(i)}</div>`).join("");
+  return `<button class="toggle" data-docback="1">Back to environments</button>
+    <div class="uc sel" style="margin-top:10px">
+      <div class="hdr"><span class="id">${esc(E.id)}</span>
+        <span class="chip lay">${esc(E.fam)}</span>
+        <span class="chip blind">parked proposal</span></div>
+      <h4>${esc(E.name)}</h4>
+      <div class="ucrow"><div class="k">Where it runs</div><div>${esc(E.where)}</div></div>
+      <div class="ucrow"><div class="k">Who owns it</div><div>${esc(E.owners)}</div></div>
+      <div class="ucrow"><div class="k">How it is built</div><div>${E.layers.map(t => `<span class="tag">${esc(t)}</span>`).join(" ")}</div></div>
+      <div class="ucrow"><div class="k">Seams</div><div>${E.seams.map(t => `<span class="tag">${esc(t)}</span>`).join(" ")}</div></div>
+      <div class="ucrow"><div class="k">What it emits</div><div>${list(E.emits)}</div></div>
+      <div class="ucrow"><div class="k">The gap</div><div>${esc(E.gap)}</div></div>
+      ${E.note ? `<div class="ucrow"><div class="k">Note</div><div>${esc(E.note)}</div></div>` : ""}
+      <div class="note">This is a parked design, not part of the catalog. Generalizing the
+        library to cover it would mean deciding whether the layer field is renamed or joined by
+        a second one, whether an environment record is required, and above all whether coverage
+        stays one number or becomes one per stack. Blending an AI population and an endpoint
+        population into a single figure would make the AI picture look better than it is.</div>
+    </div>`;
+}
+
+function docHow() {
+  return `<p class="dp">Nine procedures. Each is what a person actually does, the exact commands
+      where the repository is involved, and the traps worth knowing before you hit them.</p>` +
+    PROCEDURES.map(p => {
+      const open = !!openProc[p.key];
+      return `<div class="proc">
+        <button class="prochd" data-proc="${p.key}" aria-expanded="${open}">
+          <span class="tx">${open ? "&minus;" : "+"}</span>
+          <span><strong>${esc(p.title)}</strong><span class="lede">${esc(p.lede)}</span></span></button>
+        ${open ? `<div class="procbody">
+          <ol class="dl">${p.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>
+          ${p.commands.length ? `<div class="cmds">${p.commands.map(c => `<code>${esc(c)}</code>`).join("")}</div>` : ""}
+          <div class="watch"><span class="k">Watch out for</span>
+            <ul>${p.watch.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>
+        </div>` : ""}
+      </div>`;
+    }).join("");
+}
+
+function wireDocs() {
+  $$("#docs .ibtn[data-dstep]").forEach(b => b.onclick = () => {
+    docStep = b.dataset.dstep; docSel = null; renderDocs();
+  });
+  $$("#docs .card[data-doc]").forEach(b => b.onclick = () => { docSel = b.dataset.doc; renderDocs(); });
+  $$("#docs [data-docback]").forEach(b => b.onclick = () => { docSel = null; renderDocs(); });
+  $$("#docs .prochd[data-proc]").forEach(b => b.onclick = () => {
+    const k = b.dataset.proc; openProc[k] = !openProc[k]; renderDocs();
+  });
+}
+
 /* ---------- frameworks view ---------- */
 function renderFrameworks() {
   const names = { attack: "MITRE ATT&CK", atlas: "MITRE ATLAS",
@@ -3355,6 +3818,7 @@ function setView(v) {
   $("#reports").hidden = v !== "reports";
   $("#intake").hidden = v !== "intake";
   $("#testing").hidden = v !== "testing";
+  $("#docs").hidden = v !== "docs";
   $("#sessionview").hidden = v !== "session";
   /* the parked tab is optional and carries its own chrome */
   const parked = $("#beyond");
@@ -3380,6 +3844,7 @@ function setView(v) {
     renderIntake();
   }
   if (v === "testing") renderTesting();
+  if (v === "docs") renderDocs();
   if (v === "session") renderSession();
 }
 
@@ -3637,6 +4102,7 @@ def page(data: dict) -> str:
     <button data-view="reports" aria-current="false">Reports</button>
     <button data-view="intake" aria-current="false">Bring in a scenario</button>
     <button data-view="testing" aria-current="false">Scenario management</button>
+    <button data-view="docs" aria-current="false">Documentation</button>
     {parked_nav}
     <button data-view="session" aria-current="false" id="sessionnav" hidden>Session</button>
     <button style="margin-left:auto;color:var(--brand)" id="sessiontoggle">Start session mode</button>
@@ -3692,6 +4158,7 @@ def page(data: dict) -> str:
   <section id="reports" hidden></section>
   <section id="intake" hidden></section>
   <section id="testing" hidden></section>
+  <section id="docs" hidden></section>
   {parked_section}
   <section id="sessionview" hidden></section>
 
