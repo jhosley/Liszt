@@ -4006,7 +4006,11 @@ function setView(v) {
   const parked = $("#beyond");
   if (parked) {
     parked.hidden = v !== "beyond";
-    $(".wrap > .tiles").hidden = v === "beyond";
+    /* Guarded because this sits between unhiding a section and rendering it. An
+       unguarded miss here throws after the tab is visible and before anything fills
+       it, which presents as a blank tab rather than as an error. */
+    const tiles = $(".wrap > .tiles");
+    if (tiles) tiles.hidden = v === "beyond";
     /* The filters are handled above, for every view at once. Setting them here as well
        undid that rule on every view except this one. */
   }
