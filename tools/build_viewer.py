@@ -474,8 +474,16 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
 .tsum{background:var(--surface-2);border-left:3px solid var(--brand);border-radius:0 6px 6px 0;
       padding:10px 14px;font-size:13px;color:var(--ink-2);margin-bottom:12px}
 .tlist{border-top:1px solid var(--surface-3)}
-.trow{padding:9px 0;border-bottom:1px solid var(--surface-3);display:grid;
-      grid-template-columns:1fr auto;gap:8px 12px;align-items:start;font-size:13px}
+.trow{padding:7px 0;border-bottom:1px solid var(--surface-3);display:grid;
+      grid-template-columns:1fr auto;gap:6px 12px;align-items:center;font-size:13px}
+.trow .tmain{display:flex;align-items:center;gap:8px;min-width:0}
+.tx{width:19px;height:19px;flex:0 0 19px;border:1px solid var(--surface-3);border-radius:4px;
+    background:var(--surface);color:var(--muted);font-size:12px;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;padding:0}
+.tx:hover{border-color:var(--brand);color:var(--brand)}
+.tx.spacer{border:0;background:none;cursor:default}
+.irail.sm{margin:0 0 8px}
+.ibtn.sm{font-size:11.5px;padding:4px 10px}
 .trow .tv{justify-self:end}
 .trow .tbl{grid-column:1/-1;margin:2px 0 0;padding-left:18px;color:var(--muted);
            font-size:12px;line-height:1.5}
@@ -609,7 +617,7 @@ const EV = { "seen-in-the-wild": ["wild", "Seen in the wild"],
              "doomsday": ["doomsday", "Doomsday"] };
 
 const state = { view: "scenarios", sel: null, q: "", priority: "", evidence: "",
-                layer: "", status: "", cov: "", table: false };
+                layer: "", status: "", cov: "", test: "", table: false };
 
 /* ---------- session capture ----------
    Everything typed during a session is held here, never written over the record.
@@ -737,6 +745,11 @@ function matches(s) {
   if (state.cov === "exposed" && !s.metrics.exposed) return false;
   if (state.cov === "unscored" && s.metrics.completeness > 0) return false;
   if (state.cov === "orphan" && !s.metrics.orphaned_gaps.length) return false;
+  if (state.test) {
+    const blocked = ((s.testing || {}).blockers || []).length > 0;
+    if (state.test === "ready" && blocked) return false;
+    if (state.test === "blocked" && !blocked) return false;
+  }
   return true;
 }
 
@@ -2428,19 +2441,38 @@ function pickedBlock() {
    would write a spec for today. */
 function testable(s) { return !((s.testing && s.testing.blockers) || []).length; }
 
+/* Which rows have their blockers open, and which slice of the library is shown. Eighty
+   seven blocker lines rendered at once is a wall nobody reads; the count belongs on the
+   row and the detail belongs behind a click. */
+const openBlockers = {};
+let readyFilter = "all";
+
 function readinessPane() {
-  const all = DATA.scenarios.slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  const all = DATA.scenarios.slice().sort((a, b) => (testable(b) - testable(a))
+    || String(a.id).localeCompare(String(b.id)));
   const ready = all.filter(testable);
-  const rows = all.map(s => {
+  const shown = readyFilter === "ready" ? ready
+              : readyFilter === "blocked" ? all.filter(s => !testable(s)) : all;
+
+  const rows = shown.map(s => {
     const bl = (s.testing && s.testing.blockers) || [];
+    const open = !!openBlockers[s.id];
     return `<div class="trow ${bl.length ? "" : "ok"}">
-      <div><a href="#/scenario/${esc(s.id)}">${esc(s.id)}</a> ${esc(s.title)}</div>
+      <div class="tmain">${bl.length
+          ? `<button class="tx" data-blockers="${esc(s.id)}"
+               aria-expanded="${open}" title="show what blocks this">${open ? "&minus;" : "+"}</button>`
+          : `<span class="tx spacer"></span>`}
+        <a href="#/scenario/${esc(s.id)}">${esc(s.id)}</a> ${esc(s.title)}</div>
       <div class="tv">${bl.length
-        ? `<span class="chip blind">blocked</span>`
-        : `<span class="chip have">emitter would run</span>`}</div>
-      ${bl.length ? `<ul class="tbl">${bl.map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
+        ? `<span class="chip blind">${bl.length} blocker${bl.length === 1 ? "" : "s"}</span>`
+        : `<span class="chip have">would emit</span>`}</div>
+      ${bl.length && open ? `<ul class="tbl">${bl.map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
     </div>`;
   }).join("");
+
+  const tab = (k, label) => `<button class="ibtn sm" data-ready="${k}"
+    aria-current="${readyFilter === k}">${label}</button>`;
+
   return `<div class="sub" style="margin-bottom:10px">The mechanical half of the readiness
       gate, run over the whole library. These are the same checks
       <code>tools/emit_testspec.py</code> recomputes before it writes a spec, so what you
@@ -2448,6 +2480,7 @@ function readinessPane() {
       library, and knowing which ones and why is itself a finding.</div>
     <div class="tsum"><strong>${ready.length} of ${all.length}</strong> scenarios would emit
       a spec today. ${ready.length ? "Ready: " + ready.map(s => esc(s.id)).join(", ") + "." : ""}</div>
+    <div class="irail sm">${tab("all", "All " + all.length)}${tab("ready", "Would emit " + ready.length)}${tab("blocked", "Blocked " + (all.length - ready.length))}</div>
     <div class="tlist">${rows}</div>
     <div class="note"><strong>Completing a blocked scenario.</strong> Almost every blocker
       above is one of two things, and both are ordinary work rather than a defect. A record
@@ -2580,6 +2613,13 @@ function renderTesting() {
 function wireTesting() {
   $$("#testing .ibtn[data-tstep]").forEach(b => b.onclick = () => {
     testStep = b.dataset.tstep; renderTesting();
+  });
+  $$("#testing .ibtn[data-ready]").forEach(b => b.onclick = () => {
+    readyFilter = b.dataset.ready; renderTesting();
+  });
+  $$("#testing .tx[data-blockers]").forEach(b => b.onclick = () => {
+    const id = b.dataset.blockers;
+    openBlockers[id] = !openBlockers[id]; renderTesting();
   });
   $$("#testing .prow[data-pick]").forEach(b => b.onclick = () => {
     pickedScenario = pickedScenario === b.dataset.pick ? null : b.dataset.pick;
@@ -3307,6 +3347,10 @@ function setView(v) {
   $("#scenarios").hidden = v !== "scenarios";
   $("#coverage").hidden = v !== "coverage";
   $("#usecases").hidden = v !== "usecases";
+  /* The filters drive the scenario list and the coverage chart. On every other view they
+     are a control that appears to work and does nothing, which is worse than absent. */
+  { const fb = document.querySelector(".filters");
+    if (fb) fb.hidden = !(v === "scenarios" || v === "coverage"); }
   $("#frameworks").hidden = v !== "frameworks";
   $("#reports").hidden = v !== "reports";
   $("#intake").hidden = v !== "intake";
@@ -3317,7 +3361,8 @@ function setView(v) {
   if (parked) {
     parked.hidden = v !== "beyond";
     $(".wrap > .tiles").hidden = v === "beyond";
-    $(".filters").hidden = v === "beyond";
+    /* The filters are handled above, for every view at once. Setting them here as well
+       undid that rule on every view except this one. */
   }
   if (v === "beyond") renderBeyond();
   if (v === "coverage") renderCoverage();
@@ -3509,12 +3554,12 @@ document.addEventListener("DOMContentLoaded", () => {
     uniq(s => s.status).map(v => `<option>${esc(v)}</option>`).join("");
 
   $("#q").oninput = (e) => { state.q = e.target.value; refresh(); };
-  ["priority", "evidence", "layer", "status", "cov"].forEach(k => {
+  ["priority", "evidence", "layer", "status", "cov", "test"].forEach(k => {
     $(`#f-${k}`).onchange = (e) => { state[k] = e.target.value; refresh(); };
   });
   $("#clear").onclick = () => {
-    Object.assign(state, { q: "", priority: "", evidence: "", layer: "", status: "", cov: "" });
-    $("#q").value = ""; ["priority", "evidence", "layer", "status", "cov"]
+    Object.assign(state, { q: "", priority: "", evidence: "", layer: "", status: "", cov: "", test: "" });
+    $("#q").value = ""; ["priority", "evidence", "layer", "status", "cov", "test"]
       .forEach(k => $(`#f-${k}`).value = "");
     refresh();
   };
@@ -3631,6 +3676,9 @@ def page(data: dict) -> str:
       <option value="exposed">Exposed (NOW and Blind)</option>
       <option value="orphan">Has an unowned gap</option>
       <option value="unscored">Not scored</option></select>
+    <select id="f-test"><option value="">Any testability</option>
+      <option value="ready">Would emit a spec</option>
+      <option value="blocked">Blocked from testing</option></select>
     <span class="count" id="count"></span>
     <button class="clear" id="clear">Clear</button>
   </div>
