@@ -480,6 +480,16 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
 .trow .tbl{grid-column:1/-1;margin:2px 0 0;padding-left:18px;color:var(--muted);
            font-size:12px;line-height:1.5}
 .trow .tbl li{margin:1px 0}
+.picker{max-height:300px;overflow-y:auto;border:1px solid var(--surface-3);border-radius:8px;margin-bottom:12px}
+.prow{display:grid;grid-template-columns:44px 1fr auto auto;gap:10px;align-items:center;
+      width:100%;text-align:left;padding:7px 12px;background:none;border:0;
+      border-bottom:1px solid var(--surface-3);cursor:pointer;font-size:12.5px;color:var(--ink)}
+.prow:last-child{border-bottom:0}
+.prow:hover{background:var(--surface-2)}
+.prow.on{background:var(--surface-2);box-shadow:inset 3px 0 0 var(--brand)}
+.prow .pid{font-weight:700;color:var(--brand)}
+.prow .ptitle{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .pmeta{color:var(--muted);font-size:11px;white-space:nowrap}
 .tflow{margin:4px 0}
 .tstep{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:10px 0;
        border-bottom:1px solid var(--surface-3);font-size:13px;align-items:start}
@@ -1746,6 +1756,206 @@ RULES FOR THE WHOLE ANSWER
 PASTE THE SCENARIO RECORD BELOW THIS LINE
 `;
 
+/* The other thing a scenario is good for. The record says what evidence should exist;
+   a use case says what gets done with it, which is the difference between coverage and
+   a program that acts on what it sees. These two run in sequence: propose candidates,
+   then stub the one that was picked. */
+const P_USECASES =
+`You are proposing OPERATIONAL USE CASES for one Liszt scenario. A scenario record says what
+evidence should exist. A use case says what gets DONE with it: which signal starts a
+decision, what other evidence is pulled in behind it, and what a person or system then does.
+
+Coverage says we can see it. A use case says we do something intelligent with it. A program
+can reach high coverage where every detection is a lone signal firing into a queue nobody
+triages, and the coverage number looks fine the whole way down. Your job is to propose the
+compositions that would stop that happening here.
+
+PASTE THE SCENARIO RECORD BELOW THE LINE AT THE FOOT OF THIS PROMPT.
+
+Return between FOUR and TEN candidates as a numbered Markdown list, then the short summary
+block described at the end. These are for a person to read and choose from, not for a
+machine to consume, so keep each one to the shape below and no longer.
+
+THE SHAPE OF ONE CANDIDATE
+
+  N. TITLE. Name the DECISION, not the tool. "Correlated prompt injection with data
+     movement" is a decision. "Guardrail alerting" is a tool.
+
+     When <the trigger signal> fires in <the exact source the row names>, pull
+     <the other evidence> so that <what the receiver can now decide that they could not
+     decide from the trigger alone>.
+
+     Reads steps: <the attack_path step numbers whose evidence rows this actually uses>
+     Buildable today: <yes, or what has to exist first>
+     Cannot tell you: <the blind spot this specific composition has>
+
+RULES THAT DECIDE WHETHER A CANDIDATE IS ANY GOOD
+
+  - ONE TRIGGER EACH. If two different signals could each independently start it, that is
+    two use cases, not one. Split them.
+  - EVERY SIGNAL AND SOURCE MUST COME FROM A ROW IN THIS RECORD. Read the evidence table and
+    quote the row's signal and its source. Do not invent a signal, do not invent a log
+    source, and do not import a product name the record does not mention. If you find
+    yourself naming a tool the record never names, you have left the record.
+  - MATCH STEPS ROW BY ROW. The step numbers you list must be steps whose evidence rows this
+    composition actually reads. Do not list the whole chain because the use case is "about"
+    the scenario.
+  - THE COMPOSITION IS THE POINT. A candidate whose only content is "alert on the trigger"
+    is a lone signal, which is the failure this record type exists to make visible. Either
+    name what else gets pulled and why, or say plainly that this one is a single signal and
+    that a single signal is the honest answer here.
+  - EACH PIECE OF PULLED EVIDENCE PLAYS ONE OF THREE ROLES, and you should be able to say
+    which:
+      enrichment     adds context to the thing that fired
+      corroboration  independently supports or contradicts it
+      scoping        answers how far it goes, how long it has been happening, what else is
+                     affected
+  - BUILDABLE TODAY. Look at the coverage tag on each row you read.
+      A row tagged Have or Collectable has a source that exists, so the composition can be
+      built from signals that are already there.
+      A row tagged Blind has nothing producing it. A use case that reads a Blind row is a
+      REQUEST TO BUILD COLLECTION FIRST, not a detection anyone can build this quarter. Say
+      so in "Buildable today" and name what collection is missing.
+    IMPORTANT CAVEAT you must apply: if a row has no DeTT&CT visibility and detection scores
+    behind it, its coverage tag is an opinion, not a measurement. Where the rows you read are
+    unscored, write "buildability unverified, the rows this reads are unscored" rather than
+    asserting it is buildable. Do not treat an unscored tag as a fact.
+  - COVER THE CHAIN, NOT JUST THE LOUDEST STEP. Across your four to ten candidates, try to
+    read every step that has an evidence row. If some step is never worth reading, say which
+    and why in the summary block.
+  - DO NOT PROPOSE OR REVISE ANY SCORE. No coverage tag, no visibility number, no detection
+    number, not for now and not for after the use case is built. Owners score rows; you are
+    proposing work, not grading it.
+  - NO NAMES. Never name a person, and do not invent a team, an owner, a queue, or an
+    approver. Where a receiver is implied, describe them by the decision they make, for
+    example "whoever decides if this is an incident", and leave naming to the engineer.
+  - PLAIN LANGUAGE. A reader who does not know DeTT&CT should follow every line.
+
+ORDER AND SPREAD
+
+  Lead with the candidate that would change a decision most, not the one that is easiest to
+  build. Then order the rest so that the ones buildable from existing signals come before the
+  ones that need collection built first. If a candidate is only worth having once another one
+  exists, say which.
+
+THEN THE SUMMARY BLOCK, LAST
+
+  COVERED STEPS: the step numbers at least one candidate reads.
+  UNREAD STEPS: the step numbers no candidate reads, each with one line on why not.
+  NEEDS COLLECTION FIRST: the candidate numbers that depend on a row nothing currently
+    produces.
+  SINGLE SIGNAL: the candidate numbers that are honestly one signal with nothing to compose.
+  UNSCORED: whether the rows in this record carry DeTT&CT scores. If they do not, say in one
+    line that every buildability judgment above is provisional for that reason.
+
+SELF-CHECK, BEFORE YOU FINISH
+
+  1. Every signal and every source in every candidate appears in this record's evidence
+     table. Nothing was imported from your own knowledge of security products.
+  2. Every candidate has exactly one trigger, and every step number listed is a step whose
+     row that candidate actually reads.
+  3. No score of any kind is proposed, and no person, team, owner or approver is named.
+  4. Every candidate that reads a row with nothing producing it says so under
+     "Buildable today".
+  Add one final line reading "Self-check: pass" or naming what you corrected.
+
+PASTE THE SCENARIO RECORD BELOW THIS LINE
+`;
+
+const P_UCRECORD =
+`You are turning ONE chosen use-case candidate into a Liszt use-case record STUB, ready for
+an engineer to finish. You are not finishing it. Several fields can only be filled by
+somebody who knows the organisation, and inventing them is the one way this goes wrong.
+
+PASTE TWO THINGS BELOW THE LINE AT THE FOOT OF THIS PROMPT: the scenario record, and the
+one candidate you picked from the use-case list.
+
+Output YAML and nothing else. No prose, no code fence, no commentary.
+
+WHAT YOU FILL, AND WHAT YOU MUST LEAVE FOR THE ENGINEER
+
+  You fill these, because they are derivable from the scenario record:
+    title, covers, trigger, composes, limits
+  You leave these as a TODO line, because they are decisions about an organisation you
+  cannot see:
+    id, pipeline.owner, pipeline.destination, outcome.consumer, provenance.authored_by
+  Every field you leave MUST literally begin with "TODO:". That word is what the validator
+  flags, so a stub that reaches the catalog half-finished announces itself. Never write
+  PLACEHOLDER: the validator does not catch it and the record would pass while unfinished.
+
+THE STUB
+
+id: UC-000                        # TODO: assign the next free UC number, three digits
+title: <name the DECISION this makes, not the tool. 8 to 90 characters>
+status: proposed
+
+covers:
+  - scenario: "NNN"               # quoted, three digits, zero padded
+    steps: [ ]                    # only steps whose evidence rows this use case reads
+
+trigger:
+  signal: <the one signal that starts this, quoted from the row. 8 to 80 characters>
+  source: <that row's exact named source. 5 to 160 characters>
+
+composes:
+  - signal: <another row's signal>
+    source: <that row's exact source>
+    role: <enrichment | corroboration | scoping>
+
+pipeline:
+  strategy: <collect-centrally | instrument-at-source | evaluate-at-platform>
+  destination: TODO: where the evidence has to land for this decision to be made
+  owner: TODO: the role or team that builds and runs this, never a person
+
+outcome:
+  kind: <alert | report | trend | dashboard | enrichment | response>
+  autonomy: notify
+  consumer: TODO: the role or team that receives this, never a person
+  action: <what the consumer actually does when it arrives. At least 20 characters>
+
+limits: <what this use case cannot tell you, stated plainly. At least 30 characters>
+
+provenance:
+  authored_by: TODO: your name
+
+RULES
+
+  - EVERY signal and source must be quoted from an evidence row in the scenario record. Do
+    not invent one, and do not name a security product the record does not name.
+  - steps must be the attack path steps whose rows this use case actually reads, matched row
+    by row, each between 1 and 6. Not the whole chain because the use case is about the
+    scenario.
+  - ONE trigger. It is a single object, never a list. If the candidate really has two
+    independent starting signals, it is two use cases and you should stub the stronger one
+    and say nothing about the other.
+  - composes may be an empty list, written as [], and that is a real answer meaning the
+    composition question was asked and this is honestly a single signal. It is not the same
+    as leaving it out, and the key must always be present.
+  - role is exactly one of enrichment, corroboration, scoping.
+  - autonomy is ALWAYS notify in a stub. Raising it to assisted or autonomous requires a
+    promotion block carrying a measured true positive rate, a window, a volume, a blast
+    radius, a named approver, a review loop and an off switch. None of that exists yet, and
+    a promotion block on a notify record passes the validator silently, which is exactly the
+    kind of thing that gets found out later. So DO NOT emit a promotion block at all.
+  - Do not add a slug field. The record has no such field and the schema rejects unknown
+    keys, even though the file on disk is named UC-NNN-slug.yaml.
+  - Do not include any coverage, visibility or detection score anywhere.
+  - limits is required and it is not a formality. Name the blind spot this specific
+    composition has: a step it does not read, an actor it cannot distinguish, a case where it
+    would stay silent.
+
+BEFORE YOU EMIT, CHECK
+
+  1. Every signal and source appears in the pasted scenario record.
+  2. Every field in the leave-for-the-engineer list begins with "TODO:", and the word
+     PLACEHOLDER appears nowhere.
+  3. trigger is one object, composes is a list with a role on every entry, autonomy is
+     notify, and there is no promotion block.
+  4. The YAML parses, and no key outside the shape above is present.
+
+PASTE THE SCENARIO RECORD AND YOUR CHOSEN CANDIDATE BELOW THIS LINE
+`;
+
 /* The research prompt library. Each entry is one way of SOURCING a scenario; every one of
    them feeds the same single conversion prompt, P_CONVERT, which is what turns a finding
    into scenario JSON. Prompts added in the browser live in session.userPrompts and are
@@ -2114,6 +2324,79 @@ function renderIntake() {
    is the one where it is not. Nothing here executes anything: the browser carries the
    judgment, the repo and the CLI carry the sealing and the scoring. */
 let testStep = "readiness";
+let pickedScenario = null;
+
+/* One picker, two sorts. What makes a scenario ready to TEST is the emitter's mechanical
+   gate, which is a real measurement. There is no equivalent gate for designing a use case,
+   and the obvious stand-in, how big the coverage gap looks, is built on sand: a row with no
+   DeTT&CT scores behind it carries a coverage tag that the validator itself calls an opinion,
+   and almost every row in a young library is in that state. So the use case sort orders by
+   what can be known without scores, which is whether anything covers the scenario yet, how
+   urgent it is, and how good the evidence for it is. */
+const PRIORITY_RANK = { "NOW": 0, "NEAR-TERM": 1, "BACKLOG": 2 };
+const EVIDENCE_RANK = { "seen-in-the-wild": 0, "seen-in-research": 1, "doomsday": 2 };
+
+function pickerRows(mode) {
+  const all = DATA.scenarios.slice();
+  if (mode === "testing") {
+    return all.sort((a, b) => (testable(b) - testable(a))
+      || String(a.id).localeCompare(String(b.id)));
+  }
+  return all.sort((a, b) =>
+       ((a.use_case_ids || []).length > 0) - ((b.use_case_ids || []).length > 0)
+    || (PRIORITY_RANK[(a.classification || {}).priority] ?? 3)
+     - (PRIORITY_RANK[(b.classification || {}).priority] ?? 3)
+    || (EVIDENCE_RANK[(a.classification || {}).evidence] ?? 3)
+     - (EVIDENCE_RANK[(b.classification || {}).evidence] ?? 3)
+    || String(a.id).localeCompare(String(b.id)));
+}
+
+function scenarioPicker(mode) {
+  const rows = pickerRows(mode).map(s => {
+    const ucs = (s.use_case_ids || []).length;
+    const tag = mode === "testing"
+      ? (testable(s) ? `<span class="chip have">would emit</span>`
+                     : `<span class="chip blind">blocked</span>`)
+      : (ucs ? `<span class="chip have">${ucs} use case${ucs > 1 ? "s" : ""}</span>`
+             : `<span class="chip blind">none yet</span>`);
+    const meta = mode === "testing"
+      ? esc(s.status)
+      : `${esc((s.classification || {}).priority || "")} &middot; ${esc((s.classification || {}).evidence || "")}`;
+    return `<button class="prow${pickedScenario === s.id ? " on" : ""}" data-pick="${esc(s.id)}">
+      <span class="pid">${esc(s.id)}</span>
+      <span class="ptitle">${esc(s.title)}</span>
+      <span class="pmeta">${meta}</span>
+      <span class="ptag">${tag}</span></button>`;
+  }).join("");
+  const why = mode === "testing"
+    ? "Ready first. Ready means the emitter's mechanical gate passes, which is a measurement, not an opinion."
+    : "Uncovered first, then by priority and evidence. Designing a use case does not need scores, so every record here is workable today.";
+  return `<div class="sub" style="margin:2px 0 8px">${why}</div>
+    <div class="picker">${rows}</div>`;
+}
+
+function pickedRecord() {
+  return DATA.scenarios.find(s => s.id === pickedScenario) || null;
+}
+
+/* The record has to reach the prompt somehow, and the honest route is the clipboard: the
+   page never had the YAML, only the projection of it, so it hands over what it does have
+   and says so. */
+function pickedBlock() {
+  const s = pickedRecord();
+  if (!s) return `<div class="note">Choose a scenario above to see what to paste under the prompt.</div>`;
+  const unscored = (s.counts || {}).Unscored || 0;
+  return `<div class="tsum"><strong>${esc(s.id)} ${esc(s.title)}</strong><br>
+    ${esc((s.classification || {}).priority || "")} &middot;
+    ${esc((s.classification || {}).evidence || "")} &middot;
+    ${esc(s.status)} &middot; ${(s.attack_path || []).length} steps &middot;
+    ${(s.telemetry || []).length} evidence rows
+    ${unscored ? ` &middot; <strong>${unscored} unscored</strong>` : ""}
+    ${(s.use_case_ids || []).length ? ` &middot; covered by ${s.use_case_ids.map(esc).join(", ")}` : ""}
+    <br><button class="copybtn" data-copyrec="${esc(s.id)}">Copy the record</button>
+    <span class="hint">Paste it under the prompt. This is the record as the page holds it;
+      the file in scenarios/ is the authority.</span></div>`;
+}
 
 /* The mechanical gate, computed at build time by importing the emitter's own readiness()
    so the page and the emitter cannot drift. A record with no blockers is one the emitter
@@ -2141,6 +2424,15 @@ function readinessPane() {
     <div class="tsum"><strong>${ready.length} of ${all.length}</strong> scenarios would emit
       a spec today. ${ready.length ? "Ready: " + ready.map(s => esc(s.id)).join(", ") + "." : ""}</div>
     <div class="tlist">${rows}</div>
+    <div class="note"><strong>Completing a blocked scenario.</strong> Almost every blocker
+      above is one of two things, and both are ordinary work rather than a defect. A record
+      still in draft has not been stood behind by anyone yet. A row with no DeTT&amp;CT
+      visibility and detection scores carries a coverage tag the validator calls an opinion,
+      so it predicts nothing and cannot be tested. To clear both: start session mode, open
+      the scenario, score its rows on the two questions Liszt asks, export the session file,
+      and apply it with <code>./liszt session</code>. Once the scores are in and the record
+      is published, it appears here as ready and the other panes work on it. Designing use
+      cases does not wait for any of that.</div>
     <div class="sub" style="margin:14px 0 4px">The judgment half is a person's call and does
       not come from the record. Run this against a scenario that clears the gate above.</div>
     ${promptBox("Readiness, the judgment half",
@@ -2154,11 +2446,13 @@ function designPane() {
       broken into test units, whether the full path is worth running as one exercise, what
       the environment has to be for the answer to mean anything, and what a run would not
       settle. It plans the work you cannot run today as well, and labels it.</div>
+    ${scenarioPicker("testing")}
+    ${pickedBlock()}
     <ol class="jsteps">
       <li>Copy the prompt and paste the scenario record underneath it.</li>
       <li>Run it in any LLM. It returns a plan in prose, then a small JSON block.</li>
       <li>Read the plan. The JSON carries the pipeline mode, the units, the steps to exclude and what is blocked.</li>
-      <li>Take those decisions to the emitter in step 3.</li></ol>
+      <li>Take those decisions to the emitter in step 4.</li></ol>
     ${promptBox("Design a test plan",
       "Recommends unit-level and full-attack-path testing, the environment each needs, and what is blocked today.",
       P_TESTPLAN, "testplan")}
@@ -2169,6 +2463,34 @@ function designPane() {
       approval path is not yet defined. There is also no runner: the spec binds to an
       emulation library through an adapter that has not been written. So a plan is a
       reviewable design and a build target, not a schedule.</div>`;
+}
+
+function usecasePane() {
+  return `<div class="sub" style="margin-bottom:6px">A scenario record says what evidence
+      should exist. A use case says what gets DONE with it: which signal starts a decision,
+      what else is pulled in behind it, and who acts. Coverage says we can see it; a use case
+      says we do something intelligent with it. This does not need scores, so every record in
+      the library is workable here today.</div>
+    ${scenarioPicker("usecase")}
+    ${pickedBlock()}
+    <ol class="jsteps">
+      <li>Copy the first prompt, paste the record underneath it, and run it. It returns four to ten candidates.</li>
+      <li>Pick the one worth building. The candidates are written to be compared, not filed.</li>
+      <li>Copy the second prompt, paste the record and your chosen candidate, and run it. It returns a record stub.</li>
+      <li>Save the stub as use-cases/UC-NNN-your-slug.yaml, fill in every TODO, then run ./liszt validate.</li></ol>
+    ${promptBox("Propose use cases",
+      "Returns four to ten candidate compositions for one scenario, each with what it reads and what it cannot tell you.",
+      P_USECASES, "usecases")}
+    ${promptBox("Draft the use case record",
+      "Turns one chosen candidate into a record stub, with every field it cannot know left as a TODO.",
+      P_UCRECORD, "ucrecord")}
+    <div class="note"><strong>The stub is deliberately unfinished.</strong> The id, the
+      owner, the destination, the consumer and the author are decisions about your
+      organisation, so the prompt leaves each one as a TODO rather than inventing something
+      plausible. The validator flags TODO, which is why the stub uses that word and not
+      PLACEHOLDER: a record full of PLACEHOLDER passes validation while still being a draft.
+      Autonomy is always <code>notify</code> in a stub, because anything higher needs a
+      promotion block with a measured true positive rate and a named approver behind it.</div>`;
 }
 
 function rescorePane() {
@@ -2214,15 +2536,18 @@ function rescorePane() {
 function renderTesting() {
   const rail = `<div class="irail">${[
       ["readiness", "1 &middot; Readiness"],
-      ["design",    "2 &middot; Test design"],
-      ["rescore",   "3 &middot; Run and rescore"]]
+      ["design",    "2 &middot; Design tests"],
+      ["usecase",   "3 &middot; Design use cases"],
+      ["rescore",   "4 &middot; Run and rescore"]]
     .map(([k, t]) => `<button class="ibtn" data-tstep="${k}"
       aria-current="${testStep === k}">${t}</button>`).join("")}</div>`;
   const body = testStep === "readiness" ? readinessPane()
-             : testStep === "design" ? designPane() : rescorePane();
-  $("#testing").innerHTML = `<div class="panel"><h3>Scenario testing</h3>
-    <div class="sub">A scenario record claims what a defender would see. Testing checks
-      whether that claim is true, and the useful answer is the one where it is not.</div>
+             : testStep === "design" ? designPane()
+             : testStep === "usecase" ? usecasePane() : rescorePane();
+  $("#testing").innerHTML = `<div class="panel"><h3>Scenario management</h3>
+    <div class="sub">What a scenario is for once it is in the library. Testing checks whether
+      its evidence claims are true, and the useful answer is the one where they are not. Use
+      cases turn those claims into something the organisation acts on.</div>
     <div style="margin-top:14px">${rail}${body}</div></div>`;
   wireTesting();
 }
@@ -2231,7 +2556,22 @@ function wireTesting() {
   $$("#testing .ibtn[data-tstep]").forEach(b => b.onclick = () => {
     testStep = b.dataset.tstep; renderTesting();
   });
-  const bodies = { readiness: P_READINESS, testplan: P_TESTPLAN };
+  $$("#testing .prow[data-pick]").forEach(b => b.onclick = () => {
+    pickedScenario = pickedScenario === b.dataset.pick ? null : b.dataset.pick;
+    renderTesting();
+  });
+  $$("#testing .copybtn[data-copyrec]").forEach(b => b.onclick = () => {
+    const s = pickedRecord();
+    if (!s) return;
+    const text = JSON.stringify(s, null, 2);
+    const done = () => { const t = b.textContent; b.textContent = "Copied";
+                         setTimeout(() => b.textContent = t, 1200); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => { b.textContent = "Press Cmd-C"; });
+    } else { b.textContent = "Press Cmd-C"; }
+  });
+  const bodies = { readiness: P_READINESS, testplan: P_TESTPLAN,
+                   usecases: P_USECASES, ucrecord: P_UCRECORD };
   $$("#testing .copybtn[data-read]").forEach(b => b.onclick = () => {
     openPrompts[b.dataset.read] = !openPrompts[b.dataset.read]; renderTesting();
   });
@@ -2934,7 +3274,7 @@ def page(data: dict) -> str:
     <button data-view="frameworks" aria-current="false">Frameworks</button>
     <button data-view="reports" aria-current="false">Reports</button>
     <button data-view="intake" aria-current="false">Bring in a scenario</button>
-    <button data-view="testing" aria-current="false">Scenario testing</button>
+    <button data-view="testing" aria-current="false">Scenario management</button>
     {parked_nav}
     <button data-view="session" aria-current="false" id="sessionnav" hidden>Session</button>
     <button style="margin-left:auto;color:var(--brand)" id="sessiontoggle">Start session mode</button>
