@@ -1,0 +1,137 @@
+# UC-003 · Outbound transfer attributed to an encoded model output
+#
+# Companion to scenario 001, and the deliberate counterpart to UC-001. UC-001
+# works the middle of that chain: the run that retrieved poisoned content, the
+# guardrail decision, and the sensitive data the model touched (steps 2, 3, 4).
+# This record picks the chain up at the end, where the data actually leaves the
+# building: the model writes it into an output (step 5) and a render or a click
+# carries it out (step 6).
+#
+# The two records are kept apart on purpose. They start from different signals,
+# they fire at different moments, and they can each fire while the other stays
+# silent. Merging them would hide which half of the chain we actually saw.
+
+id: UC-003
+title: Outbound transfer attributed to an encoded model output
+status: built
+
+covers:
+  - scenario: "001"               # Indirect prompt injection to data exfiltration.
+    steps: [5, 6]                 # 5: the model output row, read as the corroborating
+                                  #    evidence that the data was encoded before it left.
+                                  # 6: the outbound row, read as the trigger and again
+                                  #    for reach. Steps 1 through 4 belong to UC-001 and
+                                  #    to the ingestion question; this record does not
+                                  #    read their rows.
+
+trigger:
+  signal: Outbound to attacker infrastructure
+  source: Secure web gateway proxy transaction log, index=proxy_txn
+  # The strongest single row in the late chain, and the only one that says
+  # something already left. It leads, and everything else is pulled behind it.
+
+composes:
+  - signal: Model output encoding data into a link or a markdown image
+    source: AI gateway completion log, index=aigw_output
+    role: corroboration
+    # The independent second signal, and the one that decides the verdict.
+    # Without it this is a client reaching an unfamiliar domain, which happens
+    # all day. With it, the same bytes can be shown leaving in an answer the
+    # model wrote. If this evidence is absent, the verdict changes, so it is
+    # not enrichment.
+  - signal: Outbound to the same attacker infrastructure from other clients
+    source: Secure web gateway proxy transaction log, index=proxy_txn
+    role: scoping
+    # The same log asked a different question: who else reached this
+    # destination, and over what period. Sizes the event before anyone starts
+    # counting records. It confirms nothing on its own.
+
+pipeline:
+  strategy: collect-centrally
+  # The proxy transactions already land in the central platform. The AI gateway
+  # completion log is emitted by the AI platform and is not joined to network
+  # data today, so the work is hauling it back and correlating on the
+  # destination and the timestamp, not tooling either platform to emit
+  # something new.
+  destination: central analytics platform, egress correlation index
+  owner: detection engineering
+
+outcome:
+  kind: alert
+  autonomy: notify
+  consumer: security operations and incident response
+  action: >-
+    The operator receives one case holding the outbound transaction, the model
+    output recorded within the correlation window that carries the same
+    destination, and the list of other clients that reached it. First move is to
+    decide whether data left: if the output is present and encodes customer or
+    internal data, the operator blocks the destination at the gateway, hands the
+    matched output to the AI platform on call, and opens an exfiltration
+    incident rather than a browsing alert.
+
+# promotion: absent, and it must stay absent while autonomy is notify. This use
+# case runs in production and still tells an operator rather than acting, so
+# there is nothing to authorize. The true positive rate and the response
+# consistency that a promotion would rest on are being collected now, at this
+# level, and have not been measured yet.
+
+limits: >-
+  This use case begins at the proxy. An outbound transfer that never crosses the
+  secure web gateway, one aimed at a destination the gateway already trusts, or
+  one carried inside a sanctioned service, produces no trigger at all, and the
+  model output is only ever pulled, never watched on its own. It reads nothing
+  from the first four steps of the chain, so it cannot say what planted the
+  instruction, which document carried it, or whether a guardrail saw it, and it
+  cannot separate a model that encoded data because it was told to from a user
+  who pasted the same link by hand. When the completion log is missing for the
+  window, it still fires, but it reports an egress event with no attribution to
+  the model, which is a weaker case than it looks.
+
+rationale: >-
+  This is the moment the loss becomes real. Everything earlier in the chain is
+  an attacker getting into position; here the data is on the wire. Today the two
+  halves of that moment are recorded by two teams who do not read each other's
+  logs. The network side sees a request to an unfamiliar address and treats it
+  as ordinary browsing. The AI platform side records an answer with an odd
+  looking link in it and has no reason to think anything of it. Neither half is
+  alarming alone, which is exactly why this attack has run to completion at real
+  companies. Joining them turns two ignorable events into one that names what
+  left, in whose answer, and to where, while the destination can still be
+  blocked and the exposure can still be counted.
+
+phase:
+  value: in-production
+  since: "2026-06-24"
+
+operates: security operations, detection watch on call
+
+backlog_ref: AIDET-241
+
+sources:
+  - tier: "1"
+    url: https://genai.owasp.org/llm-top-10/
+    title: OWASP Top 10 for LLM Applications 2025
+    note: >-
+      Framework reference for the injection and output handling entries this
+      chain maps to. Contributes the shape of the argument, not any incident
+      data.
+  - tier: "1"
+    url: https://atlas.mitre.org/
+    title: MITRE ATLAS
+    note: >-
+      Supplies the technique vocabulary the covered steps are mapped with on
+      scenario 001, so the two records can be read against each other.
+
+notes: >-
+  Step choice was the judgment call, as it was on UC-001. Steps 5 and 6 are the
+  only rows in scenario 001 whose signals this record actually reads. Step 4 was
+  considered and left out: the data access verdict would make a fine third leg,
+  but UC-001 already reads that row, and listing it here would count the same
+  evidence twice in any roll up. If the two records are ever merged, step 4
+  comes back.
+
+provenance:
+  authored_by: Prototype walkthrough
+  created: "2026-08-11"
+  last_updated: "2026-08-11"
+  illustrative: true

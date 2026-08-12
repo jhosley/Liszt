@@ -546,6 +546,28 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
 .uc .limits{background:var(--surface-2);border-left:3px solid var(--collectable);
             border-radius:0 6px 6px 0;padding:10px 14px;color:var(--ink-2);font-size:13px;
             margin-top:12px}
+
+.uc .why{background:var(--surface-2);border-left:3px solid var(--brand);border-radius:0 6px 6px 0;
+         padding:9px 13px;margin:8px 0 4px;font-size:13px;line-height:1.55;color:var(--ink-2)}
+.uc .k2{display:inline-block;min-width:112px;color:var(--muted);font-size:11px;
+        text-transform:uppercase;letter-spacing:.04em}
+.fwline{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.fwline .tag{margin-right:3px}
+.fwline .thin{color:var(--muted);font-size:12px;line-height:1.5;margin-top:4px}
+.uc .tier{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.04em;
+          color:var(--muted);border:1px solid var(--surface-3);border-radius:3px;padding:0 4px;margin-right:5px}
+.chip.ph{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--surface-3)}
+.ucedit{margin-top:14px;padding-top:12px;border-top:1px solid var(--surface-3)}
+.ucedit .hint{text-transform:none;letter-spacing:0;font-weight:400}
+.efields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px;margin:9px 0}
+.efields label,label.wide{display:block;font-size:11px;text-transform:uppercase;
+        letter-spacing:.04em;color:var(--muted)}
+label.wide{margin-top:9px}
+.efields input,.efields select,label.wide input,label.wide textarea{width:100%;margin-top:3px;
+        padding:5px 7px;border:1px solid var(--surface-3);border-radius:5px;background:var(--surface);
+        color:var(--ink);font:inherit;font-size:12.5px;text-transform:none;letter-spacing:0}
+.lhead{display:flex;justify-content:space-between;align-items:center;padding:0 2px 8px;
+       font-size:12.5px;color:var(--ink-2)}
 .uc .limits .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;
                color:var(--muted);font-weight:700;display:block;margin-bottom:4px}
 
@@ -594,7 +616,7 @@ const state = { view: "scenarios", sel: null, q: "", priority: "", evidence: "",
    Export produces a session file; tools/apply_session.py writes it into the YAML
    with the validator in the loop. The page itself is never a system of record. */
 const SKEY = "liszt.session.v1";
-const session = { active: false, facilitator: "", recorded: "", changes: {}, newScenarios: [], importedScenarios: [], userPrompts: [] };
+const session = { active: false, facilitator: "", recorded: "", changes: {}, newScenarios: [], importedScenarios: [], userPrompts: [], ucEdits: {}, newUseCases: [] };
 
 /* A scenario the room says is missing. Captured as a few plain answers, never as a
    record: tools/apply_session.py turns each one into a draft record with the next free
@@ -625,6 +647,8 @@ function loadSession() {
   if (!Array.isArray(session.newScenarios)) session.newScenarios = [];
   if (!Array.isArray(session.importedScenarios)) session.importedScenarios = [];
   if (!Array.isArray(session.userPrompts)) session.userPrompts = [];
+  if (!session.ucEdits || typeof session.ucEdits !== "object") session.ucEdits = {};
+  if (!Array.isArray(session.newUseCases)) session.newUseCases = [];
   mergeImported();
 }
 /* Imported scenarios live in the session only. Lay them over the built-in library so
@@ -2324,6 +2348,7 @@ function renderIntake() {
    is the one where it is not. Nothing here executes anything: the browser carries the
    judgment, the repo and the CLI carry the sealing and the scoring. */
 let testStep = "readiness";
+let ucSel = null;
 let pickedScenario = null;
 
 /* One picker, two sorts. What makes a scenario ready to TEST is the emitter's mechanical
@@ -2715,7 +2740,9 @@ function renderSession() {
         title: p.title, mode: p.mode, layer: p.layer,
         priority: p.priority, one_liner: p.one_liner || "" })),
       imported_scenarios: session.importedScenarios || [],
-      user_prompts: session.userPrompts || []
+      user_prompts: session.userPrompts || [],
+      use_case_edits: session.ucEdits || {},
+      new_use_cases: session.newUseCases || []
       }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -2831,59 +2858,350 @@ function renderCoverage() {
 }
 
 /* ---------- use cases view ---------- */
-function renderUseCases() {
-  const ucs = DATA.use_cases || [];
+function renderUseCases() { renderUCList(); renderUCDetail(); }
+
+/* Every use case in the session's view of the world: the built-in records with any
+   session edits laid over them, plus the ones proposed in the browser this session. */
+function allUseCases() {
+  const built = (DATA.use_cases || []).map(u => {
+    const e = (session.ucEdits || {})[u.id];
+    return e ? Object.assign({}, u, e, { _edited: true }) : u;
+  });
+  return built.concat((session.newUseCases || []).map(u => Object.assign({}, u, { _new: true })));
+}
+
+/* Why this use case exists, in framework terms, without storing anything twice. A use
+   case names the scenario steps it reads; each of those steps may carry its own ATT&CK and
+   ATLAS identifiers, and the scenario carries the OWASP mapping for the record as a whole.
+   Walking covers[] into the scenarios is therefore the whole derivation, and it is narrower
+   and more honest than copying the scenario's roll-up: it names only the techniques whose
+   evidence rows this use case actually consumes. */
+function deriveFrameworks(u) {
+  const out = { attack: new Set(), atlas: new Set(), owasp_llm: new Set(),
+                owasp_agentic: new Set(), scenarios: [], thin: [] };
+  (u.covers || []).forEach(c => {
+    const sc = DATA.scenarios.find(x => x.id === String(c.scenario));
+    if (!sc) return;
+    out.scenarios.push(sc);
+    const fm = sc.framework_mapping || {};
+    (fm.owasp_llm || []).forEach(i => out.owasp_llm.add(i));
+    (fm.owasp_agentic || []).forEach(i => out.owasp_agentic.add(i));
+    let any = false;
+    (sc.attack_path || []).forEach(st => {
+      if (!(c.steps || []).includes(st.step)) return;
+      (st.attack || []).forEach(i => { out.attack.add(i); any = true; });
+      (st.atlas || []).forEach(i => { out.atlas.add(i); any = true; });
+    });
+    if (!any) out.thin.push(sc.id);
+  });
+  ["attack", "atlas", "owasp_llm", "owasp_agentic"].forEach(k => { out[k] = [...out[k]].sort(); });
+  return out;
+}
+
+const UC_PHASES = ["in-scoping", "pending-development", "in-development",
+                   "in-testing", "in-production", "on-hold"];
+const UC_STATUS = ["proposed", "built", "tuned", "retired"];
+const UC_KINDS = ["alert", "report", "trend", "dashboard", "monitoring", "enrichment", "response"];
+
+function renderUCList() {
+  const ucs = allUseCases();
+  const el = $("#uclist");
+  if (!el) return;
+  el.innerHTML = `<div class="lhead"><strong>${ucs.length}</strong> use case${ucs.length === 1 ? "" : "s"}
+      <button class="toggle" id="uc-add">Add a use case</button></div>` +
+    (ucs.length ? ucs.map(u => {
+      const ph = (u.phase || {}).value;
+      const cov = (u.covers || []).map(c => String(c.scenario)).join(", ");
+      return `<button class="card" data-uc="${esc(u.id)}" aria-selected="${ucSel === u.id}">
+        <div class="chips"><span class="chip ${esc(u.status)}">${esc(u.status)}</span>
+          ${ph ? `<span class="chip ph">${esc(ph)}</span>` : ""}
+          ${(u.outcome || {}).kind ? `<span class="tag">${esc(u.outcome.kind)}</span>` : ""}
+          ${u._new ? '<span class="chip prop">this session</span>' : ""}
+          ${u._edited ? '<span class="chip prop">edited</span>' : ""}</div>
+        <div class="t"><span class="id">${esc(u.id)}</span> ${esc(u.title)}</div>
+        <div class="meta">serves scenario${(u.covers || []).length === 1 ? "" : "s"} ${esc(cov)}</div>
+      </button>`;
+    }).join("")
+      : `<div class="empty">No use case records yet.</div>`);
+  $$("#uclist .card[data-uc]").forEach(b => b.onclick = () => selectUC(b.dataset.uc));
+  const add = $("#uc-add");
+  if (add) add.onclick = () => { ucSel = "__new__"; renderUCList(); renderUCDetail(); };
+}
+
+function ucRow(k, body) { return `<div class="ucrow"><div class="k">${k}</div><div>${body}</div></div>`; }
+
+function renderUCDetail() {
+  const el = $("#ucdetail");
+  if (!el) return;
+  if (ucSel === "__new__") { el.innerHTML = ucNewForm(); wireUCNew(); return; }
+  const u = allUseCases().find(x => x.id === ucSel);
+  if (!u) { el.innerHTML = '<div class="empty">Select a use case.</div>'; return; }
+
+  const fw = deriveFrameworks(u);
+  const chip = (arr, cls) => arr.map(i => `<span class="tag ${cls || ""}">${esc(i)}</span>`).join(" ");
   const scLink = (sid, steps) => {
     const sc = DATA.scenarios.find(x => x.id === sid);
     const label = `${esc(sid)}${sc ? " " + esc(sc.title) : ""} &middot; step${steps.length === 1 ? "" : "s"} ${steps.join(", ")}`;
     return sc ? `<a href="#/scenario/${esc(sid)}">${label}</a>`
               : `<span style="color:var(--muted)">${label} (not in this view)</span>`;
   };
-  $("#usecases").innerHTML = `
-    <div class="panel"><h3>Operational use cases</h3>
-      <div class="sub">A scenario says what evidence should exist. A use case says what gets
-        done with it: what triggers it, what other evidence it composes and in what role, how
-        the evidence is delivered, what it produces, who receives that, and what it is allowed
-        to do on its own. Coverage says we can see it; a use case says we do something with it.
-        Records live in <code>use-cases/</code>; this page is a build artifact.</div></div>` +
-    (ucs.length ? ucs.map(u => `
-    <div class="uc" id="uc-${esc(u.id)}">
+  const ph = u.phase || {};
+  const illustrative = (u.provenance || {}).illustrative;
+
+  el.innerHTML = `
+    <div class="uc sel">
       <div class="hdr"><span class="id">${esc(u.id)}</span>
         <span class="chip ${esc(u.status)}">${esc(u.status)}</span>
+        ${ph.value ? `<span class="chip ph">${esc(ph.value)}</span>` : ""}
         <span class="chip ${esc((u.outcome || {}).autonomy || "")}"
-          title="who acts: notify, an operator; assisted, automation prepares and an operator acts; autonomous, a bounded action runs first and is reviewed after">${esc((u.outcome || {}).autonomy || "")}</span></div>
+          title="who acts: notify, an operator; assisted, automation prepares and an operator acts; autonomous, a bounded action runs first and is reviewed after">${esc((u.outcome || {}).autonomy || "")}</span>
+        <span style="margin-left:auto"><button class="copybtn" id="uc-yaml">Copy YAML</button></span></div>
       <h4>${esc(u.title)}</h4>
+      ${illustrative ? `<div class="note" style="margin:8px 0">Illustrative record. The
+        content here was written for the prototype walkthrough and has not been assessed.</div>` : ""}
 
-      <div class="ucrow"><div class="k">Covers</div><div>
-        ${(u.covers || []).map(c => `<div>${scLink(String(c.scenario), c.steps || [])}</div>`).join("")}</div></div>
+      ${u.rationale ? `<div class="why">${esc(u.rationale)}</div>` : ""}
 
-      <div class="ucrow"><div class="k">Trigger</div><div>
-        <strong>${esc((u.trigger || {}).signal || "")}</strong>
-        <div class="src">${esc((u.trigger || {}).source || "")}</div></div></div>
+      ${ucRow("Why it exists", `
+        <div style="margin-bottom:6px">Serves ${(u.covers || []).length} scenario${(u.covers || []).length === 1 ? "" : "s"}:</div>
+        ${(u.covers || []).map(c => `<div style="margin-bottom:3px">${scLink(String(c.scenario), c.steps || [])}</div>`).join("")}
+        <div class="fwline">
+          ${fw.attack.length ? `<div><span class="k2">ATT&amp;CK</span> ${chip(fw.attack)}</div>` : ""}
+          ${fw.atlas.length ? `<div><span class="k2">ATLAS</span> ${chip(fw.atlas)}</div>` : ""}
+          ${fw.owasp_llm.length ? `<div><span class="k2">OWASP LLM</span> ${chip(fw.owasp_llm)}</div>` : ""}
+          ${fw.owasp_agentic.length ? `<div><span class="k2">OWASP Agentic</span> ${chip(fw.owasp_agentic)}</div>` : ""}
+          ${(!fw.attack.length && !fw.atlas.length && !fw.owasp_llm.length && !fw.owasp_agentic.length)
+            ? `<div style="color:var(--muted)">No framework identifiers reach this use case yet.</div>` : ""}
+          ${fw.thin.length ? `<div class="thin">Scenario ${fw.thin.map(esc).join(", ")} carries no
+            step-level ATT&amp;CK or ATLAS identifiers, so nothing can be derived from the steps
+            this use case reads. The mapping above comes from the scenario as a whole where it
+            exists at all. Filling in the step-level mapping is what would make this precise.</div>` : ""}
+        </div>`)}
 
-      <div class="ucrow"><div class="k">Composes</div><div>
-        ${(u.composes || []).length ? (u.composes || []).map(cx => `
-          <div style="margin-bottom:6px"><span class="role">${esc(cx.role)}</span>
-            <strong>${esc(cx.signal)}</strong>
+      ${ucRow("Trigger", `<strong>${esc((u.trigger || {}).signal || "")}</strong>
+        <div class="src">${esc((u.trigger || {}).source || "")}</div>`)}
+
+      ${ucRow("Composes", (u.composes || []).length
+        ? (u.composes || []).map(cx => `<div style="margin-bottom:6px">
+            <span class="role">${esc(cx.role)}</span> <strong>${esc(cx.signal)}</strong>
             <div class="src">${esc(cx.source)}</div></div>`).join("")
-          : '<span style="color:var(--muted)">nothing; a single signal use case</span>'}</div></div>
+        : '<span style="color:var(--muted)">nothing; a single signal use case</span>')}
 
-      <div class="ucrow"><div class="k">Pipeline</div><div>
-        <span class="tag">${esc((u.pipeline || {}).strategy || "")}</span>
-        &rarr; ${esc((u.pipeline || {}).destination || "")}
-        <div class="src">owned by ${esc((u.pipeline || {}).owner || "")}</div></div></div>
+      ${ucRow("Delivery", `<span class="tag">${esc((u.pipeline || {}).strategy || "")}</span>
+        &rarr; ${esc((u.pipeline || {}).destination || "")}`)}
 
-      <div class="ucrow"><div class="k">Outcome</div><div>
-        <span class="tag">${esc((u.outcome || {}).kind || "")}</span>
-        to <strong>${esc((u.outcome || {}).consumer || "")}</strong>
-        <div style="margin-top:4px">${esc((u.outcome || {}).action || "")}</div>
-        ${u.promotion ? `<div class="src" style="margin-top:4px">promoted from ${esc(u.promotion.from)},
-          approved by ${esc(u.promotion.approved_by)} on ${esc(u.promotion.approved)}</div>` : ""}</div></div>
+      ${ucRow("Outcome", `<span class="tag">${esc((u.outcome || {}).kind || "")}</span>
+        <div style="margin-top:4px">${esc((u.outcome || {}).action || "")}</div>`)}
+
+      ${ucRow("Who", `
+        <div><span class="k2">Builds and tunes</span> ${esc((u.pipeline || {}).owner || "not named")}</div>
+        <div><span class="k2">Operates</span> ${esc(u.operates || "not named")}</div>
+        <div><span class="k2">Receives</span> ${esc((u.outcome || {}).consumer || "not named")}</div>`)}
+
+      ${(u.sources || []).length ? ucRow("Read more", (u.sources || []).map(sr => `
+        <div style="margin-bottom:5px"><span class="tier">tier ${esc(sr.tier)}</span>
+          <a href="${esc(sr.url)}" target="_blank" rel="noopener">${esc(sr.title || sr.url)}</a>
+          ${sr.note ? `<div class="src">${esc(sr.note)}</div>` : ""}</div>`).join("")) : ""}
+
+      ${ph.since || u.backlog_ref ? ucRow("Delivery state", `
+        ${ph.value ? `<strong>${esc(ph.value)}</strong>` : ""}
+        ${ph.since ? ` since ${esc(ph.since)}` : ""}
+        ${u.backlog_ref ? `<div class="src">tracked as ${esc(u.backlog_ref)}</div>` : ""}`) : ""}
 
       <div class="limits"><span class="k">What it cannot tell you</span>${esc(u.limits || "")}</div>
-    </div>`).join("")
-      : `<div class="panel"><div style="color:var(--muted)">No use case records yet.
-          Copy <code>use-cases/_TEMPLATE.yaml</code> to start one.</div></div>`);
+
+      <div class="ucedit">
+        <div class="k">Engineering fields <span class="hint">held in this session only; use Copy
+          YAML to take them back to the record</span></div>
+        <div class="efields">
+          <label>Phase<select data-uce="phase">${UC_PHASES.map(v =>
+            `<option value="${v}" ${ph.value === v ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+          <label>Since<input data-uce="since" type="date" value="${esc(ph.since || "")}"></label>
+          <label>Status<select data-uce="status">${UC_STATUS.map(v =>
+            `<option value="${v}" ${u.status === v ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+          <label>Outcome<select data-uce="kind">${UC_KINDS.map(v =>
+            `<option value="${v}" ${(u.outcome || {}).kind === v ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+          <label>Operated by<input data-uce="operates" value="${esc(u.operates || "")}"></label>
+          <label>Ticket<input data-uce="backlog_ref" value="${esc(u.backlog_ref || "")}"></label>
+        </div>
+        <label class="wide">Why this exists, in plain language
+          <textarea data-uce="rationale" rows="3">${esc(u.rationale || "")}</textarea></label>
+        ${(session.ucEdits || {})[u.id] ? `<button class="toggle" id="uc-revert">Discard my edits to this record</button>` : ""}
+      </div>
+    </div>`;
+  wireUCDetail(u);
+}
+
+function selectUC(id) {
+  ucSel = id;
+  location.hash = `#/usecase/${id}`;
+  renderUCList(); renderUCDetail();
+}
+
+/* Edits are held against the record id and never written through. The viewer has never
+   written to use-cases/ and does not start here: the honest handoff is the YAML. */
+function ucEdit(id, patch) {
+  const cur = (session.ucEdits || {})[id] || {};
+  session.ucEdits[id] = Object.assign({}, cur, patch);
+  session.recorded = session.recorded || new Date().toISOString().slice(0, 10);
+  saveSession();
+}
+
+function wireUCDetail(u) {
+  $$("#ucdetail [data-uce]").forEach(inp => {
+    inp.onchange = () => {
+      const k = inp.dataset.uce, v = inp.value;
+      const base = allUseCases().find(x => x.id === u.id) || {};
+      if (k === "phase" || k === "since") {
+        const ph = Object.assign({}, base.phase || {});
+        if (k === "phase") ph.value = v; else ph.since = v;
+        ucEdit(u.id, { phase: ph });
+      } else if (k === "kind") {
+        ucEdit(u.id, { outcome: Object.assign({}, base.outcome || {}, { kind: v }) });
+      } else {
+        ucEdit(u.id, { [k]: v });
+      }
+      renderUCList(); renderUCDetail();
+    };
+  });
+  const rev = $("#uc-revert");
+  if (rev) rev.onclick = () => { delete session.ucEdits[u.id]; saveSession(); renderUCList(); renderUCDetail(); };
+  const cp = $("#uc-yaml");
+  if (cp) cp.onclick = () => {
+    const text = ucToYaml(allUseCases().find(x => x.id === u.id));
+    const done = () => { cp.textContent = "Copied"; setTimeout(() => cp.textContent = "Copy YAML", 1200); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => { cp.textContent = "Press Cmd-C"; });
+    } else { cp.textContent = "Press Cmd-C"; }
+  };
+}
+
+/* A small YAML writer for one record. Deliberately not a general serializer: it knows the
+   use-case shape, emits the keys in schema order, and quotes only what has to be quoted. */
+function ucToYaml(u) {
+  if (!u) return "";
+  const q = v => {
+    const s = String(v == null ? "" : v);
+    return /^[A-Za-z0-9][A-Za-z0-9 ,.\/&:_()-]*$/.test(s) && !/: |  #/.test(s) ? s : JSON.stringify(s);
+  };
+  const L = [];
+  L.push(`id: ${u.id}`);
+  L.push(`title: ${q(u.title)}`);
+  L.push(`status: ${u.status}`);
+  if (u.phase && u.phase.value) {
+    L.push("phase:"); L.push(`  value: ${u.phase.value}`);
+    if (u.phase.since) L.push(`  since: ${u.phase.since}`);
+  }
+  L.push("covers:");
+  (u.covers || []).forEach(c => {
+    L.push(`  - scenario: "${c.scenario}"`);
+    L.push(`    steps: [${(c.steps || []).join(", ")}]`);
+  });
+  if (u.rationale) L.push(`rationale: >-\n  ${String(u.rationale).replace(/\n+/g, " ").match(/.{1,88}(\s|$)/g).map(x => x.trim()).join("\n  ")}`);
+  L.push("trigger:");
+  L.push(`  signal: ${q((u.trigger || {}).signal)}`);
+  L.push(`  source: ${q((u.trigger || {}).source)}`);
+  L.push("composes:" + ((u.composes || []).length ? "" : " []"));
+  (u.composes || []).forEach(c => {
+    L.push(`  - signal: ${q(c.signal)}`);
+    L.push(`    source: ${q(c.source)}`);
+    L.push(`    role: ${c.role}`);
+  });
+  L.push("pipeline:");
+  L.push(`  strategy: ${(u.pipeline || {}).strategy}`);
+  L.push(`  destination: ${q((u.pipeline || {}).destination)}`);
+  L.push(`  owner: ${q((u.pipeline || {}).owner)}`);
+  L.push("outcome:");
+  L.push(`  kind: ${(u.outcome || {}).kind}`);
+  L.push(`  autonomy: ${(u.outcome || {}).autonomy || "notify"}`);
+  L.push(`  consumer: ${q((u.outcome || {}).consumer)}`);
+  L.push(`  action: ${q((u.outcome || {}).action)}`);
+  if (u.operates) L.push(`operates: ${q(u.operates)}`);
+  if (u.backlog_ref) L.push(`backlog_ref: ${q(u.backlog_ref)}`);
+  if ((u.sources || []).length) {
+    L.push("sources:");
+    (u.sources || []).forEach(s => {
+      L.push(`  - tier: "${s.tier}"`);
+      L.push(`    url: ${s.url}`);
+      if (s.title) L.push(`    title: ${q(s.title)}`);
+      if (s.note) L.push(`    note: ${q(s.note)}`);
+    });
+  }
+  L.push(`limits: ${q(u.limits)}`);
+  if (u.notes) L.push(`notes: ${q(u.notes)}`);
+  L.push("provenance:");
+  const pv = u.provenance || {};
+  L.push(`  authored_by: ${q(pv.authored_by || "")}`);
+  if (pv.created) L.push(`  created: ${pv.created}`);
+  L.push(`  last_updated: ${new Date().toISOString().slice(0, 10)}`);
+  if (pv.illustrative) L.push("  illustrative: true");
+  return L.join("\n") + "\n";
+}
+
+/* Proposing one in the browser. The engineering half only: the composition itself comes
+   from reading the scenario, which is what the two prompts under Scenario management are
+   for. This form captures the decision and hands back YAML. */
+function ucNewForm() {
+  const scOpts = DATA.scenarios.slice().sort((a, b) => String(a.id).localeCompare(String(b.id)))
+    .map(s => `<option value="${esc(s.id)}">${esc(s.id)} ${esc(s.title)}</option>`).join("");
+  return `<div class="uc sel"><div class="hdr"><span class="id">New</span></div>
+    <h4>Propose a use case</h4>
+    <div class="sub" style="margin-bottom:10px">Captured in this session and handed back as YAML.
+      Nothing is written to <code>use-cases/</code> from the browser. For the composition itself,
+      the two prompts under Scenario management read a scenario and propose candidates.</div>
+    <div class="efields">
+      <label class="wide">Title, name the decision not the tool<input id="nu-title"></label>
+      <label>Scenario it serves<select id="nu-scenario">${scOpts}</select></label>
+      <label>Steps it reads, comma separated<input id="nu-steps" placeholder="2, 3, 4"></label>
+      <label>Phase<select id="nu-phase">${UC_PHASES.map(v => `<option>${v}</option>`).join("")}</select></label>
+      <label>Outcome<select id="nu-kind">${UC_KINDS.map(v => `<option>${v}</option>`).join("")}</select></label>
+      <label>Builds and tunes<input id="nu-owner" placeholder="role or team"></label>
+      <label>Operated by<input id="nu-operates" placeholder="role or team"></label>
+      <label>Receives<input id="nu-consumer" placeholder="role or team"></label>
+      <label>Ticket<input id="nu-ticket" placeholder="optional"></label>
+    </div>
+    <label class="wide">Trigger signal<input id="nu-trigger"></label>
+    <label class="wide">Trigger source, the exact named system<input id="nu-source"></label>
+    <label class="wide">Why this exists, in plain language<textarea id="nu-why" rows="3"></textarea></label>
+    <label class="wide">What it cannot tell you<textarea id="nu-limits" rows="2"></textarea></label>
+    <div style="margin-top:10px"><button class="toggle" id="nu-save">Add to this session</button>
+      <button class="toggle" id="nu-cancel">Cancel</button></div>
+    <div class="err" id="nu-err" hidden></div></div>`;
+}
+
+function wireUCNew() {
+  const cancel = $("#nu-cancel");
+  if (cancel) cancel.onclick = () => { ucSel = null; renderUCList(); renderUCDetail(); };
+  const save = $("#nu-save");
+  if (!save) return;
+  save.onclick = () => {
+    const v = id => (($("#" + id) || {}).value || "").trim();
+    const err = $("#nu-err");
+    const steps = v("nu-steps").split(",").map(x => parseInt(x.trim(), 10)).filter(n => n >= 1 && n <= 6);
+    if (!v("nu-title") || !steps.length || !v("nu-trigger") || !v("nu-source")) {
+      err.textContent = "A title, at least one step, and a trigger with its source are the minimum.";
+      err.hidden = false; return;
+    }
+    const used = allUseCases().map(u => parseInt(String(u.id).slice(3), 10)).filter(n => !isNaN(n));
+    const next = "UC-" + String(Math.max(0, ...used) + 1).padStart(3, "0");
+    session.newUseCases.push({
+      id: next, title: v("nu-title"), status: "proposed",
+      phase: { value: v("nu-phase"), since: new Date().toISOString().slice(0, 10) },
+      covers: [{ scenario: v("nu-scenario"), steps: steps }],
+      rationale: v("nu-why"),
+      trigger: { signal: v("nu-trigger"), source: v("nu-source") },
+      composes: [],
+      pipeline: { strategy: "collect-centrally", destination: "to be decided", owner: v("nu-owner") || "not named" },
+      outcome: { kind: v("nu-kind"), autonomy: "notify", consumer: v("nu-consumer") || "not named",
+                 action: "To be written by the engineer who picks this up." },
+      operates: v("nu-operates"), backlog_ref: v("nu-ticket"),
+      limits: v("nu-limits") || "Not yet stated. Every use case has a blind side and this one has not been written down.",
+      provenance: { authored_by: session.facilitator || "this session",
+                    created: new Date().toISOString().slice(0, 10), illustrative: true }
+    });
+    saveSession();
+    selectUC(next);
+  };
 }
 
 /* ---------- frameworks view ---------- */
@@ -3172,11 +3490,10 @@ function route() {
     renderList(); renderDetail();
   }
   const u = (location.hash || "").match(/^#\/usecase\/(UC-\d{3})$/);
-  if (u && (DATA.use_cases || []).some(x => x.id === u[1])) {
+  if (u) {
+    ucSel = u[1];
     if (state.view !== "usecases") setView("usecases");
-    $$("#usecases .uc").forEach(el => el.classList.toggle("sel", el.id === "uc-" + u[1]));
-    const el = document.getElementById("uc-" + u[1]);
-    if (el) el.scrollIntoView({ block: "start" });
+    renderUCList(); renderUCDetail();
   }
 }
 function refresh() {
@@ -3322,7 +3639,7 @@ def page(data: dict) -> str:
     <div class="list" id="list"></div><div class="detail" id="detail"></div>
   </div></section>
   <section id="coverage" hidden></section>
-  <section id="usecases" hidden></section>
+  <section id="usecases" hidden><div class="split"><div class="list" id="uclist"></div><div class="detail" id="ucdetail"></div></div></section>
   <section id="frameworks" hidden></section>
   <section id="reports" hidden></section>
   <section id="intake" hidden></section>

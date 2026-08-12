@@ -1,0 +1,150 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# UC-011 · Confirmed guardrail bypass rate by technique family
+#
+# Companion to scenario 008, jailbreak / guardrail bypass. That scenario has a
+# property that makes ordinary alerting the wrong instrument: the individual
+# event is constant, usually fails, and cannot be triaged one at a time. Someone
+# tries a role-play prompt on a chat surface, the guardrail holds, and nothing
+# happened. Paging an operator on that would bury the queue inside a week, and
+# the operator has no lever to pull anyway. The people who can act on a bypass
+# are the ones who write guardrail policy, and what they need is a measured
+# series, not a firing.
+#
+# So this record is deliberately outcome.kind: trend, with the model safety team
+# as its consumer. The question it answers is the one nobody can answer today:
+# is the share of attempts getting through rising, and which style of prompt is
+# doing it.
+#
+# It rests on the guardrail recording its own decisions, which it does not do
+# today. That is why pipeline.strategy is instrument-at-source and why the phase
+# is in-scoping rather than queued: the platform work has to be agreed first.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+id: UC-011
+title: Confirmed guardrail bypass rate by technique family
+status: proposed
+
+covers:
+  - scenario: '008'               # Jailbreak / guardrail bypass.
+    steps: [1, 2, 3]              # 2: the guardrail decision row, which is the trigger and the
+                                  #    series itself. 1: the prompt content row, read to label
+                                  #    each decision with the technique family behind it.
+                                  #    3: the model output row, read to separate an attempt that
+                                  #    was allowed from a bypass that actually produced banned
+                                  #    content. Step 4, the unlocked action row on tool-call and
+                                  #    identity logs, is NOT read here; see limits. The scenario's
+                                  #    refusal-rate row is a control row, not an attack path step,
+                                  #    so it appears below as composed evidence and never as a
+                                  #    covered step.
+
+trigger:
+  signal: Guardrail decision (allow / block / refusal)
+  source: L2 guardrail and LLM firewall decision log
+  # One trigger: every decision the safety layer makes, allow and block alike.
+  # The blocks matter as much as the allows here, because the measure is a
+  # ratio and a series built only from the failures cannot produce one.
+
+composes:
+  - signal: Prompt content (jailbreak patterns)
+    source: AI gateway guardrail input scan log
+    role: enrichment              # Labels each decision with the technique family that produced
+                                  # it: role-play, obfuscation, many-shot. It changes no verdict,
+                                  # the rate is the rate either way, but without it the series is
+                                  # a number with no handle on it, and the team that has to tune
+                                  # something learns only that things got worse.
+  - signal: Model output (disallowed content)
+    source: AI gateway output stage, output guardrail verdict log
+    role: corroboration           # The difference between an attempt that got past the input
+                                  # check and a bypass that actually produced banned content.
+                                  # Losing this changes what the series counts, which is why it
+                                  # is corroboration and not enrichment.
+  - signal: Refusal-rate / bypass trend
+    source: Guardrail metrics
+    role: corroboration           # The guardrail's own published refusal rate, read as an
+                                  # independent second reading of the same phenomenon. When the
+                                  # series built from decision logs moves and the guardrail's own
+                                  # metrics do not, one of the two is wrong, and finding out which
+                                  # comes before anyone tunes a policy. This row is a control row
+                                  # in the scenario, so it is composed here and stays out of
+                                  # covers.
+
+pipeline:
+  strategy: instrument-at-source  # The whole use case waits on one thing: the guardrail service
+                                  # emitting its own allow and block decisions as data. That is
+                                  # work on the platform that owns the guardrail, not a query
+                                  # somebody writes centrally. Once it emits, the series is built
+                                  # downstream, which is what separates this from evaluating in
+                                  # place.
+  destination: central analytics platform, guardrail decision index
+  owner: detection engineering
+
+outcome:
+  kind: trend
+  autonomy: notify
+  consumer: model safety and guardrail policy team
+  action: >-
+    The team reads one weekly series: decisions made, share allowed, and of those, the share
+    that went on to produce output the output guardrail judged disallowed, broken out by
+    technique family. A family whose confirmed share rises across two consecutive weeks gets
+    a named owner and a specific change, either a tightened input pattern for that family or
+    a revision to the output policy classifier, and the week the change shipped is recorded
+    against the series so the next reading measures it.
+
+# promotion: absent, and it stays absent while autonomy is notify. There is
+# nothing here to authorize yet: a trend that a team reads on a schedule is not
+# an automated action, and the measured evidence a promotion needs can only be
+# collected once this runs.
+
+limits: >-
+  This counts what the guardrail and the output classifier can already recognize, so it
+  measures a floor and not a total. A bypass whose answer the output guardrail also fails to
+  judge disallowed looks like an ordinary allowed conversation and never enters the count,
+  and the quiet, competent attacker who succeeds once and stops will not move a rate at all:
+  a trend is the wrong instrument for a single high-consequence bypass and should not be
+  read as though it were watching for one. It does not read the tool-call and identity row
+  for unlocked actions, so it cannot tell you whether a bypass on an agent surface went on
+  to invoke a restricted capability; that is a separate alert and this record does not stand
+  in for it. It attributes nothing: the series shows technique families, not who is running
+  them, and it cannot separate a red team exercise from a real attempt unless the exercise
+  is tagged at the gateway. Until the guardrail records its own decisions, none of this can
+  be built.
+
+rationale: >-
+  Nobody can currently say how often our safety layer is talked past. The individual
+  jailbreak is not the interesting event, most of them fail and the ones that work are
+  usually embarrassing rather than dangerous, so the instinct to alert on each one produces
+  a queue nobody reads and answers no question. The thing that matters is the shape: whether
+  the share getting through is climbing, and which style of prompt is doing the work.
+  Without that measurement, the guardrail gets tuned by whoever happened to notice a bad
+  answer, and a technique that quietly works for weeks looks exactly like a quiet few weeks.
+  This record exists so the safety team is arguing over a series instead of an anecdote.
+
+phase:
+  value: in-scoping
+  since: '2026-08-04'
+
+operates: AI platform engineering, which runs the guardrail service
+
+backlog_ref: OBS-1102
+
+sources:
+  - tier: "0"
+    url: https://genai.owasp.org/llm-top-10/
+    title: OWASP Top 10 for LLM Applications
+    note: >-
+      The scenario maps to LLM01. Useful here for the framing that a jailbreak is an input
+      handling problem, which is what makes the input scan worth reading alongside the
+      decision rather than instead of it.
+  - tier: "0"
+    url: https://atlas.mitre.org/
+    title: MITRE ATLAS
+    note: >-
+      Where the jailbreak technique and its case studies live. Contributes the argument that
+      these arrive in recognizable families, which is what makes a per-family rate a thing
+      worth measuring rather than one undifferentiated number.
+
+provenance:
+  authored_by: Prototype walkthrough
+  created: '2026-08-11'
+  last_updated: '2026-08-11'
+  illustrative: true

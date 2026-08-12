@@ -1,0 +1,155 @@
+# UC-010 · Model load running code from an unverified artifact
+#
+# Scenario 002 says a model file is not just data: loading one can run code. The
+# endpoint tooling already catches the code running, which is why that scenario
+# reads as mostly covered. What it does not do is tell the operator that the
+# process it just flagged was a model load, where that file came from, whether it
+# passed verification at import, or which other pipelines pulled the same file.
+# Those four facts are the difference between a host incident and a supply chain
+# incident, and they are all recorded in different places today.
+#
+# One caveat carried on the face of this record. Scenario 002 was imported from a
+# deck and its telemetry rows name a CATEGORY of system, not a system. So every
+# source below is derived from the row's emitted_at field and not from a named
+# log, index or endpoint. That is enough to scope the work and not enough to wire
+# it up, which is why this record is in-scoping and not queued for development.
+
+id: UC-010
+title: Model load running code from an unverified artifact
+status: proposed
+
+covers:
+  - scenario: '002'               # Model supply-chain compromise.
+    steps: [1, 2, 3, 4]           # 3: the model load that runs code, which is the trigger.
+                                  # 2: the import record, read as enrichment. 1: publisher and
+                                  # artifact reputation, read as corroboration. 4: the
+                                  # post-exploitation row, read for scope.
+                                  # Step 5, backdoor behavior at inference, is not read here:
+                                  # a backdoor that only fires on a trigger input never touches
+                                  # any row this use case consumes. The signature verification
+                                  # row is composed below but is a control, not an attack path
+                                  # step, so its number is deliberately absent from this list.
+
+trigger:
+  signal: Model load to code execution
+  source: endpoint and container runtime telemetry, category only, no system named in scenario 002
+  # Derived from the row's emitted_at, 'EDR / endpoint · container runtime'. The
+  # row has no source field. Resolving this to a named index is the first task
+  # in scoping, because a trigger nobody can point at cannot be built.
+
+composes:
+  - signal: Model artifact downloaded or imported
+    source: network and proxy logs, endpoint file write, registry import log, category only, no system named
+    role: enrichment
+    # Where the file came from and who pulled it. The operator fetches this by
+    # hand today, from a team that may be asleep. It does not change the verdict,
+    # it changes how long the verdict takes.
+  - signal: Model signature or hash verification
+    source: model registry and AI gateway verification records, category only, no system named
+    role: corroboration
+    # The control row of scenario 002. An unsigned artifact or a hash mismatch at
+    # import turns a suspicious process into a supply chain event; a clean
+    # verification argues for a false positive, which is why this is not
+    # enrichment. Its row number stays out of covers because it is a control.
+  - signal: Malicious artifact published externally
+    source: threat intelligence and model-hub reputation, category only, no system named in scenario 002
+    role: corroboration
+    # An independent second opinion from outside: is this publisher or this
+    # artifact already known bad. Absent for anything novel, which is most of it.
+  - signal: Post-exploitation C2, credential access, lateral movement
+    source: endpoint, network and identity telemetry, category only, no system named in scenario 002
+    role: scoping
+    # Sizes the event rather than confirming it: what the foothold reached from
+    # the host that loaded the file, and which identities it used getting there.
+
+pipeline:
+  strategy: collect-centrally
+  # Every source named above is a category of telemetry the organization already
+  # collects in some form. Nothing new has to be emitted; what is missing is the
+  # join, and the join is cheapest where the data already lands together.
+  destination: central analytics platform, model supply chain correlation index
+  owner: detection engineering
+
+outcome:
+  kind: alert
+  autonomy: notify
+  consumer: security operations and incident response
+  action: >-
+    The operator receives one case rather than a bare process alert: the load that
+    ran code, the import record naming where the artifact came from and who pulled
+    it, the verification result recorded at import, any reputation hit against the
+    publisher, and the identity and network activity from the same host in the
+    window after the load. The first move is to isolate the host and have the
+    registry owner quarantine the artifact so no other pipeline pulls it, then
+    confirm with the model platform team whether the load was an expected job.
+
+# promotion: absent. Autonomy is notify, so there is nothing to authorize, and
+# the evidence a promotion needs is collected while a use case runs, not before.
+
+limits: >-
+  This starts at the moment code runs, so the whole quiet half of scenario 002 is
+  outside it. A model whose weights are backdoored but whose file loads cleanly
+  runs no code, triggers nothing here, and stays silent until a trigger input
+  activates it at inference; this record will never see that and should not be
+  counted as if it might. The verification corroboration only exists where the
+  artifact actually passed through the registry, so a file pulled straight to a
+  workstation or a training host arrives with that evidence missing rather than
+  negative. Reputation is absent for anything new. And every source here is a
+  category taken from the scenario's emitted_at fields rather than a named system,
+  so the record scopes the work honestly and cannot yet be handed to an engineer
+  to build.
+
+rationale: >-
+  Importing a model is closer to installing software from a stranger than to
+  copying a data file, but the alert an operator gets when one misbehaves looks
+  like any other process alert on any other host. At two in the morning nobody
+  knows the process was a model load, which hub the file came from, whether anyone
+  checked its signature, or how many other teams have already pulled the same
+  file. Those questions decide whether this is one host to rebuild or an artifact
+  to pull out of every pipeline that has it, and answering them by hand takes
+  hours the incident does not have. Assembling them behind the alert is the whole
+  value here.
+
+phase:
+  value: in-scoping
+  since: '2026-08-11'
+
+operates: security operations
+backlog_ref: OBS-1210
+
+sources:
+  - tier: '1'
+    url: https://genai.owasp.org/llm-top-10/
+    title: OWASP Top 10 for LLM Applications
+    note: >-
+      Supply chain is the entry scenario 002 maps to, and it is the plain statement
+      that a model artifact is a dependency with a provenance question attached.
+  - tier: '0'
+    url: https://atlas.mitre.org/
+    title: MITRE ATLAS
+    note: >-
+      Technique language for machine learning supply chain compromise of a model,
+      which is the behavior this composition is meant to make legible when the
+      endpoint tooling fires.
+
+notes: >-
+  Scenario 002 is still a draft imported from the source deck: no framework IDs
+  resolved to the pinned baseline, no scores on any telemetry row, and no source
+  field anywhere. Every source in this record is therefore derived from the row's
+  emitted_at category and stated as such in the field itself, so no reader can
+  mistake a category for a named log. Phase is in-scoping for that reason and
+  should not move to pending-development until the scenario's rows carry named
+  systems; the record would otherwise queue engineering work against evidence
+  nobody can locate.
+  Step selection: the trigger and three composed rows account for steps 1 through
+  4. Step 5 is left out on purpose rather than claimed weakly, because nothing in
+  this composition reads model behavior at inference. The signature verification
+  row is composed because it changes the verdict, and is excluded from covers
+  because it is a control row and not an attack path step; putting its number in
+  covers would report a step the scenario's attack path does not have.
+
+provenance:
+  authored_by: Prototype walkthrough
+  created: '2026-08-11'
+  last_updated: '2026-08-11'
+  illustrative: true

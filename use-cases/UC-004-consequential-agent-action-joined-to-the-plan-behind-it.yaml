@@ -1,0 +1,152 @@
+# UC-004 · Consequential agent action joined to the plan behind it
+#
+# Companion to scenario 003. That record says the damaging step, an agent using
+# a real tool with real privilege, is already recorded, while the reasoning that
+# led to it sits in a different log that nobody joins to it. So the alert an
+# operator gets today is a service account doing something sensitive, with no
+# way to tell whether a person asked for it.
+#
+# This record is the join. It starts at the action, because that is the row that
+# already fires, and it pulls the agent's own plan back in behind it, along with
+# the token the agent presented. Note what it does not claim: row 6 of scenario
+# 003 is a control row, not an attack path step, so its evidence is composed
+# here but its number is not covered. The hand-off across the agent seam, step
+# 3, is unlogged today and is not covered either, which is stated in limits
+# rather than quietly implied.
+
+id: UC-004
+title: Consequential agent action joined to the plan behind it
+status: proposed
+
+covers:
+  - scenario: "003"               # Agent tool-abuse across hand-offs.
+    steps: [2, 4]                 # 2: the agent plan and tool invocation row, read twice,
+                                  #    once for this run and once for reach across runs.
+                                  # 4: the consequential action row, read as the trigger.
+                                  # Step 3 is the hand-off, which emits nothing to read.
+                                  # Step 5 is downstream impact and belongs to the egress
+                                  # use cases. The identity row is a control, not a step,
+                                  # so it is composed below and appears in no step list.
+
+trigger:
+  signal: Consequential action by an agent identity
+  source: Tool gateway invocation log, index=tool_gw
+  # The one row in this scenario that already fires on its own. It leads because
+  # it is the moment something irreversible may have happened, and because the
+  # rows that explain it cannot start anything by themselves.
+
+composes:
+  - signal: Agent plan and tool invocation for the same run
+    source: Agent orchestration run log, index=agent_runs
+    role: enrichment
+    # What the agent was asked, what it decided to do, and the order it called
+    # tools in. The operator would otherwise ask the AI platform team for this
+    # by hand and wait. Missing it costs time, not the verdict.
+  - signal: Agent plans invoking the same tool sequence elsewhere
+    source: Agent orchestration run log, index=agent_runs
+    role: scoping
+    # The same log asked about reach: which other runs, under which other agent
+    # identities, issued this sequence in the window. Answers how large this is
+    # before anyone starts a containment call.
+  - signal: Agent identity and privilege used
+    source: Workload identity token issuance log, index=idp_workload
+    role: corroboration
+    # Whether the token the agent presented carried privilege beyond its role,
+    # and whether a human delegation stands behind it. A sensitive action under
+    # a clearly delegated, correctly scoped token is a different event from the
+    # same action under a broad standing credential, so this changes the
+    # verdict and is not enrichment.
+
+pipeline:
+  strategy: collect-centrally
+  # All three logs are emitted today by three different platforms: the tool
+  # gateway, the agent orchestrator, and the identity provider. None of them can
+  # answer the question alone and none holds the other two, so the evidence is
+  # hauled back and correlated on the agent identity and the run identifier.
+  destination: central analytics platform, agent activity correlation index
+  owner: detection engineering
+
+outcome:
+  kind: alert
+  autonomy: notify
+  consumer: security operations, with AI platform engineering as second reader
+  action: >-
+    Open one case carrying the tool invocation, the agent run that planned it,
+    the other runs that issued the same sequence, and the token the agent
+    presented. The operator's first decision is whether a person delegated this
+    action. If no delegation is recorded, or the token carried privilege beyond
+    the agent's role, the operator has AI platform engineering suspend that
+    agent identity's active tokens and holds the run for review before any
+    further tool calls are allowed under it.
+
+# promotion: absent, and required to stay absent while autonomy is notify. This
+# use case is being built and has never fired against live volume, so there is
+# no measured true positive rate to promote on and nobody to name as approver.
+# Both come later, from running at this level.
+
+limits: >-
+  This use case is blind to the seam it was written around. The hand-off between
+  agents, step 3 of the scenario, emits nothing today, so when a sub-agent or an
+  external tool over the protocol is the party that actually requested the
+  action, this record still shows only the calling agent's identity and will
+  attribute the action to it. It cannot see the steering in step 1 either, so it
+  never explains why the plan looked the way it did. It stays silent for any
+  consequential action that reaches its target without passing the tool gateway,
+  including a tool the agent calls directly. And it cannot separate an agent that
+  was steered from one that is simply over-permitted and doing ordinary work: in
+  both cases the run log shows a plan and the identity log shows a token the
+  agent legitimately holds. That distinction still needs a human, and often
+  needs the person the agent was working for.
+
+rationale: >-
+  An agent with production credentials is an insider that never sleeps and never
+  explains itself. The security tools already record the damaging moment, an AI
+  identity reading, sending, or changing something that matters, because they
+  treat it as a powerful service account. What they cannot say is whether anyone
+  asked for it. Without the join, the operator holding that alert has a sensitive
+  action, a machine account, and no way to reach the reasoning behind it, so the
+  realistic outcome is that the alert is closed as expected automation. That is
+  the failure worth preventing: the alert fires correctly, and the answer is
+  wrong. Bringing the agent's own plan and its token next to the action turns an
+  unanswerable alert into a decision an operator can actually make on shift.
+
+phase:
+  value: in-development
+  since: "2026-08-04"
+
+operates: security operations, detection watch on call, once it is live
+
+backlog_ref: AIDET-297
+
+sources:
+  - tier: "1"
+    url: https://genai.owasp.org/llm-top-10/
+    title: OWASP Top 10 for LLM Applications 2025
+    note: >-
+      Framework reference for the excessive agency entry, which is the argument
+      for watching an agent's privilege and its plan together rather than
+      separately.
+  - tier: "1"
+    url: https://atlas.mitre.org/
+    title: MITRE ATLAS
+    note: >-
+      Supplies the technique vocabulary scenario 003 is mapped with, so this
+      record and the scenario can be read against each other without a
+      translation step.
+
+notes: >-
+  The identity row was the item worth being careful about. It is marked as a
+  control on scenario 003, meaning it describes a standing condition rather than
+  a step an attacker takes, so putting its number in the covered steps would
+  inflate what this record claims to answer. Composing its signal is fair, and
+  its role is corroboration rather than enrichment because a correctly scoped,
+  clearly delegated token genuinely lowers the confidence of the verdict. Step 5
+  was left out for the same reason step 4 was left out of UC-003: the downstream
+  egress row is read by the exfiltration use cases, and reading it here would
+  count the same evidence twice.
+
+provenance:
+  authored_by: Prototype walkthrough
+  created: "2026-08-11"
+  last_updated: "2026-08-11"
+  illustrative: true

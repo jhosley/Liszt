@@ -173,10 +173,11 @@
             "report",
             "trend",
             "dashboard",
+            "monitoring",
             "enrichment",
             "response"
           ],
-          "description": "The artifact produced. alert: an event pushed into a queue for action. report: a periodic written product. trend: a measured series watched for movement. dashboard: an always-on view someone consults. enrichment: context attached to another use case's output. response: a specified machine action. This field never says who acts; that is autonomy's job. The split earns its keep at tuning time: a detection that is accurate but always resolves with no action required has the wrong kind, not the wrong logic, and should probably become a trend or a report instead of an alert."
+          "description": "The artifact produced. alert: an event pushed into a queue for action. report: a periodic written product. trend: a measured series watched for movement. dashboard: an always-on view someone consults. enrichment: context attached to another use case's output. response: a specified machine action. This field never says who acts; that is autonomy's job. The split earns its keep at tuning time: a detection that is accurate but always resolves with no action required has the wrong kind, not the wrong logic, and should probably become a trend or a report instead of an alert. monitoring: watched deliberately with no alert attached, which is a real answer when the volume will not support one yet and is better recorded than left implied."
         },
         "autonomy": {
           "enum": [
@@ -290,6 +291,77 @@
       "minLength": 30,
       "description": "What this use case cannot tell you, stated rather than implied. Every use case has a blind side: the trigger can miss and produce nothing, the composed evidence can be absent, the correlation window can be too short. Write it down, because a use case with no stated blind spot will be trusted past its range, and the reader who over-trusts it will be the one who never saw this record."
     },
+    "rationale": {
+      "type": "string",
+      "minLength": 40,
+      "description": "Why this use case exists, in language a reader outside the detection team can follow. Not what it does, which is the title, and not what it cannot do, which is limits. This is the argument: what would go unnoticed without it, and why that matters here. A use case whose reason for existing cannot be written down plainly is usually a signal somebody wanted rather than a decision somebody needed."
+    },
+    "phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value"
+      ],
+      "description": "Where the engineering work has got to. Deliberately separate from status, which is an operational maturity ladder measured against live volume: a use case can be in-production on this axis and still only proposed on that one until it has run and been tuned. Keeping them apart means neither has to lie about the other.",
+      "properties": {
+        "value": {
+          "enum": [
+            "in-scoping",
+            "pending-development",
+            "in-development",
+            "in-testing",
+            "in-production",
+            "on-hold"
+          ],
+          "description": "in-scoping: being shaped, no commitment yet. pending-development: agreed and queued. in-development: someone is building it. in-testing: built, being validated before it carries load. in-production: serving live traffic. on-hold: stopped for a reason worth recording in notes."
+        },
+        "since": {
+          "type": "string",
+          "description": "The date this phase was entered, as YYYY-MM-DD. Not when the file was touched, which git already answers, but when the work actually moved."
+        }
+      }
+    },
+    "operates": {
+      "type": "string",
+      "minLength": 3,
+      "description": "The team that runs this once it is live: its health, its on-call, its off switch. Distinct from pipeline.owner, who builds and tunes it, and from outcome.consumer, who receives what it produces. Often the same team as one of those two, and worth stating anyway, because the question asked at three in the morning is who operates it, not who wrote it."
+    },
+    "backlog_ref": {
+      "type": "string",
+      "description": "The ticket or epic this work is tracked under, so the record and the engineering queue can be reconciled without guesswork."
+    },
+    "sources": {
+      "type": "array",
+      "description": "Public disclosures, vendor research, or framework material that explains why this use case was brought to the table. Same shape as a scenario's provenance.sources, deliberately, so a citation reads and tiers identically on both record types.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tier",
+          "url"
+        ],
+        "properties": {
+          "tier": {
+            "enum": [
+              "0",
+              "1",
+              "2"
+            ],
+            "description": "0 first party, the affected party's own disclosure or a research team's own writeup. 1 reputable secondary technical reporting. 2 press, aggregators and summaries."
+          },
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "description": "One line on what this source contributes to the argument for the use case."
+          }
+        }
+      }
+    },
     "notes": {
       "type": "string",
       "description": "Analyst working notes. Never rendered. Use freely: disagreements, open questions, why a covered step was included or left out."
@@ -304,6 +376,22 @@
         "authored_by": {
           "type": "string",
           "description": "The human who produced this record. Accountability does not transfer to a tool; if nobody will put their name on it, it is not ready."
+        },
+        "created": {
+          "type": "string",
+          "description": "YYYY-MM-DD. Matches the scenario record's provenance so both types answer the same question the same way."
+        },
+        "last_updated": {
+          "type": "string",
+          "description": "YYYY-MM-DD."
+        },
+        "last_reviewed": {
+          "type": "string",
+          "description": "YYYY-MM-DD. When a person last read this record and agreed it still describes what runs. A use case that has not been reviewed since it was written is a claim about a system that has moved on."
+        },
+        "illustrative": {
+          "type": "boolean",
+          "description": "True when this record carries invented data for demonstration rather than an assessment anyone stood behind. The viewer marks these plainly. Never set it on a record whose numbers are meant to be believed."
         }
       }
     }

@@ -2,92 +2,141 @@ schema_version: 1
 id: '005'
 slug: rag-knowledge-base-poisoning
 title: RAG / knowledge-base poisoning
-one_liner: An attacker plants misleading or booby-trapped content into the knowledge base the AI searches,
-  so it confidently gives wrong answers - or follows hidden instructions - to everyone.
-status: draft
+one_liner: An attacker plants misleading or booby-trapped content into the knowledge base the AI searches, so it 
+  confidently gives wrong answers - or follows hidden instructions - to everyone.
+status: published
 classification:
   primary_layer_component: Data
   ai_infrastructure_layer: L1 · Data
   evidence: seen-in-research
   priority: NOW
   priority_rationale:
-  - The knowledge bases behind our AI are often writable by large numbers of staff.
-  - Anyone who can add a document can influence what the AI tells everyone else.
-  - This was the delivery route used in the EchoLeak incident, so the path is already proven.
+    - The knowledge bases behind our AI are often writable by large numbers of staff.
+    - Anyone who can add a document can influence what the AI tells everyone else.
+    - This was the delivery route used in the EchoLeak incident, so the path is already proven.
 framework_mapping:
   baseline: '2026.07'
-  attack: []
-  atlas: []
+  attack:
+    - T1565.001
+    - T1567
+  atlas:
+    - AML.T0020
+    - AML.T0025
+    - AML.T0051.001
+    - AML.T0054
   owasp_llm:
-  - LLM04:2025
-  - LLM01:2025
-  - LLM09:2025
+    - LLM04:2025
+    - LLM01:2025
+    - LLM09:2025
   owasp_agentic: []
   mapping_confidence: editorial
-  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline
-    2026.07 identifiers before this record is published: ATLAS: indirect injection via data | Layers L1
-    Data'
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline 2026.07 identifiers
+    before this record is published: ATLAS: indirect injection via data | Layers L1 Data'
 attack_path:
-- step: 1
-  layer: Data
-  text: Attacker writes malicious content into the RAG / knowledge store (shared doc, wiki, ticket, indexed
-    site)
-- step: 2
-  layer: Data
-  text: Content is embedded and indexed into the vector store, now retrievable
-- step: 3
-  layer: App → Data
-  text: A user query retrieves the poisoned content as top context
-- step: 4
-  layer: Model
-  text: The model treats it as authoritative → biased / misinformed answer, or follows an embedded instruction
-- step: 5
-  layer: Various
-  text: Impact, misinformation at scale, or a launch point for injection → exfil (Scenario 01)
+  - step: 1
+    layer: Data
+    text: Attacker writes malicious content into the RAG / knowledge store (shared doc, wiki, ticket, indexed site)
+    attack:
+      - T1565.001
+    atlas:
+      - AML.T0020
+  - step: 2
+    layer: Data
+    text: Content is embedded and indexed into the vector store, now retrievable
+    atlas:
+      - AML.T0020
+  - step: 3
+    layer: App → Data
+    text: A user query retrieves the poisoned content as top context
+    atlas:
+      - AML.T0051.001
+  - step: 4
+    layer: Model
+    text: The model treats it as authoritative → biased / misinformed answer, or follows an embedded instruction
+    atlas:
+      - AML.T0054
+  - step: 5
+    layer: Various
+    text: Impact, misinformation at scale, or a launch point for injection → exfil (Scenario 01)
+    attack:
+      - T1567
+    atlas:
+      - AML.T0025
 telemetry:
-- step: 1
-  signal: Write / update to knowledge store
-  emitted_at: L1 KB & vector-DB write logs · source (SharePoint/wiki/ticket) logs
-  coverage: Collectable
-  detection_opportunity: Unusual writer; bulk / odd edits; content with injection markers
-- step: 2
-  signal: Embedding / index update
-  emitted_at: Vector-DB / index pipeline logs
-  coverage: Blind
-  detection_opportunity: Un-reviewed content indexed; content from a low-trust source
-- step: 3
-  signal: Retrieval event (what was pulled)
-  emitted_at: AI gateway · RAG retrieval logs
-  coverage: Collectable
-  detection_opportunity: Poisoned doc surfacing as top context; low-trust source in context
-- step: 4
-  signal: Model output / groundedness
-  emitted_at: AI gateway output · guardrail
-  coverage: Blind
-  detection_opportunity: Answer grounded on a low-trust source; injection-in-content
-- step: 5
-  signal: Downstream exfil (if injection payload)
-  emitted_at: NDR / proxy · DLP
-  coverage: Have
-  detection_opportunity: Egress / data access, see Scenario 01
+  - step: 1
+    signal: Write / update to knowledge store
+    emitted_at: L1 KB & vector-DB write logs · source (SharePoint/wiki/ticket) logs
+    coverage: Collectable
+    detection_opportunity: Unusual writer; bulk / odd edits; content with injection markers
+    dettect:
+      visibility: 2
+      detection: 0
+    source: SharePoint and Confluence audit log, index=kb_audit
+    owner: Knowledge Management
+  - step: 2
+    signal: Embedding / index update
+    emitted_at: Vector-DB / index pipeline logs
+    coverage: Blind
+    detection_opportunity: Un-reviewed content indexed; content from a low-trust source
+    dettect:
+      visibility: 0
+      detection: -1
+    owner: AI Platform Engineering
+  - step: 3
+    signal: Retrieval event (what was pulled)
+    emitted_at: AI gateway · RAG retrieval logs
+    coverage: Collectable
+    detection_opportunity: Poisoned doc surfacing as top context; low-trust source in context
+    dettect:
+      visibility: 2
+      detection: 0
+    source: Retrieval log on the AI gateway, index=aigw_retrieval
+    owner: AI Platform Engineering
+  - step: 4
+    signal: Model output / groundedness
+    emitted_at: AI gateway output · guardrail
+    coverage: Blind
+    detection_opportunity: Answer grounded on a low-trust source; injection-in-content
+    dettect:
+      visibility: 0
+      detection: -1
+    owner: AI Platform Engineering
+  - step: 5
+    signal: Downstream exfil (if injection payload)
+    emitted_at: NDR / proxy · DLP
+    coverage: Have
+    detection_opportunity: Egress / data access, see Scenario 01
+    dettect:
+      visibility: 3
+      detection: 2
+    source: Secure web gateway proxy transaction log, index=proxy_txn
+    evidence: rule NET-EGRESS-ANOM-07
 commentary:
-  already_see: The systems that hold knowledge bases (SharePoint, wikis, ticketing) already log who wrote
-    what - could treat edits to the AI's knowledge base like code commits (step 1).
-  blind: 'The gaps are AI-specific: logging what the AI actually retrieved (3) and scoring whether an
-    answer leaned on a low-trust source (4).'
-  how_detect: Label every knowledge source with a trust level when it's added and raise an alert when
-    low-trust content gets pulled into an answer. Trustworthy sources in, trustworthy answers out.
-scaled_up: An attacker with routine write access plants content that quietly biases answers across the
-  whole organization, and that carries a hidden instruction firing every time the document is retrieved.
+  already_see: The systems that hold knowledge bases (SharePoint, wikis, ticketing) already log who wrote what - could 
+    treat edits to the AI's knowledge base like code commits (step 1).
+  blind: 'The gaps are AI-specific: logging what the AI actually retrieved (3) and scoring whether an answer leaned on a low-trust
+    source (4).'
+  how_detect: Label every knowledge source with a trust level when it's added and raise an alert when low-trust content 
+    gets pulled into an answer. Trustworthy sources in, trustworthy answers out.
+scaled_up: An attacker with routine write access plants content that quietly biases answers across the whole 
+  organization, and that carries a hidden instruction firing every time the document is retrieved.
 incidents:
-- indirect-injection-via-document-research
-- poisoned-rag-demonstrations
-- echoleak-used-a-poisoned-document-as-its-vector
+  - echoleak-cve-2025-32711
 provenance:
   authored_by: imported-from-deck
   created: '2026-07-31'
-  last_updated: '2026-07-31'
-  sources: []
-notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before
-  publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry
-  row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.'
+  last_updated: '2026-08-11'
+  sources:
+    - tier: '1'
+      url: https://genai.owasp.org/llm-top-10/
+      title: OWASP Top 10 for LLM Applications 2025
+      note: Framework reference. This record carries illustrative data, not an incident source.
+  reviewed_by: Prototype walkthrough, illustrative data not assessed
+  review_date: '2026-08-11'
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before publishing: resolve
+  framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry row, name a data-source owner for
+  each row, and have a second analyst review against docs/02-quality-bar.md.
+
+
+  Illustrative prototype data. The DeTT&CT scores, sources, evidence references and framework identifiers on this record were
+  invented for the walkthrough and have not been assessed by anyone. Replace them before this record is read as a measurement.'

@@ -1,0 +1,18 @@
+slug: copilot-markdown-image-exfiltration-rehberger
+title: Data exfiltration by inducing an assistant to render a markdown image
+date: 2024-01-15
+what_happened: >
+  Research showed that an assistant persuaded to emit a markdown image whose URL carried
+  conversation data would cause the client to fetch that URL on render, delivering the data
+  to a host the attacker controlled. The user only had to look at the answer.
+source: Johann Rehberger, Embrace The Red
+scenarios: ["001"]
+references:
+  - tier: "0"
+    title: "Embrace The Red research blog"
+    url: https://embracethered.com/blog/
+    note: "Root reference. The exact post URL should be confirmed by an analyst before external citation."
+notes: >
+  This is the step the library keeps needing: the moment the data actually leaves. The
+  mitigation class is client side, restricting what an assistant's output is allowed to
+  make the browser fetch, which is why the scenario carries an App / net step.

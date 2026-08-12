@@ -1,0 +1,132 @@
+# UC-007 · Exposed AI endpoint correlated with a leaked provider key
+#
+# Companion to scenario 017, discovery side. That scenario says two separate
+# tools already find the two halves of this: external attack surface scanning
+# finds the open endpoint (step 1) and secret scanning finds the leaked key
+# (step 3). Both findings exist today and both are worked in their own queue,
+# one as an inventory item and one as a hygiene ticket. This record is the
+# decision neither queue makes: putting the two together and treating the
+# pair as access already in somebody else's hands.
+#
+# The consumption question, meaning who is spending the money and does anyone
+# own it, is deliberately not here. That is UC-008, a different decision with
+# a different customer.
+
+id: UC-007
+title: Exposed AI endpoint correlated with a leaked provider key
+status: tuned
+
+covers:
+  - scenario: "017"
+    steps: [1, 3, 4]
+    # 1: the external scan row, which is the trigger.
+    # 3: the secret scanning row, read as corroboration.
+    # 4: the cloud audit row, read only to size the finding.
+    # Step 2 (gateway access log) is not read here, see limits.
+    # Step 5 (billing and usage export) belongs to UC-008.
+
+trigger:
+  signal: Internet-facing AI service
+  source: External attack surface scan results, index=easm_assets
+  # The strongest row in the scenario and the only one that finds the asset
+  # at all, so it leads. Everything else in this record answers a question
+  # raised by an endpoint that is already known to be reachable.
+
+composes:
+  - signal: Credential exposure
+    source: Secret scanning alerts from source control, index=secretscan
+    role: corroboration
+    # A key committed for the same provider account changes the verdict, not
+    # the paperwork. Exposed endpoint alone is a misconfiguration. Exposed
+    # endpoint plus a working key is access somebody already holds.
+  - signal: Access from an unexpected place
+    source: Cloud provider audit log, index=cloud_audit
+    role: scoping
+    # Sizes it. Has the account behind this endpoint already been used from a
+    # network or country nobody recognizes, and how far back does that go.
+
+pipeline:
+  strategy: collect-centrally
+  destination: central analytics platform, exposure correlation index
+  owner: detection engineering
+
+outcome:
+  kind: alert
+  autonomy: notify
+  consumer: security operations, exposure management queue
+  action: >-
+    The operator opens one case holding the exposed endpoint and its cloud
+    account, any leaked key found for the same provider account, and the
+    recorded access from unexpected places against that account. The first
+    move is a revocation request to the account owner for the key and an
+    authentication or takedown request for the endpoint, raised together as
+    one ticket, with the scoping evidence deciding whether it is handled on
+    the standard exposure clock or escalated to incident response the same
+    day.
+
+# No promotion block. Autonomy is notify, and it stays there: the evidence
+# that would justify anything higher is a measured true positive rate over a
+# stated window with a named approver, and none of that exists for this
+# record. The validator refuses autonomy above notify without it.
+
+limits: >-
+  It starts from the external scan, so an AI endpoint that is only reachable
+  from a partner network, or that answers on a hostname the scanner does not
+  know about, is never found here and nothing else in this record will find
+  it. Secret scanning reads source control, so a key pasted into a support
+  ticket, a chat thread, or a log file outside source control leaves the
+  corroboration silent and the case reads as exposure alone. It does not read
+  the AI inference endpoint access log, which means it cannot say whether
+  calls have actually arrived at that endpoint with no identity attached; it
+  reports reachability, not use. And it cannot establish that the endpoint
+  and the key belong to the same team or the same system. That match is a
+  human check every time.
+
+rationale: >-
+  Both halves of this are already found today by two different tools, and
+  they land in two different queues where one reads as an inventory item and
+  the other as a hygiene ticket. Neither is urgent on its own, and both get
+  closed on their own schedule. Together they mean an AI service of ours is
+  reachable from the internet and a working key for the same provider account
+  is in public view, which is not hygiene, it is access somebody else already
+  has. Without this record the two findings are closed separately by two
+  teams and the combination is never seen by anyone.
+
+phase:
+  value: in-production
+  since: "2026-04-13"
+
+operates: security operations
+
+backlog_ref: AISEC-311
+
+sources:
+  - tier: "1"
+    url: https://genai.owasp.org/llm-top-10/
+    title: OWASP Top 10 for LLM Applications 2025
+    note: >-
+      Frames leaked provider credentials and exposed model endpoints as a
+      standing category rather than a one-off misconfiguration, which is the
+      argument for correlating the two findings instead of closing each.
+  - tier: "1"
+    url: https://atlas.mitre.org/
+    title: MITRE ATLAS
+    note: >-
+      Supplies the technique language for AI model access through valid
+      accounts, the behavior this use case is trying to get in front of.
+
+notes: >-
+  Step selection was matched row by row against scenario 017. Step 1 and step
+  3 are the two rows the scenario marks as already collected, which is why
+  this pair is buildable now. Step 4 is read only for scoping and is also the
+  trigger of UC-008; the overlap is real and is recorded rather than avoided,
+  since both records genuinely read that row. Step 2 was left out on purpose:
+  the scenario marks the gateway access log as collectable rather than
+  collected, and a record in production should not lean on evidence that does
+  not arrive yet.
+
+provenance:
+  authored_by: Prototype walkthrough
+  created: "2026-08-11"
+  last_updated: "2026-08-11"
+  illustrative: true

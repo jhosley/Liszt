@@ -1,0 +1,157 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# UC-012 · Changed connector description correlated with tool behavior
+#
+# Companion to scenario 014, malicious or vulnerable tool and connector (MCP).
+# An agent chooses a tool by reading the tool's own description of itself, and
+# whoever controls the tool controls that text. A connector approved once can be
+# rewritten later, and today that edit is not a security event anywhere: same
+# name, same endpoint, same approval.
+#
+# The endpoint and network teams will catch this connector if it runs code or
+# ships data out, but only after it does, and what they see gets attributed to a
+# tool we approved rather than to an attacker. That attribution is the failure
+# this record is built against. It makes the description change the thing that
+# starts the question, and pulls the ordinary host and network evidence in
+# behind it, so the edit and what the tool did next are read by one person
+# instead of by four teams who never compare notes.
+#
+# It is an alert rather than a trend because a changed description on a live
+# connector is rare, dated, and actionable within the hour. Phase is
+# pending-development: the shape is agreed and the registry work is queued.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+id: UC-012
+title: Changed connector description correlated with tool behavior
+status: proposed
+
+covers:
+  - scenario: '014'               # Malicious / vulnerable tool and connector (MCP).
+    steps: [1, 2, 3, 4, 5]        # Every row is genuinely read, and each one has a different
+                                  # job below. 1: the registration and description row, the
+                                  # trigger. 2: the tool-call row, read to size how far the
+                                  # changed tool has already reached. 3: the host behavior row
+                                  # and 4: the egress row, the two independent checks on whether
+                                  # the tool did anything. 5: the package provenance row, read to
+                                  # tell the reviewer where this version came from. If any of
+                                  # these stopped being read, it would come off this list.
+
+trigger:
+  signal: Tool / connector registration with a changed description
+  source: MCP registry and tool inventory records
+  # One trigger: the approved description for a connector already in the toolset
+  # no longer matches what the registry now serves. A brand new connector
+  # registering for the first time is a different signal with a different owner
+  # and a different response, so it is a different use case; see limits.
+
+composes:
+  - signal: Tool supply-chain provenance
+    source: Package and registry provenance records
+    role: enrichment              # Where this version came from and whether it is signed. It
+                                  # saves the reviewer a manual registry lookup, and it is
+                                  # enrichment rather than corroboration on purpose: plenty of
+                                  # internally built connectors are unsigned, so an unsigned
+                                  # package here raises a question and settles nothing.
+  - signal: 'Tool invocation & parameters'
+    source: L3 tool-call logs and AI gateway records
+    role: scoping                 # How far this already reaches: which agents called the tool
+                                  # after the description changed, how many runs, and what
+                                  # parameters went out with the calls. This sizes the event; it
+                                  # is the difference between a connector nobody has touched and
+                                  # one that ran four hundred times overnight.
+  - signal: Tool process behavior (host)
+    source: EDR, container runtime and NDR telemetry
+    role: corroboration           # Did the tool spawn a shell or open a connection it has no
+                                  # business opening. An independent read on the same window,
+                                  # from a system the tool's author does not control. Losing it
+                                  # costs the verdict, not minutes.
+  - signal: Tool egress
+    source: NDR and proxy records, DLP verdicts
+    role: corroboration           # Whether anything has already left through the connector. This
+                                  # is the line between a case to review this week and an
+                                  # incident to run tonight.
+
+pipeline:
+  strategy: collect-centrally     # Five platforms hold the five pieces: the registry, the
+                                  # gateway, the endpoint agent, the network sensor and the
+                                  # package provenance store. None of them can see the others,
+                                  # so no one of them can make this decision in place and the
+                                  # evidence is hauled back and joined centrally on the tool
+                                  # identifier. The registry emitting a description change at all
+                                  # is a precondition for the trigger, tracked under the backlog
+                                  # ref below; that is a dependency, not the delivery strategy.
+  destination: central analytics platform, connector correlation index
+  owner: detection engineering
+
+outcome:
+  kind: alert
+  autonomy: notify
+  consumer: security operations
+  action: >-
+    Open one case holding the new description beside the previously approved text, the
+    provenance of the version now being served, every agent run that has called the tool
+    since the change, and whatever the host and network telemetry recorded during those
+    runs. The operator reads the two descriptions against each other first. Where the tool
+    has already been invoked and either the host behavior or the egress evidence is present,
+    the operator asks the agent platform team to remove the connector from the allow list
+    while the difference is reviewed, and the review is what decides whether it goes back.
+
+# promotion: absent, and required to stay absent while autonomy is notify.
+# Pulling a connector out of an allow list is exactly the kind of bounded action
+# that eventually argues for automation, and the argument needs a measured true
+# positive rate and a named approver, neither of which exists yet. Both can only
+# be collected by running this at notify first.
+
+limits: >-
+  This starts from a description that changed, so it needs a previously approved version to
+  compare against. A malicious connector that registers once with honest-looking text and
+  never edits it produces no trigger here at all; catching that is an intake and vetting
+  control, and this record does not substitute for one. It cannot separate a compromised
+  publisher from a legitimate maintainer shipping a real update, because the diff looks the
+  same either way and the host and network evidence only reports what the tool did, not
+  whether the change was authorized. It also cannot see the quietest version of this
+  attack: a connector whose poisoned description redirects the agent while the tool itself
+  behaves exactly as it always has leaves nothing for the endpoint agent, the network sensor
+  or the loss prevention verdicts to find, and this case then contains a text diff and
+  nothing else. Where the tool has not been called since the change, only the registration
+  and the provenance are present, which makes the output a review rather than an incident.
+
+rationale: >-
+  We approve a connector once, on the strength of what it says it does, and then treat that
+  approval as settled. The text can be rewritten the next day. Nothing in the estate reads
+  that edit as a security event, and the agents that depend on the tool re-read the new text
+  on every run and act on it, which means an attacker who can change one paragraph can
+  change what a fleet of agents does without touching a single one of them. The
+  conventional detections do eventually fire, but only once the tool runs code or moves
+  data, and the finding lands as misbehavior by an approved tool rather than as an
+  intrusion. This use case exists so the edit itself raises the question, early, with the
+  evidence needed to answer it already attached.
+
+phase:
+  value: pending-development
+  since: '2026-07-30'
+
+operates: security operations
+
+backlog_ref: OBS-1108
+
+sources:
+  - tier: "0"
+    url: https://genai.owasp.org/llm-top-10/
+    title: OWASP Top 10 for LLM Applications
+    note: >-
+      The scenario maps to LLM03, supply chain. Contributes the framing that a third party
+      tool and the text it publishes about itself both sit inside the trust boundary, which
+      is the argument for treating a description edit as a security event.
+  - tier: "0"
+    url: https://atlas.mitre.org/
+    title: MITRE ATLAS
+    note: >-
+      Where the plugin and connector compromise technique and its case studies are recorded.
+      Contributes the observed pattern that the tool's self-description, not the tool's
+      code, is the part the attacker rewrites.
+
+provenance:
+  authored_by: Prototype walkthrough
+  created: '2026-08-11'
+  last_updated: '2026-08-11'
+  illustrative: true

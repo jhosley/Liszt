@@ -1,0 +1,134 @@
+# UC-005 · Low-trust knowledge source retrieved as top context for an answer
+#
+# Companion to scenario 005, RAG / knowledge-base poisoning. That scenario has a
+# problem shared by every poisoning chain: the attacker's action is an edit, and
+# an edit to a wiki page looks exactly like the work the wiki exists for. There
+# is nothing to alert on at the moment of the write.
+#
+# So this record does not start there. It starts at the one moment the planted
+# content stops being a document and starts being an answer: the retrieval that
+# pulls it into a user's context. The write is still read, but behind the
+# trigger, as the thing that tells an operator whether the document arrived the
+# ordinary way or not.
+
+id: UC-005
+title: Low-trust knowledge source retrieved as top context for an answer
+status: proposed
+
+covers:
+  - scenario: "005"               # RAG / knowledge-base poisoning.
+    steps: [1, 3]                 # 1: the knowledge store write row, read behind the
+                                  #    trigger to say who put the document there.
+                                  # 3: the retrieval row, read as the trigger.
+                                  # Steps 2, 4 and 5 are not read. See notes.
+
+trigger:
+  signal: Retrieval event placing a low-trust source in top context
+  source: Retrieval log on the AI gateway, index=aigw_retrieval
+  # The retrieval row is the only place in this chain where a document and a
+  # real user question meet. Before it, a planted page is inert; after it, the
+  # answer is already on somebody's screen. One signal, one moment, so it leads.
+
+composes:
+  - signal: Write or update to the knowledge store behind that document
+    source: SharePoint and Confluence audit log, index=kb_audit
+    role: corroboration
+    # Not enrichment. The retrieval on its own says a lightly trusted page
+    # ranked first, which happens honestly all the time: somebody's draft, an
+    # old ticket, a scratch space. The write history is what separates that from
+    # a page created last night by an account that has never touched this space,
+    # or edited in bulk across twenty pages in a minute. Remove this evidence and
+    # the operator cannot reach a verdict, only a shrug.
+
+pipeline:
+  strategy: instrument-at-source
+  # The honest reason this is queued rather than building. The retrieval log
+  # already records which documents were pulled, but it does not carry the trust
+  # level of the source they came from, and without that there is nothing to
+  # trigger on. The AI gateway has to label retrieved sources with the trust tier
+  # they were registered under before this use case exists at all. The join to
+  # the write history is ordinary work by comparison and happens downstream.
+  destination: central analytics platform, retrieval correlation index
+  owner: detection engineering
+
+outcome:
+  kind: alert
+  autonomy: notify
+  consumer: security operations triage
+  action: >-
+    The operator opens one case holding the retrieval record, the document that
+    ranked as top context, the question it was answering, and the write history
+    of that document: who last edited it, when, and whether that account edits
+    this space as a matter of routine. First move is to have the document pulled
+    from the index by the knowledge management owner of the store, then to
+    confirm the edit with the named writer before anything is put back.
+
+# promotion: absent, and it must stay absent while autonomy is notify. Nothing
+# runs yet, so there is no measured rate to promote on and no approver who could
+# reasonably sign for one. The evidence a promotion would rest on gets collected
+# after this fires at notify against live retrieval volume, not before.
+
+limits: >-
+  This use case reads two rows and knows only what they hold. It reads nothing
+  about the answer the model went on to produce, so a poisoned document that was
+  retrieved and then ignored looks identical to one the model repeated as fact.
+  It triggers on the trust label attached to a source, not on the content of the
+  document, so content planted inside a store that is registered as trusted
+  never fires it at all, and that is the version of this attack worth worrying
+  about most. It does not read the indexing pipeline either, so anything that
+  entered the vector store without a matching record in the audited knowledge
+  stores arrives with no write history behind it and the corroboration is simply
+  absent. Finally it names one retrieval. It does not count how many other
+  answers already leaned on the same document, so the operator learns that this
+  happened, not how far it spread.
+
+rationale: >-
+  The knowledge bases our AI searches are writable by large numbers of ordinary
+  staff, which is the point of them. That also means anyone who can add a
+  document can influence what the AI tells everybody else, and the act of adding
+  it is indistinguishable from normal work. Nothing looks wrong at the moment of
+  writing, so nothing is looked at. The consequence only becomes visible later,
+  somewhere else, when a person acts on a confident answer that was never true,
+  and by then no one connects the answer back to the page that produced it.
+  Watching the moment of retrieval is the one chance to catch it while it is
+  still a document in an index rather than a decision somebody already made.
+
+phase:
+  value: pending-development
+  since: "2026-08-05"
+
+operates: security operations engineering, detection watch on call
+
+backlog_ref: AIDET-263
+
+sources:
+  - tier: "1"
+    url: https://genai.owasp.org/llm-top-10/
+    title: OWASP Top 10 for LLM Applications 2025
+    note: >-
+      Contributes the framing for the data and knowledge poisoning entry that
+      scenario 005 maps to, and the reason retrieval is treated as a distinct
+      point of control rather than part of the model.
+  - tier: "1"
+    url: https://atlas.mitre.org/
+    title: MITRE ATLAS
+    note: >-
+      Supplies the technique vocabulary scenario 005 tags its steps with, so the
+      covered steps here and the scenario's own mapping read as one thing.
+
+notes: >-
+  Step choice. Step 3 is the trigger and step 1 is the corroboration, and those
+  are the only two rows this record reads. Step 2, the embedding and index
+  update, was left out for a plain reason: the scenario names no system for that
+  row, and a composed item nobody can point at will be silently missing on the
+  day it is needed. Step 4, the model output and groundedness row, is the natural
+  third leg and would turn this from a retrieval alert into a grounded-answer
+  alert; it belongs to a separate use case once the gateway emits anything on it.
+  Step 5 is the exfiltration tail and is already served by the egress use cases
+  written against scenario 001.
+
+provenance:
+  authored_by: Prototype walkthrough
+  created: "2026-08-11"
+  last_updated: "2026-08-11"
+  illustrative: true

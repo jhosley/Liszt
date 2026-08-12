@@ -1,0 +1,143 @@
+# UC-009 · Untrusted data config followed by cluster escalation
+#
+# Second use case against scenario 021, and deliberately not the same ground as
+# UC-002. That record starts from the endpoint detection on the worker and reads
+# the egress and transfer rows behind it: steps 2, 4 and 6. Everything it leaves
+# unread is the quiet half of the same chain. The dataset-worker log records the
+# config that arrived (step 3) and the cluster audit records the privilege that
+# followed (step 5), but nothing joins them and nothing alerts on either, so the
+# two halves sit in different systems owned by different teams. Step 1, what the
+# agent was permitted to do and with which safeguards on, has no emitter at all.
+#
+# This record is written and parked rather than left unwritten, because a gap
+# somebody decided not to close yet is worth more in the library than a gap
+# nobody wrote down. See notes for the hold.
+
+id: UC-009
+title: Untrusted data config followed by cluster escalation
+status: proposed
+
+covers:
+  - scenario: '021'               # Agent sandbox escape to autonomous intrusion.
+    steps: [1, 3, 5]              # 3: the dataset-worker row that records an untrusted config
+                                  #    being processed, which is the trigger. 5: the cluster and
+                                  #    cloud audit row, read as corroboration. 1: the agent run
+                                  #    configuration row, read as enrichment, and the reason this
+                                  #    record is on hold. Steps 2, 4 and 6 belong to UC-002.
+
+trigger:
+  signal: Untrusted artifact or config processed
+  source: dataset-worker application logs, index=app_dataproc, source=worker.jsonl
+  # The weakest of the three rows and the earliest. It is written today and read
+  # by nobody, which is exactly why it is worth starting from rather than adding
+  # to the pile behind the worker detection UC-002 already has.
+
+composes:
+  - signal: Container escape and credential use
+    source: EKS control-plane audit log, CloudWatch group /aws/eks/prod/cluster; AWS CloudTrail
+    role: corroboration
+    # A privileged or hostPath pod created, or the metadata service read from a
+    # pod, on the same node inside the window after the config was processed.
+    # Without it a processed config is a curiosity; with it the sequence is the
+    # scenario's step 4 into step 5 and the verdict changes.
+  - signal: Agent run configuration and safeguard state
+    source: "Nothing emits this today. It would have to come from the agent platform's run manifest."
+    role: enrichment
+    # Which agent run submitted the job, whether it was attended, and which
+    # safeguards were on. Named here with the scenario's own wording for the
+    # source, unchanged, because an honest record of what this composition needs
+    # is the point: the enrichment does not exist, and that is the hold.
+
+pipeline:
+  strategy: instrument-at-source
+  # The worker log and the cluster audit both already land centrally; the join
+  # could be built this quarter. The run manifest cannot, because the agent
+  # platform emits nothing to join to. The delivery decision therefore sits with
+  # the AI platform team under OBS-1041, and the correlation is downstream of it.
+  destination: central analytics platform, correlation index
+  owner: detection engineering
+
+outcome:
+  kind: monitoring
+  # Not an alert on purpose. The worker log writes the same condition differently
+  # between runs and is not kept long, so an alert built on it now would page on
+  # log formatting rather than on behavior. Watched deliberately, with the reason
+  # written down, beats an alert nobody can trust.
+  autonomy: notify
+  consumer: AI platform engineering
+  action: >-
+    Once a week the AI platform team reads the watch list: every worker run whose
+    config carried template syntax or a local file path, with the cluster and cloud
+    audit activity from the same node in the hour after it set alongside. A run with
+    an escalation match is handed to incident response by hand, as an incident, that
+    day. A run without one is traced back to the team that submitted the job, so the
+    config gets a named owner and stops being anonymous the next time it appears.
+
+# promotion: absent, and stays absent while autonomy is notify. There is no
+# measured rate behind this record because it has never run.
+
+limits: >-
+  This starts from a line in the dataset-worker log, so a config processed by any
+  service that does not write to that log produces nothing at all, and a config
+  processed before the log's retention window closed cannot be looked up after the
+  fact. It cannot tell an attacker-supplied config from a clumsy internal one; both
+  render the same way in the log. The cluster audit match establishes that
+  escalation happened close in time on the same node, not that the config caused
+  it, and an escalation that reaches the cluster by another route is invisible
+  here. Above all, with nothing emitting the agent run manifest, this cannot say
+  which agent run was behind the processing or whether its safeguards were on,
+  which is the one question the scenario exists to raise.
+
+rationale: >-
+  Today a data file arrives at a processing worker and gets logged, and an account
+  in the cluster gains more privilege an hour later and gets logged, and the two
+  facts live in different systems owned by different teams. Nobody puts them side
+  by side, so the escalation, if anyone notices it, is investigated as a cluster
+  problem with no idea what started it, and the config line is never read at all.
+  This watch is the cheapest way to find out whether that sequence is happening in
+  our estate before deciding what to build, and if it is happening it names the
+  team whose job submitted the config.
+
+phase:
+  value: on-hold
+  since: '2026-08-11'
+
+operates: detection engineering
+backlog_ref: OBS-1042
+
+sources:
+  - tier: '0'
+    url: https://atlas.mitre.org/
+    title: MITRE ATLAS
+    note: >-
+      Source of the technique language behind the covered steps, including AI supply
+      chain compromise of data and escape to host, which is what this pair of rows
+      would evidence if the sequence is real.
+  - tier: '1'
+    url: https://genai.owasp.org/llm-top-10/
+    title: OWASP Top 10 for LLM Applications
+    note: >-
+      Supply chain and excessive agency are the two entries scenario 021 maps to, and
+      they are the argument for watching what an agent workload was permitted to do,
+      not only what its host did.
+
+notes: >-
+  ON HOLD, and the hold is the interesting part of this record. The composition
+  needs three things and only two of them exist. The dataset-worker log is written
+  and the cluster audit is written, but the agent run manifest is not emitted by
+  anything, so the watch could be stood up and would still be unable to answer
+  which run and which safeguard state was behind a hit. That work is tracked under
+  OBS-1041 with the AI platform team and has not been scheduled. Building the join
+  first was considered and rejected: the two rows on their own generate a list of
+  worker runs with no owner, and a list nobody can act on turns into a list nobody
+  reads. Revisit when OBS-1041 lands, or sooner if the field normalization under
+  OBS-1042 makes the worker log stable enough to alert on, in which case this
+  should be reconsidered as an alert rather than a watch.
+  Step selection: UC-002 reads steps 2, 4 and 6 of scenario 021, so this record
+  takes what is left and reads no row twice.
+
+provenance:
+  authored_by: Prototype walkthrough
+  created: '2026-08-11'
+  last_updated: '2026-08-11'
+  illustrative: true

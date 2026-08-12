@@ -1,0 +1,131 @@
+# UC-008 · Attributing unowned AI inference usage to an owner or an incident
+#
+# Companion to scenario 017, consumption side. UC-007 asks whether an AI
+# service of ours is reachable and whether a key for it is loose. This record
+# asks the question that comes after the access exists: somebody is running
+# inference on our account from somewhere we did not expect, and no team has
+# put their name against the spend. That is an ownership and money question
+# first, and it is answered on a monthly written cadence by the people who
+# read the bill, not by an alert into the security operations queue.
+#
+# It is written as proposed and in-scoping on purpose. Scenario 017 marks the
+# usage export and the gateway access log as collectable rather than
+# collected, so the first piece of work here is tagging usage with an owning
+# application and team at the platform, not building a query.
+
+id: UC-008
+title: Attributing unowned AI inference usage to an owner or an incident
+status: proposed
+
+covers:
+  - scenario: "017"
+    steps: [2, 4, 5]
+    # 4: the cloud audit row, which is the trigger.
+    # 5: the billing and usage export row, read as corroboration.
+    # 2: the gateway access log row, read to size which endpoints are involved.
+    # Steps 1 and 3, the exposed asset and the leaked key, are UC-007.
+
+trigger:
+  signal: Access from an unexpected place
+  source: Cloud provider audit log, index=cloud_audit
+
+composes:
+  - signal: Usage that nobody owns
+    source: AI provider billing and usage export, index=ai_spend
+    role: corroboration
+    # This is what decides the verdict. Unexpected access by a team that owns
+    # its spend is a travel story. Unexpected access against usage that maps
+    # to no known application or team is the case this record exists for.
+  - signal: Authentication on the AI endpoint
+    source: AI inference endpoint access log, index=aigw_access
+    role: scoping
+    # Reach. Which inference endpoints served those calls, and whether the
+    # calls carried an identity at all, which tells us how many systems and
+    # keys fall inside the same unowned usage rather than just one.
+
+pipeline:
+  strategy: instrument-at-source
+  destination: AI usage attribution review, cloud analytics workspace, built on index=ai_spend
+  owner: AI Platform Engineering
+
+outcome:
+  kind: report
+  autonomy: notify
+  consumer: cloud FinOps
+  action: >-
+    Each month FinOps receives one list: every provider account and key whose
+    inference spend maps to no known application, the endpoints those calls
+    reached, and the networks and countries the access came from. Each line
+    is either claimed by a named team inside the review, or the key goes onto
+    the rotation list AI Platform Engineering works that week. A line that
+    stays unclaimed and shows access from an unexpected place is handed to
+    security operations as a suspected credential compromise rather than
+    carried forward as a billing question.
+
+# No promotion block. Autonomy is notify. Nothing here is automated, and
+# raising it would require a measured true positive rate over a stated window
+# and a named approver, neither of which exists for this record.
+
+limits: >-
+  This is a monthly written product built on a billing export, so it is slow
+  by design. A burst of usage that starts and finishes inside one billing
+  cycle is read only after the money is spent, and nothing in this record is
+  an alert path. It does not read secret scanning, so it can tell you a key
+  is running work nobody claims and still not tell you how that key got out.
+  It cannot separate an attacker from a team working out of a new office or a
+  contractor network, because that difference is settled by whether somebody
+  claims the line, not by the data. Usage that is correctly attributed to a
+  real team never appears at all, even when what that team is doing with it
+  is a problem. And where the provider export carries no owning application
+  tag, every line from that provider looks unowned, which is noise until the
+  tagging work in scoping is done.
+
+rationale: >-
+  Unowned AI usage is somebody else's money problem right up until it is a
+  security problem, and it is commonly noticed as neither. A leaked key that
+  quietly runs inference produces a line on a bill nobody reads and no alert
+  at all, because nothing about it resembles an intrusion. Asking the
+  ownership question on a fixed schedule forces every line of AI spend to
+  acquire a named owner or get turned off, which is also the only practical
+  way to build the list of AI endpoints and keys the organization does not
+  currently have.
+
+phase:
+  value: in-scoping
+  since: "2026-08-04"
+
+operates: AI Platform Engineering
+
+backlog_ref: AIPLAT-233
+
+sources:
+  - tier: "1"
+    url: https://genai.owasp.org/llm-top-10/
+    title: OWASP Top 10 for LLM Applications 2025
+    note: >-
+      Establishes unbounded consumption of inference on someone else's account
+      as a named risk, which is what makes unattributed spend worth a standing
+      review rather than a quarterly cleanup.
+  - tier: "1"
+    url: https://atlas.mitre.org/
+    title: MITRE ATLAS
+    note: >-
+      Provides the technique language for using AI model access obtained
+      through valid accounts, the behavior the unclaimed lines in this report
+      are being tested against.
+
+notes: >-
+  Kept separate from UC-007 because the customer and the clock are different:
+  UC-007 is an alert to security operations on discovery, this is a monthly
+  attribution review owned by FinOps with a defined handoff to security
+  operations for lines that stay unclaimed. Strategy is instrument-at-source
+  rather than collect-centrally because the missing piece is not a query, it
+  is an owning application and team tag on usage records at the platform.
+  Step 2 is included because the gateway access log is read to size how many
+  endpoints one unowned key touches, not merely to describe the trigger.
+
+provenance:
+  authored_by: Prototype walkthrough
+  created: "2026-08-11"
+  last_updated: "2026-08-11"
+  illustrative: true

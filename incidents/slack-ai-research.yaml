@@ -1,0 +1,18 @@
+slug: slack-ai-research
+title: Prompt injection against Slack AI surfaces private channel data
+date: 2024-08-20
+what_happened: >
+  Researchers showed that instructions planted in a public channel could be picked up by
+  the workspace assistant while it answered another user, causing it to surface content
+  from private channels the attacker had no access to.
+source: PromptArmor research
+scenarios: ["001"]
+references:
+  - tier: "1"
+    title: "PromptArmor research on Slack AI"
+    url: https://promptarmor.com/
+    note: "Root reference. The exact post URL should be confirmed by an analyst before external citation."
+notes: >
+  Useful because the boundary crossed was an access control boundary, not a model
+  boundary. The assistant was permitted to read the private channels; the attacker was not,
+  and the assistant became the path between them.
