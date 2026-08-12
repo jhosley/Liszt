@@ -172,6 +172,12 @@ def build_data(include_drafts: bool, org: str | None) -> dict:
         },
         "owasp_names": {**fw.get("owasp_llm", {}).get("ids", {}),
                         **fw.get("owasp_agentic", {}).get("ids", {})},
+        # The whole pinned baseline, not just the version strings. The documentation renders
+        # from this rather than restating it, so the page cannot claim a pin the repository
+        # does not hold, and cutting a new baseline updates the docs with it.
+        "frameworks_detail": fw,
+        "baseline_meta": {k: baseline.get(k) for k in
+                          ("baseline", "status", "declared", "owner", "review_due")},
         "scenarios": scenarios,
         "use_cases": use_cases,
         "incidents": incidents,
@@ -3518,12 +3524,188 @@ function layerFrameworks(lid) {
   return out;
 }
 
+/* The doctrine half of a framework page: what it answers, what it does not, and the trap.
+   The pin half comes out of DATA.frameworks_detail, which is the baseline file itself, so
+   a version on this page is the version the records were written against by construction. */
+const FW_DOC = {
+  attack: {
+    role: "Infrastructure behavior",
+    answers: "What an adversary does to infrastructure: hosts, containers, clouds, identity, the network.",
+    not: "Anything model or prompt specific. There is no ATT&CK technique for prompt injection, and inventing one is not an option.",
+    shape: "T1611, T1552.005, tactics TA0005",
+    why: "It is the vocabulary your existing detection engineering already speaks. Where a chain touches a node, a bucket, a cluster or a credential, ATT&CK lets an AI scenario land in the same queue, with the same analytics, as everything else the team defends. That is the whole reason the L0 layer transfers cleanly and the others do not.",
+    watch: "It is silent above the infrastructure boundary. A record mapped only to ATT&CK is usually a record whose AI specific half has not been mapped yet.",
+  },
+  atlas: {
+    role: "AI system behavior",
+    answers: "What an adversary does to AI systems: models, training data, retrieval corpora, agents and agent tools.",
+    not: "Infrastructure detail beyond the AI boundary. It defers to ATT&CK there deliberately.",
+    shape: "AML.T0105, AML.T0010.002, tactics AML.TA0004",
+    why: "It is the only maintained taxonomy that describes attacks on the model and the corpus as adversary behavior rather than as risk categories. Without it, the interesting half of most scenarios in this library has no identifier at all.",
+    watch: "The link to ATT&CK is real but narrow and one way. Of 178 ATLAS techniques, 37 carry an attack-reference, and the field means adapted from rather than equals. ATT&CK holds no pointer back. Recording only one of a near equivalent pair loses information depending on who reads the record.",
+  },
+  owasp_llm: {
+    role: "Risk category",
+    answers: "Which risk class this falls into, in language a developer or an application security reviewer already uses.",
+    not: "Adversary behavior. These are risk classes, not techniques. There is no chain, no tactic and no ordering.",
+    shape: "LLM03:2025, always written with the edition",
+    why: "It is the bridge to the people who will actually change the code. An engineering audience that has never opened ATLAS will recognize the LLM list, and a scenario that carries one is a scenario an application team can be asked about.",
+    watch: "These identifiers live at the scenario level only and the schema enforces it. A step never carries an OWASP id. And there is no authoritative crosswalk between OWASP and either MITRE framework, in either direction, so any mapping between them here is editorial and must say so.",
+  },
+  owasp_agentic: {
+    role: "Risk category, agentic",
+    answers: "The same question as the LLM list, for systems where an agent plans, calls tools and hands off work.",
+    not: "Adversary behavior, and not a superset of the LLM list. It is a separate first edition.",
+    shape: "ASI01:2026. The prefix is ASI, for Agentic Security Initiative",
+    why: "The orchestration layer is where the least instrumentation exists and where the most is being built, and this is the only widely recognized vocabulary for it. A scenario classified at L3 that carries no agentic identifier is usually under mapped.",
+    watch: "First edition, so no renumbering history yet, but also no stability record. Do not confuse it with the earlier Agentic AI Threats and Mitigations document, which exposes no stable identifier scheme and should be cited as prose.",
+  },
+  dettect: {
+    role: "Can we see it",
+    answers: "Whether we would see any of it, and how good the underlying data is.",
+    not: "What the adversary did. It defines no identifiers of its own.",
+    shape: "Scores only: visibility 0 to 4, detection -1 to 5, five quality dimensions 0 to 5",
+    why: "It is what turns an opinion into a determination. Every coverage verdict in this library is computed from two DeTT&CT numbers by one function, and the validator recomputes it on every row and fails if the stored label disagrees. Without a scoring scale the tag would be a thing somebody typed.",
+    watch: "A score is a claim about our telemetry, not a mapping, and it belongs on the evidence row with evidence behind it. Detection scored 0 means logged for forensics only, which is Collectable and not Have. Conflating the two scales is the most common scoring error.",
+  },
+};
+
+const FW_ORDER = ["attack", "atlas", "owasp_llm", "owasp_agentic", "dettect"];
+
+/* How much of each framework the library actually uses, counted from the records. */
+function fwUsage(key) {
+  const ids = new Set();
+  let scenarios = 0;
+  DATA.scenarios.forEach(s => {
+    const fm = s.framework_mapping || {};
+    let used = (fm[key] || []).length > 0;
+    (fm[key] || []).forEach(i => ids.add(i));
+    if (key === "attack" || key === "atlas") {
+      (s.attack_path || []).forEach(st => (st[key] || []).forEach(i => { ids.add(i); used = true; }));
+    }
+    if (key === "dettect") {
+      used = (s.telemetry || []).some(r => r.dettect);
+    }
+    if (used) scenarios++;
+  });
+  return { ids: [...ids].sort(), scenarios: scenarios };
+}
+
+function docFrameworks() {
+  const D = DATA.frameworks_detail || {};
+  const M = DATA.baseline_meta || {};
+  if (docSel && FW_DOC[docSel]) return docFrameworkPage(docSel);
+
+  const cards = FW_ORDER.filter(k => D[k]).map(k => {
+    const f = D[k], doc = FW_DOC[k], u = fwUsage(k);
+    const ver = f.version || f.edition || "";
+    return `<button class="card" data-doc="${k}">
+      <div class="chips"><span class="chip lay">${esc(ver)}</span>
+        <span class="tag">${esc(doc.role)}</span></div>
+      <div class="t">${esc(f.name || k)}</div>
+      <div class="meta">${esc(doc.answers)}</div>
+      <div class="meta" style="margin-top:4px">${k === "dettect"
+        ? `scored on ${u.scenarios} of ${DATA.scenarios.length} scenarios`
+        : `${u.ids.length} identifier${u.ids.length === 1 ? "" : "s"} in use across ${u.scenarios} scenario${u.scenarios === 1 ? "" : "s"}`}</div>
+    </button>`;
+  }).join("");
+
+  return `<h4 class="dh">The pinned baseline</h4>
+    <p class="dp">Every scenario record names exactly one baseline, and every identifier in
+      that record is expressed in that baseline's vocabulary. The pin exists because
+      year over year numbers are only comparable if the taxonomy underneath them is held
+      still. Two of these four made breaking changes in the last eighteen months, and without
+      a pin a coverage drop is indistinguishable from MITRE renaming a tactic.</p>
+    <div class="tsum"><strong>Baseline ${esc(M.baseline || "")}</strong>, ${esc(M.status || "")},
+      declared ${esc(M.declared || "")}, review due ${esc(M.review_due || "")}.<br>
+      <span class="src">Owner: ${esc(M.owner || "not named")}</span></div>
+    <p class="dp">Never mix baselines within a record, and never re-map a published record in
+      place. Cutting a new baseline and migrating deliberately is the supported path.</p>
+    <div class="dgrid">${cards}</div>
+    <p class="dp" style="margin-top:12px">These are not four views of the same thing, and
+      treating them as interchangeable is the most common mapping error in this repository.
+      For the index of which identifier appears in which scenario, see the
+      <strong>Frameworks</strong> tab.</p>`;
+}
+
+function docFrameworkPage(k) {
+  const f = (DATA.frameworks_detail || {})[k] || {};
+  const doc = FW_DOC[k];
+  const u = fwUsage(k);
+  const row = (label, body) => body ? `<div class="ucrow"><div class="k">${label}</div><div>${body}</div></div>` : "";
+  const link = (url, text) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text || url)}</a>`;
+  const ver = f.version || f.edition || "";
+
+  const links = [
+    f.site ? `<div>${link(f.site, "Official site")}</div>` : "",
+    f.data ? `<div>${link(f.data, "Machine readable data")}</div>` : "",
+    f.pinned_url ? `<div>${link(f.pinned_url, "The exact pinned artifact")}</div>` : "",
+    f.taxii ? `<div>${link(f.taxii, "TAXII endpoint for this version")}</div>` : "",
+    f.pdf ? `<div>${link(f.pdf, "PDF of this edition")}</div>` : "",
+    f.repo ? `<div>${link(f.repo, "Repository")}</div>` : "",
+    f.wiki ? `<div>${link(f.wiki, "Wiki and scoring guidance")}</div>` : "",
+  ].filter(Boolean).join("");
+
+  const breaking = (f.breaking_changes_since_prior_baseline || []).length
+    ? `<ul class="dl" style="margin:0">${f.breaking_changes_since_prior_baseline
+        .map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : "";
+
+  const idList = f.ids ? Object.keys(f.ids).sort().map(i =>
+    `<div><span class="tag">${esc(i)}</span> ${esc(f.ids[i])}</div>`).join("") : "";
+
+  const scales = f.scales ? `
+    <div><span class="k2">Visibility</span> ${Object.entries(f.scales.visibility || {})
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([n, v]) => `${esc(n)} ${esc(v)}`).join(", ")}</div>
+    <div><span class="k2">Detection</span> ${Object.entries(f.scales.detection || {})
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([n, v]) => `${esc(n)} ${esc(v)}`).join(", ")}</div>
+    <div style="margin-top:5px"><span class="k2">Quality</span> ${Object.keys(f.scales.quality_dimensions || {})
+      .map(d => `<span class="tag">${esc(d)}</span>`).join(" ")}</div>` : "";
+
+  return `<button class="toggle" data-docback="1">Back to frameworks</button>
+    <div class="uc sel" style="margin-top:10px">
+      <div class="hdr"><span class="id">${esc(ver)}</span>
+        <span class="chip lay">${esc(doc.role)}</span></div>
+      <h4>${esc(f.name || k)}</h4>
+      <div class="why">${esc(doc.why)}</div>
+
+      ${row("Answers", esc(doc.answers))}
+      ${row("Does not answer", esc(doc.not))}
+      ${row("Identifier shape", `<span class="src">${esc(doc.shape)}</span>`)}
+      ${row("Watch out for", esc(doc.watch))}
+
+      ${row("Pinned at", `<strong>${esc(ver)}</strong>${f.spec_version ? `, spec ${esc(f.spec_version)}` : ""}${f.format_version ? `, format ${esc(f.format_version)}` : ""}${f.released ? `, released ${esc(f.released)}` : ""}${f.published ? `, published ${esc(f.published)}` : ""}${f.targets_attack ? `, targets ATT&CK v${esc(f.targets_attack)}` : ""}`)}
+      ${row("Release cadence", f.cadence ? esc(f.cadence) : "")}
+      ${row("Pinned artifact", f.pinned_artifact ? `<span class="src">${esc(f.pinned_artifact)}</span>` : "")}
+      ${row("Identifier stability", f.id_stability ? esc(f.id_stability) : "")}
+      ${row("Breaking changes since the last baseline", breaking)}
+      ${row("Also used", (f.also_used || []).length ? f.also_used.map(a => `<div>${esc(a)}</div>`).join("") : "")}
+      ${row("Working offline", f.offline ? esc(f.offline) : (f.note && k === "dettect" ? esc(f.note) : ""))}
+      ${row("Caveat", f.version_date_caveat ? esc(f.version_date_caveat) : (f.note && k === "owasp_agentic" ? esc(f.note) : ""))}
+      ${row("The scales", scales)}
+      ${row("The categories in this edition", idList)}
+      ${row("Read the source", links)}
+
+      ${row("In this library", k === "dettect"
+        ? `Scored on ${u.scenarios} of ${DATA.scenarios.length} scenarios.`
+        : `${u.ids.length} identifier${u.ids.length === 1 ? "" : "s"} in use across ${u.scenarios} of ${DATA.scenarios.length} scenarios.${u.ids.length ? `<div style="margin-top:6px">${u.ids.map(i => `<span class="tag">${esc(i)}</span>`).join(" ")}</div>` : ""}`)}
+
+      <div class="note">Everything under Pinned at and below is read out of
+        <code>frameworks/baseline-${esc((DATA.baseline_meta || {}).baseline || "")}.yaml</code>
+        rather than written into this page, so it cannot claim a pin the repository does not
+        hold. Cutting a new baseline updates this page with it.</div>
+    </div>`;
+}
+
 function renderDocs() {
   const rail = `<div class="irail">${[
-      ["overview", "Overview"], ["envs", "Environments"], ["how", "How to"]]
+      ["overview", "Overview"], ["envs", "Environments"],
+      ["frameworks", "Frameworks"], ["how", "How to"]]
     .map(([k, t]) => `<button class="ibtn" data-dstep="${k}" aria-current="${docStep === k}">${t}</button>`).join("")}</div>`;
   const body = docStep === "overview" ? docOverview()
-             : docStep === "envs" ? docEnvs() : docHow();
+             : docStep === "envs" ? docEnvs()
+             : docStep === "frameworks" ? docFrameworks() : docHow();
   $("#docs").innerHTML = `<div class="panel"><h3>Documentation</h3>
     <div class="sub">What Liszt is, how the environments it reasons about are put together, and
       how to do each job in the tool.</div>
