@@ -21,7 +21,7 @@ Four tiers, narrowest to widest. They compound: the aggregate outcome is impossi
 | 4 | What is the single highest-leverage fix? | `hardening[]` with `leverage: high` and a `breaks_step` that resolves |
 | 5 | Does that fix have an owner? | `hardening[].owner`, and `telemetry[].owner` on every Blind/Collectable row |
 
-Question 5 is the one that gets dropped, and dropping it is what turns the exercise into theatre. The schema says it directly: *a Blind row with no owner is an orphan and will never be fixed.*
+Question 5 is the one that gets dropped, and dropping it is what turns the exercise into theater. The schema says it directly: *a Blind row with no owner is an orphan and will never be fixed.*
 
 **Observable.** Someone who was not in the room reads the record and reconstructs the reasoning without asking the author anything. Not "understands the scenario", *reconstructs the reasoning*, including why a disputed framework ID was resolved the way it was and which control held.
 

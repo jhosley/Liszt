@@ -341,7 +341,7 @@ Ask it explicitly at every `Have` row: *if this fired at 03:00 on a Sunday, wher
 
 `owner` is the team that would **accept the ticket**, not the team that happens to generate the data. The validator warns on a draft and errors on a published record for any `Blind` or `Collectable` row with no owner.
 
-**An unowned gap never closes** because a gap is closed by appearing on somebody's roadmap. An unowned row appears on a slide, produces agreement in the room, and produces no work. `docs/04-measurement.md` reports `orphaned_steps`. Blind rows with no owner, as its own escalation list for exactly this reason, and `docs/00-outcomes.md` section 1 names the owner question as the one that gets dropped and the dropping of which turns the exercise into theatre.
+**An unowned gap never closes** because a gap is closed by appearing on somebody's roadmap. An unowned row appears on a slide, produces agreement in the room, and produces no work. `docs/04-measurement.md` reports `orphaned_steps`. Blind rows with no owner, as its own escalation list for exactly this reason, and `docs/00-outcomes.md` section 1 names the owner question as the one that gets dropped and the dropping of which turns the exercise into theater.
 
 An owner you have not spoken to is a guess. Write it and mark it provisional in `notes`.
 

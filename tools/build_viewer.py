@@ -1212,10 +1212,10 @@ Rules:
     more is two scenarios, so split it rather than fusing unlike moves to fit.
   - incidents[].tier grades the SOURCE, not the severity, and is filled only for a published
     incident. Use the number, not a word:
-      1  first party. The affected organisation's own disclosure, or a research team's
+      1  first party. The affected organization's own disclosure, or a research team's
          own technical writeup of work they did themselves.
       2  reputable secondary technical reporting that adds detail: a vendor research team
-         analysing someone else's incident, a national CERT advisory.
+         analyzing someone else's incident, a national CERT advisory.
       3  press, aggregators and summaries. Good for the fact that it happened, not for
          technical detail. If all you have is a press story, tier 3 is the honest answer.
   - Valid JSON only, one object, no trailing commas, no commentary. Every key except the
@@ -1306,7 +1306,7 @@ what you changed) into "_check".
     the outcome in _check.check_3_fields.
 
 Then fill the judgment half of "_check": layer_reason (one sentence, why that layer and not
-the neighbour), layer_runner_up (the layer you nearly picked, or ""), steps_merged (if you
+the neighbor), layer_runner_up (the layer you nearly picked, or ""), steps_merged (if you
 merged or split moves to stay within six, which ones, else ""), confidence (high, medium or
 low). _check is not part of the record; the reviewer reads it and it is dropped on import.
 `;
@@ -1639,7 +1639,7 @@ WRITE THE PLAN IN THESE SEVEN SECTIONS
      rows, plus any control rows worth corroborating. Describe a component by the ROLE it
      plays, never by the flaw that makes it usable. Name what each stands in for and what
      it deliberately does not reproduce.
-     Close section 6 with four labelled lines a reader can carry into change control:
+     Close section 6 with four labeled lines a reader can carry into change control:
        TARGETS: the named lab systems this plan would put on the allowlist, or the words
          "cannot be derived from the record". Never "the lab", never a category, never a
          wildcard.
@@ -1731,8 +1731,8 @@ RULES FOR THE WHOLE ANSWER
     emulation is known to exist. If you do not know, write "emulation availability
     unverified"; do not treat the adapter as a guarantee. A unit whose technique has no
     published emulation is NEEDS ENVIRONMENT, not a ready unit. Never let it resolve to a
-    neighbouring technique that does have one: a near-neighbour emulation exercises a
-    different behaviour against the same evidence row and produces a confident number about
+    neighboring technique that does have one: a near-neighbor emulation exercises a
+    different behavior against the same evidence row and produces a confident number about
     the wrong thing.
   - Do not propose a weaker substitute when a step cannot be tested. Say it cannot be tested.
     A substitute silently changes what the score means, which is worse than a visible gap.
@@ -1865,7 +1865,7 @@ PASTE THE SCENARIO RECORD BELOW THIS LINE
 const P_UCRECORD =
 `You are turning ONE chosen use-case candidate into a Liszt use-case record STUB, ready for
 an engineer to finish. You are not finishing it. Several fields can only be filled by
-somebody who knows the organisation, and inventing them is the one way this goes wrong.
+somebody who knows the organization, and inventing them is the one way this goes wrong.
 
 PASTE TWO THINGS BELOW THE LINE AT THE FOOT OF THIS PROMPT: the scenario record, and the
 one candidate you picked from the use-case list.
@@ -1876,7 +1876,7 @@ WHAT YOU FILL, AND WHAT YOU MUST LEAVE FOR THE ENGINEER
 
   You fill these, because they are derivable from the scenario record:
     title, covers, trigger, composes, limits
-  You leave these as a TODO line, because they are decisions about an organisation you
+  You leave these as a TODO line, because they are decisions about an organization you
   cannot see:
     id, pipeline.owner, pipeline.destination, outcome.consumer, provenance.authored_by
   Every field you leave MUST literally begin with "TODO:". That word is what the validator
@@ -2137,7 +2137,7 @@ function normalizeImported(raw) {
   /* The layer is a claim about where the attack lands, and the chain is the evidence for
      that claim. When no step in the chain sits on the chosen layer, one of the two is wrong.
      This is the check that catches the failure we kept hitting: a chain that plainly runs on
-     hosts, labelled L3 because an agent was the actor. It warns rather than corrects, because
+     hosts, labeled L3 because an agent was the actor. It warns rather than corrects, because
      a legitimate answer exists in both directions and only a person can tell which. */
   if (layer) {
     const chainLayers = stepLayers.map(sl => SEAM_LAYER[sl.seam] || "").filter(Boolean);
@@ -2486,7 +2486,7 @@ function usecasePane() {
       P_UCRECORD, "ucrecord")}
     <div class="note"><strong>The stub is deliberately unfinished.</strong> The id, the
       owner, the destination, the consumer and the author are decisions about your
-      organisation, so the prompt leaves each one as a TODO rather than inventing something
+      organization, so the prompt leaves each one as a TODO rather than inventing something
       plausible. The validator flags TODO, which is why the stub uses that word and not
       PLACEHOLDER: a record full of PLACEHOLDER passes validation while still being a draft.
       Autonomy is always <code>notify</code> in a stub, because anything higher needs a
@@ -2547,7 +2547,7 @@ function renderTesting() {
   $("#testing").innerHTML = `<div class="panel"><h3>Scenario management</h3>
     <div class="sub">What a scenario is for once it is in the library. Testing checks whether
       its evidence claims are true, and the useful answer is the one where they are not. Use
-      cases turn those claims into something the organisation acts on.</div>
+      cases turn those claims into something the organization acts on.</div>
     <div style="margin-top:14px">${rail}${body}</div></div>`;
   wireTesting();
 }
