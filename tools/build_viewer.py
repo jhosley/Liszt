@@ -490,6 +490,49 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
 .tx.spacer{border:0;background:none;cursor:default}
 .irail.sm{margin:0 0 8px}
 .ibtn.sm{font-size:11.5px;padding:4px 10px}
+
+/* session mind map */
+.mapswitch{display:flex;gap:8px;margin:0 0 10px}
+.toggle.on{border-color:var(--brand);color:var(--brand)}
+.flow{display:flex;align-items:stretch;gap:6px;overflow-x:auto;padding:4px 2px 10px}
+.fstep{min-width:150px;max-width:200px;border:1px solid var(--surface-3);border-left:4px solid var(--surface-3);
+       border-radius:8px;padding:8px 10px;background:var(--surface);cursor:pointer;text-align:left;
+       display:flex;flex-direction:column;gap:3px;font:inherit;color:var(--ink)}
+.fstep:hover{border-color:var(--brand)}
+.fstep.on{outline:2px solid var(--brand);outline-offset:1px}
+.fstep.Have{border-left-color:var(--have)}
+.fstep.Collectable{border-left-color:var(--collectable)}
+.fstep.Blind{border-left-color:var(--blind)}
+.fstep .fnum{font-weight:700;font-size:11px;color:var(--brand)}
+.fstep .flay{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.fstep .ftxt{font-size:11.5px;line-height:1.35;color:var(--ink-2);display:-webkit-box;
+             -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fstep .fverdict{margin-top:auto;align-self:flex-start}
+.farr{align-self:center;color:var(--muted);font-size:16px;flex:0 0 auto}
+.maptools{display:flex;gap:10px;align-items:center;margin:2px 0 8px}
+.mbranch{margin-left:10px;padding-left:16px;border-left:2px solid var(--surface-3)}
+.mstep{margin:14px 0}
+.mstep .msh{font-size:13px;font-weight:600;margin-bottom:2px}
+.mstep .msh .n{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--surface-2);
+               color:var(--brand);font-size:11px;font-weight:700;align-items:center;justify-content:center;margin-right:6px}
+.mb{border:1px solid var(--surface-3);border-radius:8px;padding:10px 12px;margin:8px 0;
+    background:var(--surface);position:relative}
+.mb::before{content:"";position:absolute;left:-16px;top:18px;width:14px;height:2px;background:var(--surface-3)}
+.mb .q{font-weight:600;font-size:12.5px;margin-bottom:6px}
+.mb .q2{margin-top:8px}
+.mb input{width:100%;box-sizing:border-box;border:1px solid var(--surface-3);border-radius:6px;
+          padding:6px 9px;font:inherit;font-size:12.5px;background:var(--surface);color:var(--ink)}
+.mrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.mchip{border:1px solid var(--surface-3);border-radius:6px;background:var(--surface);padding:5px 12px;
+       font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink)}
+.mchip:hover{border-color:var(--brand);color:var(--brand)}
+.mchip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.mhint{color:var(--muted);font-size:11.5px;margin-top:5px;line-height:1.45}
+.mclaim{font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.mowe{background:var(--surface-2);border-left:3px solid var(--collectable);border-radius:0 6px 6px 0;
+      padding:7px 12px;margin:8px 0;font-size:12.5px;color:var(--ink-2)}
+.mdone{background:var(--surface-2);border-left:3px solid var(--have);border-radius:0 6px 6px 0;
+       padding:7px 12px;margin:8px 0;font-size:12.5px;color:var(--ink-2)}
 .trow .tv{justify-self:end}
 .trow .tbl{grid-column:1/-1;margin:2px 0 0;padding-left:18px;color:var(--muted);
            font-size:12px;line-height:1.5}
@@ -931,7 +974,11 @@ function telemetryBlock(s) {
           <td style="color:var(--muted)">${esc(e.owner || "")}${e.backlog_ref ? `<div class="tag" style="margin-top:4px">${esc(e.backlog_ref)}</div>` : ""}</td></tr>`;
       }).join("")}</tbody></table>`;
   }
-  return rows.map(t => editCard(s, t)).join("");
+  const switcher = `<div class="mapswitch">
+    <button class="toggle${scoreView === "cards" ? " on" : ""}" data-scoreview="cards">Score as cards</button>
+    <button class="toggle${scoreView === "map" ? " on" : ""}" data-scoreview="map">Score as map</button></div>`;
+  if (scoreView === "map") return switcher + mapPanel(s);
+  return switcher + rows.map(t => editCard(s, t)).join("");
 }
 
 function editCard(s, t) {
@@ -1045,6 +1092,221 @@ function wireEditors(s) {
       el.onchange = handler;
       if (el.tagName === "INPUT") el.onblur = handler;
     });
+  });
+  wireMap(s);
+}
+
+
+/* ---------- the session mind map ---------- */
+/* A second skin over the same session capture. The cards ask for numbers; a room answers
+   questions. The map renders the attack path as a flow and walks each step through the
+   questions a facilitator asks anyway: would we see this, where, does anything alert, who
+   owns the gap. Every answer lands through setRow exactly as the cards write it, so the
+   two views are interchangeable mid-session and the export does not know which was used.
+   A guided branch also cannot strand half a score pair: the no path commits both numbers
+   at once, and the yes path holds the pending value the same way the cards do. */
+let scoreView = "cards";
+let mapFocus = null;
+let mapAll = false;
+const mapUi = {};
+const mapKey = (sid, step) => sid + "|" + step;
+
+function attackRows(s) {
+  return (s.telemetry || []).filter(r => (r.kind || "attack-step") === "attack-step");
+}
+function mapVis(sid, t) {
+  const u = rowChange(sid, t.step);
+  if (u.pending_v != null && u.pending_v !== "") return Number(u.pending_v);
+  const e = effRow(sid, t);
+  return e.dettect && e.dettect.visibility != null ? e.dettect.visibility : null;
+}
+function mapDet(sid, t) {
+  const u = rowChange(sid, t.step);
+  if (u.pending_d != null && u.pending_d !== "") return Number(u.pending_d);
+  const e = effRow(sid, t);
+  return e.dettect && e.dettect.detection != null ? e.dettect.detection : null;
+}
+function mapCommitPair(s, step, v, d) {
+  const base = (((s.telemetry || []).find(r => r.step === step) || {}).dettect) || {};
+  const q = base.quality;
+  setRow(s.id, step, "pending_v", null);
+  setRow(s.id, step, "pending_d", null);
+  setRow(s.id, step, "dettect",
+    { visibility: v, detection: d, ...(q ? { quality: q } : {}) });
+}
+function mapCommitVis(s, step, v) {
+  const t = (s.telemetry || []).find(r => r.step === step);
+  const d = mapDet(s.id, t);
+  if (d == null) {
+    setRow(s.id, step, "dettect", null);
+    setRow(s.id, step, "pending_v", String(v));
+  } else mapCommitPair(s, step, v, d);
+}
+function mapCommitDet(s, step, d) {
+  const t = (s.telemetry || []).find(r => r.step === step);
+  const v = mapVis(s.id, t);
+  if (v == null) {
+    setRow(s.id, step, "dettect", null);
+    setRow(s.id, step, "pending_d", String(d));
+  } else mapCommitPair(s, step, v, d);
+}
+
+/* What this branch still owes before the room moves on. Mirrors the validator's bar:
+   a Have needs a source and evidence, a Collectable needs a source and an owner, a
+   Blind needs an owner. */
+function mapOwed(s, t) {
+  const c = effCoverage(s.id, t);
+  const e = effRow(s.id, t);
+  const owed = [];
+  if (c === "Have") {
+    if (!e.source) owed.push("the exact source");
+    if (!e.evidence) owed.push("evidence that it fires");
+  } else if (c === "Collectable") {
+    if (!e.source) owed.push("the exact source");
+    if (!e.owner) owed.push("an owner for wiring it up");
+  } else if (c === "Blind") {
+    if (!e.owner) owed.push("an owner for the gap");
+  }
+  return { verdict: c, owed };
+}
+
+function branchFor(s, t) {
+  const k = mapKey(s.id, t.step);
+  const ui = mapUi[k] || {};
+  const v = mapVis(s.id, t), d = mapDet(s.id, t);
+  const e = effRow(s.id, t);
+  const chip = (q, val, label, sel) =>
+    `<button class="mchip${sel ? " on" : ""}" data-mstep="${t.step}" data-mq="${q}" data-mv="${val}">${label}</button>`;
+  const input = (key, label, value, placeholder, hint) =>
+    `<div class="mb"><div class="q">${label}</div>
+      <input data-mk="${key}" data-mstep="${t.step}" value="${esc(value || "")}" placeholder="${esc(placeholder)}">
+      ${hint ? `<div class="mhint">${hint}</div>` : ""}</div>`;
+  const out = [];
+
+  const yesMode = (v != null && v >= 1) || ui.yes === true;
+  out.push(`<div class="mb"><div class="q">Would we see this?</div>
+    <div class="mrow">${chip("q1", "no", "No", v === 0)}${chip("q1", "yes", "Yes", yesMode)}</div>
+    ${yesMode ? `<div class="q q2">How completely?</div>
+      <div class="mrow">${[1, 2, 3, 4].map(n => chip("vis", n, String(n), v === n)).join("")}
+        <span class="mhint">1 minimal, 4 excellent</span></div>` : ""}
+    ${v === 0 ? `<div class="mhint">Nothing emits this, so nothing can alert. Recorded as
+      visibility 0 and detection none; the verdict is Blind by construction.</div>` : ""}
+  </div>`);
+
+  if (v == null && !yesMode) {
+    return `<div class="mbranch">${out.join("")}</div>`;
+  }
+
+  if (v === 0) {
+    out.push(input("owner", "Who owns this gap?", e.owner,
+      "the team that would build the collection",
+      "An unowned gap is an orphan and never closes."));
+    out.push(input("backlog_ref", "Ticket", e.backlog_ref,
+      "the backlog item that funds closing it", ""));
+  } else if (v >= 1) {
+    out.push(input("source", "Where would we see it?", e.source,
+      "the product, log source, index or endpoint by name",
+      `The record claims: ${esc(t.emitted_at || "no claim recorded")}. Confirm it or correct it.`));
+    out.push(`<div class="mb"><div class="q">How would we see it?</div>
+      <div class="mclaim"><strong>${esc(t.signal || "")}</strong>
+        ${t.detection_opportunity ? `<div>Would alert on: ${esc(t.detection_opportunity)}</div>` : ""}</div>
+      <div class="mhint">The record's claim. If the room disagrees, capture the correction in notes.</div></div>`);
+
+    const alertYes = (d != null && d >= 1) || ui.alert === true;
+    out.push(`<div class="mb"><div class="q">Does anything alert on it?</div>
+      <div class="mrow">${chip("alert", "-1", "No", d === -1 && !alertYes)}${chip("alert", "0", "Logged for forensics only", d === 0 && !alertYes)}${chip("alert", "yes", "Yes", alertYes)}</div>
+      ${alertYes ? `<div class="q q2">How mature?</div>
+        <div class="mrow">${[1, 2, 3, 4, 5].map(n => chip("mat", n, String(n), d === n)).join("")}
+          <span class="mhint">1 basic, 5 excellent</span></div>` : ""}
+      ${d === 0 ? `<div class="mhint">Forensics only is Collectable, not Have. That distinction is the whole point of the tag.</div>` : ""}
+    </div>`);
+
+    if (d != null && d >= 1) {
+      out.push(input("evidence", "What fires? Prove it.", e.evidence,
+        "the saved search, rule ID or ticket that proves it",
+        "Required for a Have. A Have nobody can check makes these figures worthless."));
+    } else if (d === 0 || d === -1) {
+      out.push(input("owner", "Who owns wiring it up?", e.owner,
+        "the team that owns that source", ""));
+      out.push(input("backlog_ref", "Ticket", e.backlog_ref,
+        "the backlog item that funds it", ""));
+    }
+  }
+
+  if (v != null && (v === 0 || d != null)) {
+    out.push(input("notes", "Notes", e.notes,
+      "anything the room said that the next reader needs", ""));
+    const st = mapOwed(s, t);
+    out.push(st.owed.length
+      ? `<div class="mowe">This branch still owes: ${st.owed.join(", ")}.</div>`
+      : `<div class="mdone">Branch complete. Verdict: <span class="chip ${st.verdict}">${st.verdict}</span></div>`);
+  }
+  return `<div class="mbranch">${out.join("")}</div>`;
+}
+
+function mapPanel(s) {
+  const rows = attackRows(s);
+  if (!rows.length) return '<div class="sub">This record has no attack-step evidence rows to map.</div>';
+  if (mapFocus == null || !rows.some(r => r.step === mapFocus)) {
+    mapFocus = (rows.find(r => effCoverage(s.id, r) === "Unscored") || rows[0]).step;
+  }
+  const strip = rows.map(t => {
+    const c = effCoverage(s.id, t);
+    const started = c !== "Unscored" || Object.keys(rowChange(s.id, t.step)).length > 0
+                    || !!(mapUi[mapKey(s.id, t.step)] || {}).yes;
+    return `<button class="fstep ${c}${mapFocus === t.step && !mapAll ? " on" : ""}" data-mfocus="${t.step}"
+        title="${esc(t.text || "")}">
+      <span class="fnum">${t.step}</span><span class="flay">${esc(t.layer || "")}</span>
+      <span class="ftxt">${esc(t.text || "")}</span>
+      <span class="fverdict chip ${c}">${c === "Unscored" ? (started ? "in progress" : "+") : c}</span>
+    </button>`;
+  }).join('<span class="farr">&#8594;</span>');
+  const controls = (s.telemetry || []).filter(r => r.kind === "control");
+  const focus = rows.find(r => r.step === mapFocus);
+  const body = mapAll
+    ? rows.map(t => `<div class="mstep"><div class="msh"><span class="n">${t.step}</span>
+        ${esc(t.text || "")}</div>${branchFor(s, t)}</div>`).join("")
+    : (focus ? branchFor(s, focus) : "");
+  return `<div class="flow">${strip}</div>
+    ${controls.length ? `<div class="mhint" style="margin:2px 0 6px">Control signals are
+      verification evidence, not steps, and are scored in the cards view:
+      ${controls.map(c => esc(c.signal)).join("; ")}.</div>` : ""}
+    <div class="maptools"><button class="toggle" id="mapall">${mapAll
+      ? "Focus one step" : "Show the whole map"}</button>
+      <span class="mhint">Walking the whole map start to finish is the readback.</span></div>
+    ${body}`;
+}
+
+function wireMap(s) {
+  $$("#detail [data-scoreview]").forEach(b => b.onclick = () => {
+    scoreView = b.dataset.scoreview; renderDetail(); renderList();
+  });
+  const ma = $("#mapall");
+  if (ma) ma.onclick = () => { mapAll = !mapAll; renderDetail(); };
+  $$("#detail .fstep[data-mfocus]").forEach(b => b.onclick = () => {
+    mapFocus = Number(b.dataset.mfocus); mapAll = false; renderDetail();
+  });
+  $$("#detail .mchip").forEach(b => b.onclick = () => {
+    const step = Number(b.dataset.mstep), q = b.dataset.mq, val = b.dataset.mv;
+    const ui = (mapUi[mapKey(s.id, step)] ||= {});
+    if (q === "q1") {
+      if (val === "no") { ui.yes = false; mapCommitPair(s, step, 0, -1); }
+      else ui.yes = true;
+    } else if (q === "vis") {
+      mapCommitVis(s, step, Number(val));
+    } else if (q === "alert") {
+      if (val === "yes") ui.alert = true;
+      else { ui.alert = false; mapCommitDet(s, step, Number(val)); }
+    } else if (q === "mat") {
+      mapCommitDet(s, step, Number(val));
+    }
+    renderDetail(); renderList(); updateSessionCount();
+  });
+  $$("#detail .mb input[data-mk]").forEach(el => {
+    el.onchange = () => {
+      setRow(s.id, Number(el.dataset.mstep), el.dataset.mk, el.value);
+      updateSessionCount(); renderDetail(); renderList();
+    };
   });
 }
 
@@ -3365,6 +3627,7 @@ const PROCEDURES = [
       "Press Start session mode at the right of the nav bar. A session bar appears with a facilitator box and a capture counter, a Session tab appears, and every evidence table turns into per row edit cards.",
       "Put a name in the facilitator box. It is written into the exported file and becomes the author on anything the session proposes.",
       "Score each row on the two questions: would we see it, and does anything alert on it. The verdict recomputes live using the same rule the repository uses.",
+      "Or score as a map: the toggle above the rows shows the attack path as a flow and walks each step through the questions one box at a time. The answers land in the same session capture as the cards, so the two views are interchangeable mid-session.",
       "Capture the rest as you go: source, evidence, owner, ticket, row notes, a proposed use case line, new scenarios, imported scenarios, use case edits.",
       "Read the readback aloud on the Session tab, then export.",
       "Leave session mode when you want the read only view back. Nothing is lost by toggling; captured work sits in browser storage until you export or discard it.",
