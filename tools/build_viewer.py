@@ -1047,9 +1047,12 @@ function telemetryBlock(s) {
           <td style="color:var(--muted)">${esc(e.owner || "")}${e.backlog_ref ? `<div class="tag" style="margin-top:4px">${esc(e.backlog_ref)}</div>` : ""}</td></tr>`;
       }).join("")}</tbody></table>`;
   }
+  const cap = session.changes[s.id] || {};
+  const captured = Object.keys(cap.telemetry || {}).length > 0 || !!cap.notes || !!cap.use_case_note;
   const switcher = `<div class="mapswitch">
     <button class="toggle${scoreView === "cards" ? " on" : ""}" data-scoreview="cards">Score as cards</button>
-    <button class="toggle${scoreView === "map" ? " on" : ""}" data-scoreview="map">Score as map</button></div>`;
+    <button class="toggle${scoreView === "map" ? " on" : ""}" data-scoreview="map">Score as map</button>
+    ${captured ? `<button class="toggle danger" id="screset" style="margin-left:auto">Reset captured answers</button>` : ""}</div>`;
   if (scoreView === "map") {
     const map = mapPanel(s);
     /* Tabletop mode is a takeover, not a hidden-chrome diet: a fixed overlay covers the
@@ -1451,6 +1454,23 @@ function wireMap(s) {
   $$("#detail [data-scoreview]").forEach(b => b.onclick = () => {
     scoreView = b.dataset.scoreview; renderDetail(); renderList();
   });
+  /* Per-scenario reset. Session captures never touch the records, so this clears the
+     browser's answers for this one scenario and the view falls back to the record. The
+     rest of the session, other scenarios, proposals, imports, is untouched. */
+  const rs = $("#screset");
+  if (rs) rs.onclick = () => {
+    const c = session.changes[s.id] || {};
+    const n = Object.keys(c.telemetry || {}).length;
+    const ok = confirm("Reset " + s.id + "? This clears what was captured for this scenario "
+      + "in this browser session: " + n + " row edit" + (n === 1 ? "" : "s")
+      + (c.use_case_note ? ", the proposed use case line" : "")
+      + (c.notes ? ", the scenario notes" : "")
+      + ". The record itself and the rest of the session are untouched.");
+    if (!ok) return;
+    delete session.changes[s.id];
+    Object.keys(mapUi).forEach(k => { if (k.indexOf(s.id + "|") === 0) delete mapUi[k]; });
+    saveSession(); updateSessionCount(); renderDetail(); renderList();
+  };
   const ma = $("#mapall");
   if (ma) ma.onclick = () => { mapAll = !mapAll; renderDetail(); };
   /* Pin the context strip just below whatever sits above it: the sticky header in the
@@ -3868,6 +3888,7 @@ const PROCEDURES = [
       "Score each row on the two questions: would we see it, and does anything alert on it. The verdict recomputes live using the same rule the repository uses.",
       "Or score as a map: the toggle above the rows shows the attack path as a flow and walks each step through the questions one box at a time. The answers land in the same session capture as the cards, so the two views are interchangeable mid-session.",
       "We don't know is a real answer. The row stays unscored, which keeps it out of every average, and it is flagged for research with an owner. The flag clears the moment the row is scored, and the validator warns if a scored row still carries it.",
+      "Reset captured answers, on the scenario's scoring view, clears one scenario's session capture and nothing else. Useful between tabletop runs. The record is untouched, because session captures never write to the repository in the first place.",
       "Capture the rest as you go: source, evidence, owner, ticket, row notes, a proposed use case line, new scenarios, imported scenarios, use case edits.",
       "Read the readback aloud on the Session tab, then export.",
       "Leave session mode when you want the read only view back. Nothing is lost by toggling; captured work sits in browser storage until you export or discard it.",
