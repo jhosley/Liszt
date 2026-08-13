@@ -494,25 +494,51 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
 /* session mind map */
 .mapswitch{display:flex;gap:8px;margin:0 0 10px}
 .toggle.on{border-color:var(--brand);color:var(--brand)}
-.flow{display:flex;align-items:stretch;gap:6px;overflow-x:auto;padding:4px 2px 10px}
-.fstep{min-width:150px;max-width:200px;border:1px solid var(--surface-3);border-left:4px solid var(--surface-3);
-       border-radius:8px;padding:8px 10px;background:var(--surface);cursor:pointer;text-align:left;
-       display:flex;flex-direction:column;gap:3px;font:inherit;color:var(--ink)}
+.mapctx{position:sticky;z-index:8;background:var(--surface-2);padding:6px 0 8px;
+        border-bottom:1px solid var(--surface-3)}
+.curve{display:flex;gap:2px;height:6px;margin:0 2px 8px;border-radius:3px;overflow:hidden}
+.curve span{flex:1;background:var(--surface-3)}
+.curve span.Have{background:var(--have)}
+.curve span.Collectable{background:var(--collectable)}
+.curve span.Blind{background:var(--blind)}
+.flow{display:flex;align-items:stretch;overflow-x:auto;padding:2px}
+.fstep{min-width:168px;max-width:210px;border:1px solid var(--surface-3);border-radius:9px;
+       padding:9px 11px;background:var(--surface);cursor:pointer;text-align:left;
+       display:flex;flex-direction:column;gap:4px;font:inherit;color:var(--ink);flex:0 0 auto}
 .fstep:hover{border-color:var(--brand)}
-.fstep.on{outline:2px solid var(--brand);outline-offset:1px}
-.fstep.Have{border-left-color:var(--have)}
-.fstep.Collectable{border-left-color:var(--collectable)}
-.fstep.Blind{border-left-color:var(--blind)}
-.fstep .fnum{font-weight:700;font-size:11px;color:var(--brand)}
-.fstep .flay{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
-.fstep .ftxt{font-size:11.5px;line-height:1.35;color:var(--ink-2);display:-webkit-box;
-             -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.fstep .fverdict{margin-top:auto;align-self:flex-start}
-.farr{align-self:center;color:var(--muted);font-size:16px;flex:0 0 auto}
-.maptools{display:flex;gap:10px;align-items:center;margin:2px 0 8px}
+.fstep.on{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand)}
+.fstep.dim{opacity:.55}
+.fstep.dim:hover{opacity:1}
+.fhead{display:flex;align-items:center;gap:7px}
+.fnum{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--surface-2);
+      color:var(--brand);font-size:11px;font-weight:700;align-items:center;justify-content:center;
+      flex:0 0 20px}
+.fnum.done{background:var(--have);color:#fff}
+.ftype{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fseam{margin-left:auto;font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;
+       color:var(--brand-ink);background:var(--surface-2);border-radius:4px;padding:2px 6px}
+.flab{font-weight:700;font-size:13px;line-height:1.25}
+.ftxt{font-size:11px;line-height:1.4;color:var(--muted);display:-webkit-box;
+      -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ffoot{margin-top:auto;padding-top:3px}
+.ffrac{font-size:10.5px;font-weight:600;color:var(--muted)}
+.ffrac.done{color:var(--have)}
+.fplus{display:inline-flex;width:18px;height:18px;border:1px solid var(--surface-3);border-radius:5px;
+       color:var(--muted);font-size:13px;align-items:center;justify-content:center}
+.fstep:hover .fplus{border-color:var(--brand);color:var(--brand)}
+.fgate{display:flex;align-items:center;flex:0 0 30px}
+.fgate::before,.fgate::after{content:"";height:2px;background:var(--surface-3);flex:1}
+.fgate i{width:7px;height:30px;border-radius:3px;background:var(--surface-3);flex:0 0 7px}
+.fgate.Have i{background:var(--have)}
+.fgate.Collectable i{background:var(--collectable)}
+.fgate.Blind i{background:var(--blind)}
+.fend{align-self:center;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+      color:var(--muted);border:1px dashed var(--surface-3);border-radius:6px;padding:5px 8px;
+      flex:0 0 auto}
+.maptools{display:flex;gap:10px;align-items:center;margin:10px 0 8px}
 .mbranch{margin-left:10px;padding-left:16px;border-left:2px solid var(--surface-3)}
 .mstep{margin:14px 0}
-.mstep .msh{font-size:13px;font-weight:600;margin-bottom:2px}
+.mstep .msh{font-size:13px;font-weight:600;margin-bottom:2px;line-height:1.45}
 .mstep .msh .n{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--surface-2);
                color:var(--brand);font-size:11px;font-weight:700;align-items:center;justify-content:center;margin-right:6px}
 .mb{border:1px solid var(--surface-3);border-radius:8px;padding:10px 12px;margin:8px 0;
@@ -529,10 +555,12 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
 .mchip.on{background:var(--brand);border-color:var(--brand);color:#fff}
 .mhint{color:var(--muted);font-size:11.5px;margin-top:5px;line-height:1.45}
 .mclaim{font-size:12.5px;color:var(--ink-2);line-height:1.5}
-.mowe{background:var(--surface-2);border-left:3px solid var(--collectable);border-radius:0 6px 6px 0;
-      padding:7px 12px;margin:8px 0;font-size:12.5px;color:var(--ink-2)}
+.hotspot{display:inline-block;background:#e91e8c;color:#fff;font-size:12px;font-weight:700;
+         padding:6px 12px;border-radius:4px;margin:10px 0 4px;transform:rotate(-1.5deg);
+         box-shadow:0 1px 4px rgba(0,0,0,.18);letter-spacing:.02em}
 .mdone{background:var(--surface-2);border-left:3px solid var(--have);border-radius:0 6px 6px 0;
        padding:7px 12px;margin:8px 0;font-size:12.5px;color:var(--ink-2)}
+#detail .ec[data-uc-note]{margin-top:26px;border-top:2px solid var(--surface-3);padding-top:18px}
 .trow .tv{justify-self:end}
 .trow .tbl{grid-column:1/-1;margin:2px 0 0;padding-left:18px;color:var(--muted);
            font-size:12px;line-height:1.5}
@@ -1238,10 +1266,35 @@ function branchFor(s, t) {
       "anything the room said that the next reader needs", ""));
     const st = mapOwed(s, t);
     out.push(st.owed.length
-      ? `<div class="mowe">This branch still owes: ${st.owed.join(", ")}.</div>`
+      ? `<div class="hotspot" role="status">OWES: ${st.owed.join(", ")}</div>`
       : `<div class="mdone">Branch complete. Verdict: <span class="chip ${st.verdict}">${st.verdict}</span></div>`);
   }
   return `<div class="mbranch">${out.join("")}</div>`;
+}
+
+/* A two or three word action label for the step card, in the stepper tradition of
+   brutally short spine labels. The full text sits on the card's second line and in the
+   branch header, so nothing is lost, but the label is what the back of the room reads. */
+function shortLabel(text) {
+  const words = String(text || "").split(/\s+/)
+    .filter(w => !/^(the|a|an|and|of|to|with|from|into|in|on|for|our|their|its|is|are|was|were|then)$/i.test(w));
+  const label = words.slice(0, 2).join(" ");
+  return label ? label.charAt(0).toUpperCase() + label.slice(1) : "";
+}
+
+/* Progress is not verdict. The card carries progress (answered n of m, checkmark when
+   done); the gate carries the verdict. m is the completion bar for the verdict the
+   branch computed: a Blind owes an owner, a Collectable its source and an owner, a
+   Have its source and evidence. */
+function branchProgress(s, t) {
+  const c = effCoverage(s.id, t);
+  if (c === "Unscored") return null;
+  const e = effRow(s.id, t);
+  const items = c === "Blind" ? [true, !!e.owner]
+    : c === "Have" ? [true, !!e.source, !!e.evidence]
+    : [true, !!e.source, !!e.owner];
+  return { n: items.filter(Boolean).length, m: items.length,
+           complete: items.every(Boolean), verdict: c };
 }
 
 function mapPanel(s) {
@@ -1250,24 +1303,51 @@ function mapPanel(s) {
   if (mapFocus == null || !rows.some(r => r.step === mapFocus)) {
     mapFocus = (rows.find(r => effCoverage(s.id, r) === "Unscored") || rows[0]).step;
   }
-  const strip = rows.map(t => {
+  const ap = step => (s.attack_path || []).find(a => a.step === step) || {};
+
+  /* The verdict curve: the whole engagement's shape in one glance, one segment per
+     step, before any card is read. */
+  const curve = `<div class="curve">${rows.map(t =>
+    `<span class="${effCoverage(s.id, t)}" title="Step ${t.step}: ${effCoverage(s.id, t)}"></span>`).join("")}</div>`;
+
+  const cards = rows.map((t, i) => {
+    const a = ap(t.step);
     const c = effCoverage(s.id, t);
+    const p = branchProgress(s, t);
     const started = c !== "Unscored" || Object.keys(rowChange(s.id, t.step)).length > 0
                     || !!(mapUi[mapKey(s.id, t.step)] || {}).yes;
-    return `<button class="fstep ${c}${mapFocus === t.step && !mapAll ? " on" : ""}" data-mfocus="${t.step}"
-        title="${esc(t.text || "")}">
-      <span class="fnum">${t.step}</span><span class="flay">${esc(t.layer || "")}</span>
-      <span class="ftxt">${esc(t.text || "")}</span>
-      <span class="fverdict chip ${c}">${c === "Unscored" ? (started ? "in progress" : "+") : c}</span>
+    const dim = !mapAll && mapFocus !== t.step;
+    const foot = p
+      ? (p.complete
+          ? `<span class="ffrac done">&#10003; complete</span>`
+          : `<span class="ffrac">${p.n}/${p.m} answered</span>`)
+      : (started ? `<span class="ffrac">in progress</span>` : `<span class="fplus">+</span>`);
+    const card = `<button class="fstep${mapFocus === t.step && !mapAll ? " on" : ""}${dim ? " dim" : ""}"
+        data-mfocus="${t.step}" title="${esc(a.text || "")}">
+      <span class="fhead"><span class="fnum${p && p.complete ? " done" : ""}">${p && p.complete ? "&#10003;" : t.step}</span>
+        <span class="ftype">Step ${t.step}</span>
+        <span class="fseam">${esc(a.layer || "")}</span></span>
+      <span class="flab">${esc(shortLabel(a.text) || "Step " + t.step)}</span>
+      <span class="ftxt">${esc(a.text || "")}</span>
+      <span class="ffoot">${foot}</span>
     </button>`;
-  }).join('<span class="farr">&#8594;</span>');
+    /* The barrier gate: the detective control for this step, standing on the path the
+       way a bowtie draws it. A red gate is a hole in the wall at this point. */
+    const gate = `<span class="fgate ${c}" title="Detection at step ${t.step}: ${c}"><i></i></span>`;
+    return card + gate;
+  }).join("");
+
   const controls = (s.telemetry || []).filter(r => r.kind === "control");
   const focus = rows.find(r => r.step === mapFocus);
+  const fa = focus ? ap(focus.step) : {};
   const body = mapAll
-    ? rows.map(t => `<div class="mstep"><div class="msh"><span class="n">${t.step}</span>
-        ${esc(t.text || "")}</div>${branchFor(s, t)}</div>`).join("")
-    : (focus ? branchFor(s, focus) : "");
-  return `<div class="flow">${strip}</div>
+    ? rows.map(t => { const a = ap(t.step); return `<div class="mstep">
+        <div class="msh"><span class="n">${t.step}</span> ${esc(a.text || "")}</div>
+        ${branchFor(s, t)}</div>`; }).join("")
+    : (focus ? `<div class="mstep"><div class="msh"><span class="n">${focus.step}</span>
+        ${esc(fa.text || "")}</div>${branchFor(s, focus)}</div>` : "");
+
+  return `<div class="mapctx">${curve}<div class="flow">${cards}<span class="fend">Impact</span></div></div>
     ${controls.length ? `<div class="mhint" style="margin:2px 0 6px">Control signals are
       verification evidence, not steps, and are scored in the cards view:
       ${controls.map(c => esc(c.signal)).join("; ")}.</div>` : ""}
@@ -1283,6 +1363,12 @@ function wireMap(s) {
   });
   const ma = $("#mapall");
   if (ma) ma.onclick = () => { mapAll = !mapAll; renderDetail(); };
+  /* Pin the context strip just below the sticky header, whatever height the header
+     happens to be at this width. Measured rather than hardcoded, because the session
+     bar wraps at narrow widths and a wrong constant slides the strip underneath it. */
+  const ctx = $("#detail .mapctx");
+  const hdr = document.querySelector("header");
+  if (ctx && hdr) ctx.style.top = hdr.offsetHeight + "px";
   $$("#detail .fstep[data-mfocus]").forEach(b => b.onclick = () => {
     mapFocus = Number(b.dataset.mfocus); mapAll = false; renderDetail();
   });
