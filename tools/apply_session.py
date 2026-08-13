@@ -47,7 +47,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from new_scenario import ScaffoldError, create_scenario, next_scenario_id
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-FIELDS = ("dettect", "coverage", "source", "owner", "evidence", "backlog_ref", "notes")
+FIELDS = ("dettect", "coverage", "source", "owner", "evidence", "backlog_ref", "notes",
+          "research_needed")
 
 yaml = YAML()
 yaml.preserve_quotes = True

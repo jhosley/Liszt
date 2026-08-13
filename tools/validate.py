@@ -200,6 +200,10 @@ def check_quality_bar(rec: dict, f: Findings, incidents: set[str],
     # --- coverage derivation -------------------------------------------------
     for r in rows:
         d = derive_coverage(r.get("dettect"))
+        if r.get("research_needed") and d is not None:
+            f.warn(f"telemetry[{r['step']}]",
+                   "scored but still flagged research_needed. The flag means the room could "
+                   "not answer; a scored row has been answered, so clear the flag")
         if d is None:
             (f.err if published else f.warn)(
                 f"telemetry[{r['step']}]",

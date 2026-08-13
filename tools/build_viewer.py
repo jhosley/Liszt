@@ -587,6 +587,23 @@ body.tabletop{overflow:hidden}
 .ttwrap .mhint{font-size:12.5px}
 .ttwrap .hotspot{font-size:14px;padding:7px 14px}
 .ttwrap .mdone{font-size:14px}
+
+/* research needed: a known unknown, violet everywhere and violet means only this */
+.curve span.research{background:#7A5AF8}
+.ffrac.research{color:#7A5AF8;font-weight:700}
+.chip.research{background:#efeafe;color:#5b3fd4}
+.mark.research{background:#efeafe;color:#5b3fd4;font-size:10px;font-weight:700;
+               letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:2px 7px}
+.rdone{background:#f4f0fe;border-left:3px solid #7A5AF8;border-radius:0 6px 6px 0;
+       padding:7px 12px;margin:8px 0;font-size:12.5px;color:var(--ink-2)}
+.mb textarea{width:100%;box-sizing:border-box;border:1px solid var(--surface-3);border-radius:6px;
+             padding:7px 10px;font:inherit;font-size:12.5px;background:var(--surface);
+             color:var(--ink);resize:vertical;min-height:74px;line-height:1.5}
+.mcount{text-align:right;color:var(--muted);font-size:10.5px;margin-top:3px}
+.ec textarea{width:100%;box-sizing:border-box;border:1px solid var(--surface-3);border-radius:6px;
+             padding:7px 10px;font:inherit;font-size:13px;background:var(--surface);
+             color:var(--ink);resize:vertical;line-height:1.5}
+.ttwrap .mb textarea{font-size:14px}
 .trow .tv{justify-self:end}
 .trow .tbl{grid-column:1/-1;margin:2px 0 0;padding-left:18px;color:var(--muted);
            font-size:12px;line-height:1.5}
@@ -1022,7 +1039,9 @@ function telemetryBlock(s) {
           <td><strong>${esc(t.signal)}</strong>${e.evidence ? `<div style="color:var(--muted);font-size:12px;margin-top:3px">${esc(e.evidence)}</div>` : ""}</td>
           <td style="color:var(--muted)">${esc(t.emitted_at)}</td>
           <td class="mono" style="color:var(--ink-2)">${esc(e.source || "")}</td>
-          <td><span class="chip ${c}"><i class="dot ${c}"></i>${c}</span>
+          <td>${c === "Unscored" && e.research_needed
+                ? `<span class="chip research">Research</span>`
+                : `<span class="chip ${c}"><i class="dot ${c}"></i>${c}</span>`}
               <div class="scores">${sc}</div></td>
           <td>${esc(t.detection_opportunity)}</td>
           <td style="color:var(--muted)">${esc(e.owner || "")}${e.backlog_ref ? `<div class="tag" style="margin-top:4px">${esc(e.backlog_ref)}</div>` : ""}</td></tr>`;
@@ -1057,6 +1076,7 @@ function editCard(s, t) {
   return `<div class="ec ${touched ? "changed" : ""}" data-step="${t.step}">
     <div class="hdr"><span class="n">${t.kind === "control" ? "c" : t.step}</span>
       <span class="sig">${esc(t.signal)}</span>
+      ${e.research_needed && c === "Unscored" ? '<span class="mark research">needs research</span>' : ""}
       ${touched ? '<span class="mark">captured this session</span>' : ""}</div>
     <div class="cat">${esc(t.emitted_at)}${t.detection_opportunity ? " &middot; would alert on: " + esc(t.detection_opportunity) : ""}</div>
 
@@ -1089,8 +1109,8 @@ function editCard(s, t) {
     </div>
 
     <div class="fld"><label>Notes</label>
-      <input data-k="notes" value="${esc(e.notes || "")}"
-        placeholder="anything the room said that the next reader needs"></div>
+      <textarea data-k="notes" rows="3" maxlength="1500"
+        placeholder="anything the room said that the next reader needs">${esc(e.notes || "")}</textarea></div>
   </div>`;
 }
 
@@ -1115,7 +1135,7 @@ function ucNoteCard(s) {
 function wireEditors(s) {
   $$("#detail .ec").forEach(card => {
     const step = Number(card.dataset.step);
-    $$("select,input", card).forEach(el => {
+    $$("select,input,textarea", card).forEach(el => {
       const k = el.dataset.k;
       const handler = () => {
         if (k === "use_case_note") {
@@ -1195,6 +1215,7 @@ function mapDet(sid, t) {
 function mapCommitPair(s, step, v, d) {
   const base = (((s.telemetry || []).find(r => r.step === step) || {}).dettect) || {};
   const q = base.quality;
+  setRow(s.id, step, "research_needed", null);
   setRow(s.id, step, "pending_v", null);
   setRow(s.id, step, "pending_d", null);
   setRow(s.id, step, "dettect",
@@ -1247,11 +1268,20 @@ function branchFor(s, t) {
     `<div class="mb"><div class="q">${label}</div>
       <input data-mk="${key}" data-mstep="${t.step}" value="${esc(value || "")}" placeholder="${esc(placeholder)}">
       ${hint ? `<div class="mhint">${hint}</div>` : ""}</div>`;
+  /* Notes are verbose on purpose. The room's reasoning is the part a reader cannot
+     reconstruct later, so it gets space and a counter rather than a single line. */
+  const bigInput = (key, label, value, placeholder, hint) =>
+    `<div class="mb"><div class="q">${label}</div>
+      <textarea data-mk="${key}" data-mstep="${t.step}" rows="4" maxlength="1500"
+        placeholder="${esc(placeholder)}">${esc(value || "")}</textarea>
+      <div class="mcount">${String(value || "").length}/1500</div>
+      ${hint ? `<div class="mhint">${hint}</div>` : ""}</div>`;
   const out = [];
 
+  const research = !!e.research_needed && v == null;
   const yesMode = (v != null && v >= 1) || ui.yes === true;
   out.push(`<div class="mb"><div class="q">Would we see this?</div>
-    <div class="mrow">${chip("q1", "no", "No", v === 0)}${chip("q1", "yes", "Yes", yesMode)}</div>
+    <div class="mrow">${chip("q1", "no", "No", v === 0)}${chip("q1", "yes", "Yes", yesMode)}${chip("q1", "unk", "We don't know", research)}</div>
     ${yesMode ? `<div class="q q2">How completely?</div>
       <div class="mrow">${[1, 2, 3, 4].map(n => chip("vis", n, String(n), v === n)).join("")}
         <span class="mhint">1 minimal, 4 excellent</span></div>` : ""}
@@ -1259,6 +1289,22 @@ function branchFor(s, t) {
       visibility 0 and detection none; the verdict is Blind by construction.</div>` : ""}
   </div>`);
 
+  if (research) {
+    out.push(`<div class="mb"><div class="q">An honest answer, and a flagged one.</div>
+      <div class="mhint">The row stays unscored, which keeps it out of every average. The
+        flag records that this blank is a known unknown with follow-up owed, not a question
+        nobody has asked yet. It clears the moment the row is scored.</div></div>`);
+    out.push(input("owner", "Who owns finding out?", e.owner,
+      "the team that will run this down", ""));
+    out.push(input("backlog_ref", "Ticket", e.backlog_ref,
+      "the follow-up item that tracks the research", ""));
+    out.push(bigInput("notes", "What do we need to learn?", e.notes,
+      "what was checked in the room, who was asked, and what would settle it", ""));
+    out.push(e.owner
+      ? `<div class="rdone">Research owned. The row stays unscored until the answer comes back.</div>`
+      : `<div class="hotspot" role="status">OWES: an owner for the research</div>`);
+    return `<div class="mbranch">${out.join("")}</div>`;
+  }
   if (v == null && !yesMode) {
     return `<div class="mbranch">${out.join("")}</div>`;
   }
@@ -1300,7 +1346,7 @@ function branchFor(s, t) {
   }
 
   if (v != null && (v === 0 || d != null)) {
-    out.push(input("notes", "Notes", e.notes,
+    out.push(bigInput("notes", "Notes", e.notes,
       "anything the room said that the next reader needs", ""));
     const st = mapOwed(s, t);
     out.push(st.owed.length
@@ -1345,8 +1391,11 @@ function mapPanel(s) {
 
   /* The verdict curve: the whole engagement's shape in one glance, one segment per
      step, before any card is read. */
-  const curve = `<div class="curve">${rows.map(t =>
-    `<span class="${effCoverage(s.id, t)}" title="Step ${t.step}: ${effCoverage(s.id, t)}"></span>`).join("")}</div>`;
+  const curve = `<div class="curve">${rows.map(t => {
+    const c = effCoverage(s.id, t);
+    const cls = c === "Unscored" && effRow(s.id, t).research_needed ? "research" : c;
+    return `<span class="${cls}" title="Step ${t.step}: ${cls === "research" ? "research needed" : c}"></span>`;
+  }).join("")}</div>`;
 
   const cards = rows.map((t, i) => {
     const a = ap(t.step);
@@ -1354,12 +1403,14 @@ function mapPanel(s) {
     const p = branchProgress(s, t);
     const started = c !== "Unscored" || Object.keys(rowChange(s.id, t.step)).length > 0
                     || !!(mapUi[mapKey(s.id, t.step)] || {}).yes;
+    const flagged = !!effRow(s.id, t).research_needed && c === "Unscored";
     const dim = !mapAll && mapFocus !== t.step;
     const foot = p
       ? (p.complete
           ? `<span class="ffrac done">&#10003; complete</span>`
           : `<span class="ffrac">${p.n}/${p.m} answered</span>`)
-      : (started ? `<span class="ffrac">in progress</span>` : `<span class="fplus">+</span>`);
+      : (flagged ? `<span class="ffrac research">research</span>`
+        : started ? `<span class="ffrac">in progress</span>` : `<span class="fplus">+</span>`);
     const card = `<button class="fstep${mapFocus === t.step && !mapAll ? " on" : ""}${dim ? " dim" : ""}"
         data-mfocus="${t.step}" title="${esc(a.text || "")}">
       <span class="fhead"><span class="fnum${p && p.complete ? " done" : ""}">${p && p.complete ? "&#10003;" : t.step}</span>
@@ -1462,8 +1513,20 @@ function wireMap(s) {
     const step = Number(b.dataset.mstep), q = b.dataset.mq, val = b.dataset.mv;
     const ui = (mapUi[mapKey(s.id, step)] ||= {});
     if (q === "q1") {
-      if (val === "no") { ui.yes = false; mapCommitPair(s, step, 0, -1); }
-      else ui.yes = true;
+      if (val === "no") {
+        ui.yes = false;
+        setRow(s.id, step, "research_needed", null);
+        mapCommitPair(s, step, 0, -1);
+      } else if (val === "unk") {
+        ui.yes = false;
+        setRow(s.id, step, "dettect", null);
+        setRow(s.id, step, "pending_v", null);
+        setRow(s.id, step, "pending_d", null);
+        setRow(s.id, step, "research_needed", true);
+      } else {
+        ui.yes = true;
+        setRow(s.id, step, "research_needed", null);
+      }
     } else if (q === "vis") {
       mapCommitVis(s, step, Number(val));
     } else if (q === "alert") {
@@ -1474,10 +1537,14 @@ function wireMap(s) {
     }
     renderDetail(); renderList(); updateSessionCount();
   });
-  $$("#detail .mb input[data-mk]").forEach(el => {
+  $$("#detail .mb input[data-mk], #detail .mb textarea[data-mk]").forEach(el => {
     el.onchange = () => {
       setRow(s.id, Number(el.dataset.mstep), el.dataset.mk, el.value);
       updateSessionCount(); renderDetail(); renderList();
+    };
+    if (el.tagName === "TEXTAREA") el.oninput = () => {
+      const c = el.parentElement.querySelector(".mcount");
+      if (c) c.textContent = el.value.length + "/1500";
     };
   });
 }
@@ -3800,6 +3867,7 @@ const PROCEDURES = [
       "Put a name in the facilitator box. It is written into the exported file and becomes the author on anything the session proposes.",
       "Score each row on the two questions: would we see it, and does anything alert on it. The verdict recomputes live using the same rule the repository uses.",
       "Or score as a map: the toggle above the rows shows the attack path as a flow and walks each step through the questions one box at a time. The answers land in the same session capture as the cards, so the two views are interchangeable mid-session.",
+      "We don't know is a real answer. The row stays unscored, which keeps it out of every average, and it is flagged for research with an owner. The flag clears the moment the row is scored, and the validator warns if a scored row still carries it.",
       "Capture the rest as you go: source, evidence, owner, ticket, row notes, a proposed use case line, new scenarios, imported scenarios, use case edits.",
       "Read the readback aloud on the Session tab, then export.",
       "Leave session mode when you want the read only view back. Nothing is lost by toggling; captured work sits in browser storage until you export or discard it.",

@@ -361,8 +361,12 @@
           },
           "notes": {
             "type": "string",
-            "maxLength": 400,
-            "description": "Row-level working notes captured during a session. Never rendered on the slides."
+            "maxLength": 1500,
+            "description": "Row-level working notes captured during a session. Verbose on purpose: the room's reasoning is worth keeping. Never rendered on the slides."
+          },
+          "research_needed": {
+            "type": "boolean",
+            "description": "The room could not answer whether this signal exists. The row stays unscored, which keeps it out of every average, and this flag records that the blank is a known unknown with follow-up owed, not a question nobody has asked yet. Name an owner for the research. Clear the flag when the row is scored."
           }
         }
       }
