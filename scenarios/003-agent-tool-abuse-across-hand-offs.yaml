@@ -2,8 +2,7 @@ schema_version: 1
 id: '003'
 slug: agent-tool-abuse-across-hand-offs
 title: Agent tool-abuse across hand-offs
-one_liner: An AI agent that can use tools and act on its own is tricked (or simply over-permitted) into misusing that 
-  power - often across hand-offs to other agents that nobody is logging.
+one_liner: An AI agent that can use tools and act on its own is tricked (or simply over-permitted) into misusing that power - often across hand-offs to other agents that nobody is logging.
 status: draft
 classification:
   primary_layer_component: Agent
@@ -11,138 +10,110 @@ classification:
   evidence: seen-in-the-wild
   priority: NOW
   priority_rationale:
-    - Agents are being given real production credentials and can take real actions.
-    - One injected instruction can turn an agent into an insider acting with our own permissions.
-    - The hand-offs between agents are almost entirely unlogged today.
+  - Agents are being given real production credentials and can take real actions.
+  - One injected instruction can turn an agent into an insider acting with our own permissions.
+  - The hand-offs between agents are almost entirely unlogged today.
 framework_mapping:
   baseline: '2026.07'
   attack:
-    - T1059
-    - T1213
-    - T1567
+  - T1059
+  - T1213
+  - T1567
   atlas:
-    - AML.T0024
-    - AML.T0025
-    - AML.T0051.001
+  - AML.T0024
+  - AML.T0025
+  - AML.T0051.001
   owasp_llm:
-    - LLM06:2025
+  - LLM06:2025
   owasp_agentic: []
   mapping_confidence: editorial
-  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline 2026.07 identifiers
-    before this record is published: ATLAS: Prompt Injection (steering) + tool / plugin abuse | Layers L3 Agent (+ App, +
-    Identity)'
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline 2026.07 identifiers before this record is published: ATLAS: Prompt Injection (steering) + tool / plugin abuse | Layers L3 Agent (+ App, + Identity)'
 attack_path:
-  - step: 1
-    layer: App / Data
-    text: Attacker steers the agent - injection in a task, or a poisoned tool (MCP server)
-    atlas:
-      - AML.T0051.001
-  - step: 2
-    layer: Agent
-    text: The agent plans and invokes tools with broad privilege (over-privileged service account or delegated auth)
-    attack:
-      - T1059
-  - step: 3
-    layer: Agent seam
-    text: The agent hands off to a sub-agent or external tool over MCP / A2A
-  - step: 4
-    layer: Tool
-    text: The tool acts with the agent's privilege - data access, write, send, or a system change
-    attack:
-      - T1213
-    atlas:
-      - AML.T0024
-  - step: 5
-    layer: Various
-    text: Impact - exfiltration, unauthorized transaction, lateral movement - hard to attribute
-    attack:
-      - T1567
-    atlas:
-      - AML.T0025
+- step: 1
+  layer: App / Data
+  text: Attacker steers the agent - injection in a task, or a poisoned tool (MCP server)
+  atlas:
+  - AML.T0051.001
+- step: 2
+  layer: Agent
+  text: The agent plans and invokes tools with broad privilege (over-privileged service account or delegated auth)
+  attack:
+  - T1059
+- step: 3
+  layer: Agent seam
+  text: The agent hands off to a sub-agent or external tool over MCP / A2A
+- step: 4
+  layer: Tool
+  text: The tool acts with the agent's privilege - data access, write, send, or a system change
+  attack:
+  - T1213
+  atlas:
+  - AML.T0024
+- step: 5
+  layer: Various
+  text: Impact - exfiltration, unauthorized transaction, lateral movement - hard to attribute
+  attack:
+  - T1567
+  atlas:
+  - AML.T0025
 telemetry:
-  - step: 1
-    signal: 'Steering: injection or poisoned tool'
-    emitted_at: L2 guardrail · MCP registry / tool inventory
-    coverage: Blind
-    detection_opportunity: Injection hit; unknown tool registered; tool-description poisoning
-    dettect:
-      visibility: 0
-      detection: -1
-    owner: AI Platform Engineering
-  - step: 2
-    signal: Agent plan + tool invocation
-    emitted_at: L3 orchestration / tool-call logs · AI gateway
-    coverage: Collectable
-    detection_opportunity: Anomalous tool sequence; tool use outside role
-    dettect:
-      visibility: 2
-      detection: 0
-    source: Agent orchestration run log, index=agent_runs
-    owner: AI Platform Engineering
-  - step: 3
-    signal: Hand-off across the seam (MCP / A2A)
-    emitted_at: L3 inter-agent / MCP logs
-    coverage: Blind
-    detection_opportunity: Hand-off to unexpected party; identity mismatch at the hop
-    dettect:
-      visibility: 0
-      detection: -1
-    owner: AI Platform Engineering
-  - step: 4
-    signal: Consequential action
-    emitted_at: Target API / app logs · DLP · Identity
-    coverage: Have
-    detection_opportunity: Sensitive action by an AI identity; over-privileged / out-of-pattern access
-    dettect:
-      visibility: 3
-      detection: 2
-    source: Tool gateway invocation log, index=tool_gw
-    evidence: rule AGENT-TOOL-PRIV-09
-  - step: 5
-    signal: Impact / exfil / transaction
-    emitted_at: DLP · NDR · app logs
-    coverage: Have
-    detection_opportunity: Standard exfil / transaction-anomaly detection
-    dettect:
-      visibility: 3
-      detection: 2
-    source: Secure web gateway proxy transaction log, index=proxy_txn
-    evidence: rule NET-EGRESS-ANOM-07
-  - step: 6
-    signal: Agent identity & privilege used
-    emitted_at: Identity / IAM / PAM
-    coverage: Have
-    detection_opportunity: Excessive agent privilege; agent acting as a user without clear delegation
-    kind: control
-    dettect:
-      visibility: 3
-      detection: 2
-    source: Workload identity token issuance log, index=idp_workload
-    evidence: saved search AGENT-IDENT-01
+- step: 1
+  signal: 'Steering: injection or poisoned tool'
+  emitted_at: L2 guardrail · MCP registry / tool inventory
+  coverage: Blind
+  detection_opportunity: Injection hit; unknown tool registered; tool-description poisoning
+  owner: AI Platform Engineering
+- step: 2
+  signal: Agent plan + tool invocation
+  emitted_at: L3 orchestration / tool-call logs · AI gateway
+  coverage: Collectable
+  detection_opportunity: Anomalous tool sequence; tool use outside role
+  source: Agent orchestration run log, index=agent_runs
+  owner: AI Platform Engineering
+- step: 3
+  signal: Hand-off across the seam (MCP / A2A)
+  emitted_at: L3 inter-agent / MCP logs
+  coverage: Blind
+  detection_opportunity: Hand-off to unexpected party; identity mismatch at the hop
+  owner: AI Platform Engineering
+- step: 4
+  signal: Consequential action
+  emitted_at: Target API / app logs · DLP · Identity
+  coverage: Have
+  detection_opportunity: Sensitive action by an AI identity; over-privileged / out-of-pattern access
+  source: Tool gateway invocation log, index=tool_gw
+  evidence: rule AGENT-TOOL-PRIV-09
+- step: 5
+  signal: Impact / exfil / transaction
+  emitted_at: DLP · NDR · app logs
+  coverage: Have
+  detection_opportunity: Standard exfil / transaction-anomaly detection
+  source: Secure web gateway proxy transaction log, index=proxy_txn
+  evidence: rule NET-EGRESS-ANOM-07
+- step: 6
+  signal: Agent identity & privilege used
+  emitted_at: Identity / IAM / PAM
+  coverage: Have
+  detection_opportunity: Excessive agent privilege; agent acting as a user without clear delegation
+  kind: control
+  source: Workload identity token issuance log, index=idp_workload
+  evidence: saved search AGENT-IDENT-01
 commentary:
-  already_see: Identity and access tools already see the damaging step - the agent taking a real action - if you treat 
-    every agent as a powerful service account and watch it like one (steps 4 to 5).
-  blind: 'What we can''t see today is the AI-specific middle: which tools the agent chose (2) and, above all, the hand-offs
-    between agents (3) that no one logs.'
-  how_detect: Give agents least privilege and monitor their identity to catch the action, then log tool-calls and 
-    hand-offs to add the 'who and why.' The stubborn gap is attribution across un-logged hand-offs - which is why 
-    hand-off logging is its own priority.
-scaled_up: An agent holding production credentials is steered into chaining dozens of tool calls across sub-agents, so 
-  no single log shows the full sequence, and the damage is only visible afterward.
+  already_see: Identity and access tools already see the damaging step - the agent taking a real action - if you treat every agent as a powerful service account and watch it like one (steps 4 to 5).
+  blind: 'What we can''t see today is the AI-specific middle: which tools the agent chose (2) and, above all, the hand-offs between agents (3) that no one logs.'
+  how_detect: Give agents least privilege and monitor their identity to catch the action, then log tool-calls and hand-offs to add the 'who and why.' The stubborn gap is attribution across un-logged hand-offs - which is why hand-off logging is its own priority.
+scaled_up: An agent holding production credentials is steered into chaining dozens of tool calls across sub-agents, so no single log shows the full sequence, and the damage is only visible afterward.
 incidents:
-  - mcp-inspector-rce-cve-2025-49596
-  - mcp-tool-poisoning-invariant
-  - postmark-mcp
-  - asana-supabase-mcp
+- mcp-inspector-rce-cve-2025-49596
+- mcp-tool-poisoning-invariant
+- postmark-mcp
+- asana-supabase-mcp
 provenance:
   authored_by: imported-from-deck
   created: '2026-07-31'
   last_updated: '2026-08-11'
   sources: []
-notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before publishing: resolve
-  framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry row, name a data-source owner for
-  each row, and have a second analyst review against docs/02-quality-bar.md.
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.
 
 
-  Illustrative prototype data. The DeTT&CT scores, sources, evidence references and framework identifiers on this record were
-  invented for the walkthrough and have not been assessed by anyone. Replace them before this record is read as a measurement.'
+  Illustrative prototype data. The sources, evidence references and framework identifiers on this record were invented for the walkthrough and have not been assessed by anyone. The DeTT&CT scores that once accompanied them were removed on purpose: scoring happens in your own environment, in a session, by the people who own the systems. Treat everything here as a claim to check, not a measurement.'

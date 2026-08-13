@@ -32,7 +32,7 @@ The three metric families exist because three different audiences ask three diff
 
 They are reported side by side and never composited, because the most dangerous state, high coverage with low maturity, meaning confident numbers with nothing behind them, is exactly what a composite hides.
 
-**Library state at this commit:** 21 scenarios, of which 4 are published (001, 005, 017, 021) and the rest are drafts; 12 use case records; 6 incident records. Scenarios 001, 003, 005, 009, and 017 carry illustrative scores, labeled as such in their notes; scenario 021 is the fully worked, fully scored reference record. Production planning should treat the library as young and the discipline as the asset.
+**Library state at this commit:** 21 scenarios, all draft, none scored; 12 use case records; 6 incident records. The records ship as claims on purpose: every evidence row names the signal, where it would be emitted, and what a detection could look for, and carries no DeTT&CT scores, because scoring belongs to the adopting organization's own sessions with the people who own the systems. Scenario 021 remains the fully worked reference for the testing loop, and the spec, sealed prediction, and scored runs emitted from its earlier scored state remain in specs/ and runs/ as static worked examples. Production planning should treat the library as young and the discipline as the asset.
 
 ## 3. Domain model
 

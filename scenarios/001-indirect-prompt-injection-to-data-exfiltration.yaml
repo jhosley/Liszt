@@ -2,165 +2,134 @@ schema_version: 1
 id: '001'
 slug: indirect-prompt-injection-to-data-exfiltration
 title: Indirect prompt injection → data exfiltration
-one_liner: 'An attacker hides instructions inside something the AI reads: A document, an email, a web page. The AI obeys them
-  and smuggles sensitive data out inside its own answer.'
-status: published
+one_liner: 'An attacker hides instructions inside something the AI reads: A document, an email, a web page. The AI obeys them and smuggles sensitive data out inside its own answer.'
+status: draft
 classification:
   primary_layer_component: App / Model
   ai_infrastructure_layer: L2 · Model
   evidence: seen-in-the-wild
   priority: NOW
   priority_rationale:
-    - This has already happened to real companies. It is not theoretical.
-    - The attack can steal data without the user clicking anything at all.
-    - We cannot see the middle of this attack today, so it would run to completion unnoticed.
+  - This has already happened to real companies. It is not theoretical.
+  - The attack can steal data without the user clicking anything at all.
+  - We cannot see the middle of this attack today, so it would run to completion unnoticed.
 framework_mapping:
   baseline: '2026.07'
   attack:
-    - T1027
-    - T1213
-    - T1566
-    - T1567
+  - T1027
+  - T1213
+  - T1566
+  - T1567
   atlas:
-    - AML.T0024
-    - AML.T0025
-    - AML.T0051
-    - AML.T0051.001
-    - AML.T0054
+  - AML.T0024
+  - AML.T0025
+  - AML.T0051
+  - AML.T0051.001
+  - AML.T0054
   owasp_llm:
-    - LLM01:2025
-    - LLM02:2025
+  - LLM01:2025
+  - LLM02:2025
   owasp_agentic: []
   mapping_confidence: editorial
-  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline 2026.07 identifiers
-    before this record is published: ATLAS: LLM Prompt Injection (indirect) → Data Leakage | Layers D → M → (Agent) → App
-    / net'
+  mapping_notes: 'IMPORTED FROM DECK, mapping was prose, not IDs. An analyst must resolve these to baseline 2026.07 identifiers before this record is published: ATLAS: LLM Prompt Injection (indirect) → Data Leakage | Layers D → M → (Agent) → App / net'
 attack_path:
-  - step: 1
-    layer: Data / inbound
-    text: Plant hidden instructions in content the AI will read (RAG doc, email, web, tool output)
-    attack:
-      - T1566
-    atlas:
-      - AML.T0051.001
-  - step: 2
-    layer: App → Model
-    text: A user or automation runs the AI on a task that retrieves that content
-    atlas:
-      - AML.T0051
-  - step: 3
-    layer: Model
-    text: Model ingests the poisoned content and follows the embedded instruction
-    atlas:
-      - AML.T0054
-  - step: 4
-    layer: Model / Agent
-    text: Model uses in-context sensitive data, or calls a tool to reach more
-    attack:
-      - T1213
-    atlas:
-      - AML.T0024
-  - step: 5
-    layer: Model → App
-    text: Model encodes the data into an output, a link, a markdown image, or text
-    attack:
-      - T1027
-  - step: 6
-    layer: App / net
-    text: Rendering or a click sends the data to attacker infrastructure
-    attack:
-      - T1567
-    atlas:
-      - AML.T0025
+- step: 1
+  layer: Data / inbound
+  text: Plant hidden instructions in content the AI will read (RAG doc, email, web, tool output)
+  attack:
+  - T1566
+  atlas:
+  - AML.T0051.001
+- step: 2
+  layer: App → Model
+  text: A user or automation runs the AI on a task that retrieves that content
+  atlas:
+  - AML.T0051
+- step: 3
+  layer: Model
+  text: Model ingests the poisoned content and follows the embedded instruction
+  atlas:
+  - AML.T0054
+- step: 4
+  layer: Model / Agent
+  text: Model uses in-context sensitive data, or calls a tool to reach more
+  attack:
+  - T1213
+  atlas:
+  - AML.T0024
+- step: 5
+  layer: Model → App
+  text: Model encodes the data into an output, a link, a markdown image, or text
+  attack:
+  - T1027
+- step: 6
+  layer: App / net
+  text: Rendering or a click sends the data to attacker infrastructure
+  attack:
+  - T1567
+  atlas:
+  - AML.T0025
 telemetry:
-  - step: 1
-    signal: Content added / received
-    emitted_at: L1 ingestion & vector-DB writes · Email · Web proxy
-    coverage: Have
-    detection_opportunity: Anomalous doc in KB; injection markers in ingested content
-    dettect:
-      visibility: 3
-      detection: 2
-    source: Microsoft 365 message trace and SharePoint audit log, index=m365_audit
-    evidence: saved search KB-INGEST-EXT-01
-  - step: 2
-    signal: Prompt + retrieval event
-    emitted_at: AI gateway / app prompt logs · RAG retrieval logs
-    coverage: Collectable
-    detection_opportunity: Untrusted content entering context; poisoned-doc retrieval
-    dettect:
-      visibility: 2
-      detection: 0
-    source: AI gateway prompt and retrieval log, index=aigw_prompt
-    owner: AI Platform Engineering
-  - step: 3
-    signal: Injection-detector / guardrail decision
-    emitted_at: L2 guardrail / LLM firewall
-    coverage: Blind
-    detection_opportunity: Prompt-injection classifier hit; instruction-in-content
-    dettect:
-      visibility: 0
-      detection: -1
-    owner: AI Platform Engineering
-  - step: 4
-    signal: Sensitive-data access; tool call
-    emitted_at: Tool-call logs · API logs · DLP · Identity
-    coverage: Have
-    detection_opportunity: Sensitive data accessed by an AI identity; anomalous tool use
-    dettect:
-      visibility: 3
-      detection: 2
-    source: Data loss prevention access verdicts, index=dlp_access
-    evidence: rule DLP-CTX-14
-  - step: 5
-    signal: Model output (encoded data / link / image)
-    emitted_at: AI gateway output logs · guardrail scan · DLP egress
-    coverage: Collectable
-    detection_opportunity: Output DLP; suspicious markdown-image / link patterns
-    dettect:
-      visibility: 2
-      detection: 0
-    source: AI gateway completion log, index=aigw_output
-    owner: AI Platform Engineering
-  - step: 6
-    signal: Outbound to attacker infra
-    emitted_at: NDR / egress FW / proxy · EDR
-    coverage: Have
-    detection_opportunity: Egress to new / low-reputation domain; data-in-URL; policy block
-    dettect:
-      visibility: 4
-      detection: 3
-    source: Secure web gateway proxy transaction log, index=proxy_txn
-    evidence: rule NET-EGRESS-ANOM-07
+- step: 1
+  signal: Content added / received
+  emitted_at: L1 ingestion & vector-DB writes · Email · Web proxy
+  coverage: Have
+  detection_opportunity: Anomalous doc in KB; injection markers in ingested content
+  source: Microsoft 365 message trace and SharePoint audit log, index=m365_audit
+  evidence: saved search KB-INGEST-EXT-01
+- step: 2
+  signal: Prompt + retrieval event
+  emitted_at: AI gateway / app prompt logs · RAG retrieval logs
+  coverage: Collectable
+  detection_opportunity: Untrusted content entering context; poisoned-doc retrieval
+  source: AI gateway prompt and retrieval log, index=aigw_prompt
+  owner: AI Platform Engineering
+- step: 3
+  signal: Injection-detector / guardrail decision
+  emitted_at: L2 guardrail / LLM firewall
+  coverage: Blind
+  detection_opportunity: Prompt-injection classifier hit; instruction-in-content
+  owner: AI Platform Engineering
+- step: 4
+  signal: Sensitive-data access; tool call
+  emitted_at: Tool-call logs · API logs · DLP · Identity
+  coverage: Have
+  detection_opportunity: Sensitive data accessed by an AI identity; anomalous tool use
+  source: Data loss prevention access verdicts, index=dlp_access
+  evidence: rule DLP-CTX-14
+- step: 5
+  signal: Model output (encoded data / link / image)
+  emitted_at: AI gateway output logs · guardrail scan · DLP egress
+  coverage: Collectable
+  detection_opportunity: Output DLP; suspicious markdown-image / link patterns
+  source: AI gateway completion log, index=aigw_output
+  owner: AI Platform Engineering
+- step: 6
+  signal: Outbound to attacker infra
+  emitted_at: NDR / egress FW / proxy · EDR
+  coverage: Have
+  detection_opportunity: Egress to new / low-reputation domain; data-in-URL; policy block
+  source: Secure web gateway proxy transaction log, index=proxy_txn
+  evidence: rule NET-EGRESS-ANOM-07
 commentary:
-  already_see: 'The tools we already run see the key parts: data-loss-prevention (DLP) catches the model touching sensitive
-    data (4), and network monitoring / web proxy sees it leaving (6).'
-  blind: 'The blind spots are AI-specific: Did a safety filter catch the injection (3), and what got written into the knowledge
-    base (1). The access and the egress, we already see.'
-  how_detect: 'No single alert is trustworthy alone: People paste links, AI reads data, traffic leaves. The confident signal
-    is the whole chain. Injection caught, then sensitive data touched by the AI, then a suspicious answer leaving, joined
-    up in the data and alerting tools.'
-scaled_up: If the same hidden instruction were aimed at an agent that can read many systems and act on its own, it could
-  copy thousands of records before anyone noticed, because no single step in the chain looks alarming by itself.
+  already_see: 'The tools we already run see the key parts: data-loss-prevention (DLP) catches the model touching sensitive data (4), and network monitoring / web proxy sees it leaving (6).'
+  blind: 'The blind spots are AI-specific: Did a safety filter catch the injection (3), and what got written into the knowledge base (1). The access and the egress, we already see.'
+  how_detect: 'No single alert is trustworthy alone: People paste links, AI reads data, traffic leaves. The confident signal is the whole chain. Injection caught, then sensitive data touched by the AI, then a suspicious answer leaving, joined up in the data and alerting tools.'
+scaled_up: If the same hidden instruction were aimed at an agent that can read many systems and act on its own, it could copy thousands of records before anyone noticed, because no single step in the chain looks alarming by itself.
 incidents:
-  - echoleak-cve-2025-32711
-  - slack-ai-research
-  - copilot-markdown-image-exfiltration-rehberger
+- echoleak-cve-2025-32711
+- slack-ai-research
+- copilot-markdown-image-exfiltration-rehberger
 provenance:
   authored_by: imported-from-deck
   created: '2026-07-31'
   last_updated: '2026-08-11'
   sources:
-    - tier: '1'
-      url: https://genai.owasp.org/llm-top-10/
-      title: OWASP Top 10 for LLM Applications 2025
-      note: Framework reference. This record carries illustrative data, not an incident source.
-  reviewed_by: Prototype walkthrough, illustrative data not assessed
-  review_date: '2026-08-11'
-notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before publishing: resolve
-  framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry row, name a data-source owner for
-  each row, and have a second analyst review against docs/02-quality-bar.md.
+  - tier: '1'
+    url: https://genai.owasp.org/llm-top-10/
+    title: OWASP Top 10 for LLM Applications 2025
+    note: Framework reference. This record carries illustrative data, not an incident source.
+notes: 'IMPORTED from the source deck by tools/import_from_deck.py. Status is ''draft'' on purpose. Before publishing: resolve framework IDs to the pinned baseline, add DeTT&CT scores and evidence to every telemetry row, name a data-source owner for each row, and have a second analyst review against docs/02-quality-bar.md.
 
 
-  Illustrative prototype data. The DeTT&CT scores, sources, evidence references and framework identifiers on this record were
-  invented for the walkthrough and have not been assessed by anyone. Replace them before this record is read as a measurement.'
+  Illustrative prototype data. The sources, evidence references and framework identifiers on this record were invented for the walkthrough and have not been assessed by anyone. The DeTT&CT scores that once accompanied them were removed on purpose: scoring happens in your own environment, in a session, by the people who own the systems. Treat everything here as a claim to check, not a measurement.'
