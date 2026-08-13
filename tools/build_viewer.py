@@ -561,6 +561,32 @@ body.session .detail{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)
 .mdone{background:var(--surface-2);border-left:3px solid var(--have);border-radius:0 6px 6px 0;
        padding:7px 12px;margin:8px 0;font-size:12.5px;color:var(--ink-2)}
 #detail .ec[data-uc-note]{margin-top:26px;border-top:2px solid var(--surface-3);padding-top:18px}
+
+/* tabletop mode: the map takes the screen */
+body.tabletop{overflow:hidden}
+.ttwrap{position:fixed;inset:0;z-index:100;background:var(--surface-2);
+        overflow-y:auto;padding:0 30px 48px}
+.ttwrap > *{max-width:1440px;margin-left:auto;margin-right:auto}
+.ttbar{position:sticky;top:0;z-index:12;background:var(--surface-2);display:flex;
+       align-items:center;gap:16px;padding:14px 2px 10px;border-bottom:1px solid var(--surface-3)}
+.ttbar .ttt{font-size:16px;line-height:1.4}
+.ttbar button{margin-left:auto;flex:0 0 auto}
+.ttwrap .curve{height:8px}
+.ttwrap .fstep{min-width:200px;max-width:270px;padding:11px 13px}
+.ttwrap .flab{font-size:15px}
+.ttwrap .ftxt{font-size:12px;-webkit-line-clamp:3}
+.ttwrap .ftype,.ttwrap .fseam{font-size:10.5px}
+.ttwrap .ffrac{font-size:11.5px}
+.ttwrap .fgate{flex:0 0 38px}
+.ttwrap .fgate i{height:38px;width:8px}
+.ttwrap .mstep .msh{font-size:15.5px}
+.ttwrap .mb .q{font-size:15px}
+.ttwrap .mb input{font-size:14px;padding:8px 11px}
+.ttwrap .mchip{font-size:14px;padding:7px 16px}
+.ttwrap .mclaim{font-size:14px}
+.ttwrap .mhint{font-size:12.5px}
+.ttwrap .hotspot{font-size:14px;padding:7px 14px}
+.ttwrap .mdone{font-size:14px}
 .trow .tv{justify-self:end}
 .trow .tbl{grid-column:1/-1;margin:2px 0 0;padding-left:18px;color:var(--muted);
            font-size:12px;line-height:1.5}
@@ -1005,7 +1031,18 @@ function telemetryBlock(s) {
   const switcher = `<div class="mapswitch">
     <button class="toggle${scoreView === "cards" ? " on" : ""}" data-scoreview="cards">Score as cards</button>
     <button class="toggle${scoreView === "map" ? " on" : ""}" data-scoreview="map">Score as map</button></div>`;
-  if (scoreView === "map") return switcher + mapPanel(s);
+  if (scoreView === "map") {
+    const map = mapPanel(s);
+    /* Tabletop mode is a takeover, not a hidden-chrome diet: a fixed overlay covers the
+       whole app, so nothing behind it needs to know. The room sees the strip, the branch,
+       and a slim bar naming the scenario. Everything still writes through the same
+       session capture; leaving the mode loses nothing. */
+    if (tabletop) return `<div class="ttwrap"><div class="ttbar">
+      <span class="ttt"><strong>${esc(s.id)}</strong> ${esc(s.title)}</span>
+      <span class="mhint">Arrow keys move between steps. Esc exits.</span>
+      <button class="toggle" id="ttexit">Exit tabletop</button></div>${map}</div>`;
+    return switcher + map;
+  }
   return switcher + rows.map(t => editCard(s, t)).join("");
 }
 
@@ -1134,6 +1171,7 @@ function wireEditors(s) {
    A guided branch also cannot strand half a score pair: the no path commits both numbers
    at once, and the yes path holds the pending value the same way the cards do. */
 let scoreView = "cards";
+let tabletop = false;
 let mapFocus = null;
 let mapAll = false;
 const mapUi = {};
@@ -1353,6 +1391,7 @@ function mapPanel(s) {
       ${controls.map(c => esc(c.signal)).join("; ")}.</div>` : ""}
     <div class="maptools"><button class="toggle" id="mapall">${mapAll
       ? "Focus one step" : "Show the whole map"}</button>
+      ${tabletop ? "" : `<button class="toggle" id="ttenter">Tabletop mode</button>`}
       <span class="mhint">Walking the whole map start to finish is the readback.</span></div>
     ${body}`;
 }
@@ -1363,12 +1402,59 @@ function wireMap(s) {
   });
   const ma = $("#mapall");
   if (ma) ma.onclick = () => { mapAll = !mapAll; renderDetail(); };
-  /* Pin the context strip just below the sticky header, whatever height the header
-     happens to be at this width. Measured rather than hardcoded, because the session
-     bar wraps at narrow widths and a wrong constant slides the strip underneath it. */
+  /* Pin the context strip just below whatever sits above it: the sticky header in the
+     normal view, the tabletop bar in tabletop mode. Measured rather than hardcoded,
+     because both wrap at narrow widths and a wrong constant slides the strip under. */
   const ctx = $("#detail .mapctx");
-  const hdr = document.querySelector("header");
-  if (ctx && hdr) ctx.style.top = hdr.offsetHeight + "px";
+  if (ctx) {
+    const above = tabletop ? $("#detail .ttbar") : document.querySelector("header");
+    ctx.style.top = (above ? above.offsetHeight : 0) + "px";
+  }
+  document.body.classList.toggle("tabletop", tabletop && scoreView === "map");
+  const enterTt = $("#ttenter");
+  if (enterTt) enterTt.onclick = () => {
+    tabletop = true;
+    const el = document.documentElement;
+    const fs = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (fs) { try { fs.call(el); } catch (e) {} }
+    renderDetail();
+  };
+  const exitTt = $("#ttexit");
+  if (exitTt) exitTt.onclick = () => {
+    tabletop = false;
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+    renderDetail();
+  };
+  /* Leaving browser fullscreen with Esc also leaves tabletop, so the two never disagree
+     about what the room is looking at. */
+  if (!window._ttHooked) {
+    window._ttHooked = true;
+    document.addEventListener("fullscreenchange", () => {
+      if (!document.fullscreenElement && tabletop) { tabletop = false; renderDetail(); }
+    });
+  }
+  document.onkeydown = !tabletop ? null : (ev) => {
+    if (ev.key === "Escape") {
+      tabletop = false;
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+      renderDetail(); return;
+    }
+    if (ev.key === "ArrowRight" || ev.key === "ArrowLeft") {
+      const a = document.activeElement;
+      if (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return;
+      const rows = attackRows(s);
+      const i = rows.findIndex(r => r.step === mapFocus);
+      const j = ev.key === "ArrowRight" ? Math.min(rows.length - 1, i + 1) : Math.max(0, i - 1);
+      if (rows[j] && rows[j].step !== mapFocus) {
+        mapFocus = rows[j].step; mapAll = false; renderDetail();
+      }
+      ev.preventDefault();
+    }
+  };
   $$("#detail .fstep[data-mfocus]").forEach(b => b.onclick = () => {
     mapFocus = Number(b.dataset.mfocus); mapAll = false; renderDetail();
   });
