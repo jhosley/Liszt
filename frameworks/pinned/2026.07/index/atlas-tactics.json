@@ -1,0 +1,50 @@
+{
+ "AML.TA0000": {
+  "name": "AI Model Access"
+ },
+ "AML.TA0001": {
+  "name": "AI Attack Staging"
+ },
+ "AML.TA0002": {
+  "name": "Reconnaissance"
+ },
+ "AML.TA0003": {
+  "name": "Resource Development"
+ },
+ "AML.TA0004": {
+  "name": "Initial Access"
+ },
+ "AML.TA0005": {
+  "name": "Execution"
+ },
+ "AML.TA0006": {
+  "name": "Persistence"
+ },
+ "AML.TA0007": {
+  "name": "Defense Evasion"
+ },
+ "AML.TA0008": {
+  "name": "Discovery"
+ },
+ "AML.TA0009": {
+  "name": "Collection"
+ },
+ "AML.TA0010": {
+  "name": "Exfiltration"
+ },
+ "AML.TA0011": {
+  "name": "Impact"
+ },
+ "AML.TA0012": {
+  "name": "Privilege Escalation"
+ },
+ "AML.TA0013": {
+  "name": "Credential Access"
+ },
+ "AML.TA0014": {
+  "name": "Command and Control"
+ },
+ "AML.TA0015": {
+  "name": "Lateral Movement"
+ }
+}

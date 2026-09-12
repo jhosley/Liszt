@@ -1,0 +1,32 @@
+{
+  "baseline": "2026.07",
+  "sources": {
+    "attack": {
+      "artifact": "enterprise-attack-19.1.json",
+      "sha256": "bdf1ce86a4e604214c5076d37ae4dcb322678afc528df8492e6fdc1b554f5da3",
+      "version": "19.1",
+      "spec_version": "3.3.0",
+      "techniques": 858,
+      "tactics": 15,
+      "data_components": 109,
+      "retired_data_sources": 38,
+      "revoked": 149,
+      "deprecated": 12
+    },
+    "atlas": {
+      "artifact": "ATLAS-2026.07.yaml",
+      "sha256": "0e07bb07fc6423d72cdf24ddc2038a6905bcbc00ba571064153119ee1a5888d4",
+      "content_version": "2026.07",
+      "format_version": "6.0.0",
+      "techniques": 178,
+      "tactics": 16,
+      "mitigations": 37,
+      "with_attack_reference": 37
+    },
+    "owasp": {
+      "artifact": "baseline-2026.07.yaml",
+      "ids": 20,
+      "note": "OWASP publishes no machine readable artifact; the slot names are transcribed in the baseline file and indexed from there"
+    }
+  }
+}

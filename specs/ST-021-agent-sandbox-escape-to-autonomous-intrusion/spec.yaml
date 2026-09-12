@@ -3,9 +3,9 @@ spec_id: ST-021
 scenario: '021'
 scenario_title: Agent sandbox escape → autonomous intrusion
 baseline: '2026.07'
-generated: '2026-08-05'
+generated: '2026-09-11'
 generated_by: tools/emit_testspec.py
-source_digest: a9525c649281bd1f12de1307c108f1b36b1c25fe3f9843fc273965ab6b119d1a
+source_digest: e210659a96131c1bd63cefa255b5b9906a9a53e6194eb90274cfc8e33d4ed69c
 status: draft
 authorization:
   autonomy: lab-only
@@ -342,7 +342,7 @@ procedure:
 readiness:
   verdict: ready
   validated_by: J. Hosley
-  validated: '2026-08-05'
+  validated: '2026-09-11'
   checks:
   - status is published
   - every attack path step has a scored evidence row

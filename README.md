@@ -52,14 +52,19 @@ a procedure, that is why scenario 021 is carried end to end with its mistakes in
 docs/           the discipline: outcomes, methodology, quality bar, framework mapping,
                 measurement, environments, keeping current, the viewer contract,
                 boundaries, and running with no internet
-schema/         the capture format. The JSON Schema every record is checked against
+schema/         the capture format. One JSON Schema per record type: scenario, use case,
+                incident, framework baseline, coverage overlay, environment, test spec,
+                prediction, run record, discovery run, and the metrics snapshot
 scenarios/      the library itself: one YAML record per scenario, and _TEMPLATE.yaml
 incidents/      one record per real incident, described once and cited by every scenario
                 that draws on it
 coverage/<org>/ per-org coverage overlays. What a given organization can see, kept apart
                 from the scenario, which is org-independent
-frameworks/     the pinned framework baseline, and the vendored artifacts with checksums
-                that make an ID verifiable offline
+frameworks/     the pinned framework baseline, the vendored artifacts with checksums, and
+                under pinned/<baseline>/index/ the small committed projection of them that
+                lets the validator verify every framework ID offline
+environments/   versioned definitions of the labs test runs execute in, so a run can cite
+                the environment by id and version the way it cites a prediction by digest
 reference/      scenario 021 carried gate by gate, mistakes intact. The teaching example
 use-cases/      one YAML record per operational use case, and _TEMPLATE.yaml
 docs/diagrams/  the two system diagrams, and the script that draws them

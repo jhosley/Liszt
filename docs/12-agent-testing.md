@@ -238,6 +238,8 @@ The feedback block turns the score into work, as **proposals only**:
 - **Proposed rescores** name the row, the field in dispute, and the direction. Applying one is a deliberate act, and it must cite the run id as its `backlog_ref` so the change lands in the snapshot's `ids_rescored_this_period`. A coverage change driven by evidence should be visible as evidence, not as improvement.
 - **Method findings** are what the run says about how we *predict*, rather than about the estate. This is the tuning signal: which layers and techniques we are worst at, and which recurring assumption keeps being wrong.
 - **Lab findings** are requirements for the next environment.
+
+**The environment has an identity.** A run binds to the spec and the prediction by digest, and it binds to the environment by citing an environment definition, `environments/<id>.yaml`, by id and version (`schema/environment.schema.json`). The definition carries the targets a spec may allowlist, the components and their fidelity, the telemetry pipeline mode, the stand-ins for the world outside the estate, and how teardown is proven. Anything a result could depend on bumps the version; the old version stays. Two runs of one spec against different environment versions are not comparable, and the run record now says so instead of leaving it to be discovered in the scorecard. The validator checks that a run's `kind`, `telemetry_pipeline` and `targets_used` agree with the definition it cites.
 - **New sources found** are systems that produced useful artifacts and are on no record.
 
 ---

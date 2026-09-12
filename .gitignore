@@ -16,3 +16,7 @@ vendor/wheels/
 # Pinned framework artifacts are large. Commit CHECKSUMS.json always; the bytes
 # only if your host tolerates them (Git LFS, or an internal artifact store).
 frameworks/pinned/*/enterprise-attack-*.json
+
+# The DeTT&CT clone is large and reproducible from its tag. Commit CHECKSUMS.json; the
+# tree only if your host tolerates it.
+frameworks/pinned/*/DeTTECT-*/

@@ -1,0 +1,547 @@
+{
+ "DC0001": {
+  "analytics_citing": 21,
+  "deprecated": false,
+  "name": "Scheduled Job Creation"
+ },
+ "DC0002": {
+  "analytics_citing": 109,
+  "deprecated": false,
+  "name": "User Account Authentication"
+ },
+ "DC0003": {
+  "analytics_citing": 7,
+  "deprecated": false,
+  "name": "Malware Metadata"
+ },
+ "DC0004": {
+  "analytics_citing": 15,
+  "deprecated": false,
+  "name": "Firmware Modification"
+ },
+ "DC0005": {
+  "analytics_citing": 9,
+  "deprecated": false,
+  "name": "Scheduled Job Metadata"
+ },
+ "DC0006": {
+  "analytics_citing": 5,
+  "deprecated": false,
+  "name": "Web Credential Creation"
+ },
+ "DC0007": {
+  "analytics_citing": 20,
+  "deprecated": false,
+  "name": "Web Credential Usage"
+ },
+ "DC0008": {
+  "analytics_citing": 7,
+  "deprecated": false,
+  "name": "WMI Creation"
+ },
+ "DC0009": {
+  "analytics_citing": 3,
+  "deprecated": false,
+  "name": "User Account Deletion"
+ },
+ "DC0010": {
+  "analytics_citing": 37,
+  "deprecated": false,
+  "name": "User Account Modification"
+ },
+ "DC0011": {
+  "analytics_citing": 4,
+  "deprecated": false,
+  "name": "Malware Content"
+ },
+ "DC0012": {
+  "analytics_citing": 3,
+  "deprecated": false,
+  "name": "Scheduled Job Modification"
+ },
+ "DC0013": {
+  "analytics_citing": 33,
+  "deprecated": false,
+  "name": "User Account Metadata"
+ },
+ "DC0014": {
+  "analytics_citing": 17,
+  "deprecated": false,
+  "name": "User Account Creation"
+ },
+ "DC0015": {
+  "analytics_citing": 4,
+  "deprecated": false,
+  "name": "Image Creation"
+ },
+ "DC0016": {
+  "analytics_citing": 130,
+  "deprecated": false,
+  "name": "Module Load"
+ },
+ "DC0017": {
+  "analytics_citing": 3,
+  "deprecated": false,
+  "name": "Cloud Storage Enumeration"
+ },
+ "DC0018": {
+  "analytics_citing": 36,
+  "deprecated": false,
+  "name": "Host Status"
+ },
+ "DC0019": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Pod Creation"
+ },
+ "DC0020": {
+  "analytics_citing": 29,
+  "deprecated": false,
+  "name": "Process Modification"
+ },
+ "DC0021": {
+  "analytics_citing": 66,
+  "deprecated": false,
+  "name": "OS API Execution"
+ },
+ "DC0022": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Cloud Storage Deletion"
+ },
+ "DC0023": {
+  "analytics_citing": 5,
+  "deprecated": false,
+  "name": "Cloud Storage Modification"
+ },
+ "DC0024": {
+  "analytics_citing": 1,
+  "deprecated": false,
+  "name": "Cloud Storage Creation"
+ },
+ "DC0025": {
+  "analytics_citing": 13,
+  "deprecated": false,
+  "name": "Cloud Storage Access"
+ },
+ "DC0026": {
+  "analytics_citing": 0,
+  "deprecated": false,
+  "name": "Image Deletion"
+ },
+ "DC0027": {
+  "analytics_citing": 3,
+  "deprecated": false,
+  "name": "Cloud Storage Metadata"
+ },
+ "DC0028": {
+  "analytics_citing": 3,
+  "deprecated": false,
+  "name": "Image Metadata"
+ },
+ "DC0029": {
+  "analytics_citing": 35,
+  "deprecated": false,
+  "name": "Script Execution"
+ },
+ "DC0030": {
+  "analytics_citing": 0,
+  "deprecated": false,
+  "name": "Pod Modification"
+ },
+ "DC0031": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Kernel Module Load"
+ },
+ "DC0032": {
+  "analytics_citing": 864,
+  "deprecated": false,
+  "name": "Process Creation"
+ },
+ "DC0033": {
+  "analytics_citing": 14,
+  "deprecated": false,
+  "name": "Process Termination"
+ },
+ "DC0034": {
+  "analytics_citing": 40,
+  "deprecated": false,
+  "name": "Process Metadata"
+ },
+ "DC0035": {
+  "analytics_citing": 93,
+  "deprecated": false,
+  "name": "Process Access"
+ },
+ "DC0036": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Image Modification"
+ },
+ "DC0037": {
+  "analytics_citing": 1,
+  "deprecated": false,
+  "name": "Pod Enumeration"
+ },
+ "DC0038": {
+  "analytics_citing": 207,
+  "deprecated": false,
+  "name": "Application Log Content"
+ },
+ "DC0039": {
+  "analytics_citing": 254,
+  "deprecated": false,
+  "name": "File Creation"
+ },
+ "DC0040": {
+  "analytics_citing": 29,
+  "deprecated": false,
+  "name": "File Deletion"
+ },
+ "DC0041": {
+  "analytics_citing": 22,
+  "deprecated": false,
+  "name": "Service Metadata"
+ },
+ "DC0042": {
+  "analytics_citing": 22,
+  "deprecated": false,
+  "name": "Drive Creation"
+ },
+ "DC0043": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Firewall Disable"
+ },
+ "DC0044": {
+  "analytics_citing": 0,
+  "deprecated": false,
+  "name": "Firewall Enumeration"
+ },
+ "DC0045": {
+  "analytics_citing": 0,
+  "deprecated": false,
+  "name": "Windows Registry Key Deletion"
+ },
+ "DC0046": {
+  "analytics_citing": 9,
+  "deprecated": false,
+  "name": "Drive Modification"
+ },
+ "DC0047": {
+  "analytics_citing": 0,
+  "deprecated": false,
+  "name": "Snapshot Enumeration"
+ },
+ "DC0048": {
+  "analytics_citing": 4,
+  "deprecated": false,
+  "name": "Named Pipe Metadata"
+ },
+ "DC0049": {
+  "analytics_citing": 3,
+  "deprecated": false,
+  "name": "Snapshot Deletion"
+ },
+ "DC0050": {
+  "analytics_citing": 6,
+  "deprecated": false,
+  "name": "Windows Registry Key Access"
+ },
+ "DC0051": {
+  "analytics_citing": 14,
+  "deprecated": false,
+  "name": "Firewall Rule Modification"
+ },
+ "DC0052": {
+  "analytics_citing": 4,
+  "deprecated": false,
+  "name": "Social Media"
+ },
+ "DC0053": {
+  "analytics_citing": 0,
+  "deprecated": false,
+  "name": "Firewall Metadata"
+ },
+ "DC0054": {
+  "analytics_citing": 10,
+  "deprecated": false,
+  "name": "Drive Access"
+ },
+ "DC0055": {
+  "analytics_citing": 166,
+  "deprecated": false,
+  "name": "File Access"
+ },
+ "DC0056": {
+  "analytics_citing": 12,
+  "deprecated": false,
+  "name": "Windows Registry Key Creation"
+ },
+ "DC0057": {
+  "analytics_citing": 4,
+  "deprecated": false,
+  "name": "Snapshot Creation"
+ },
+ "DC0058": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Snapshot Modification"
+ },
+ "DC0059": {
+  "analytics_citing": 96,
+  "deprecated": false,
+  "name": "File Metadata"
+ },
+ "DC0060": {
+  "analytics_citing": 31,
+  "deprecated": false,
+  "name": "Service Creation"
+ },
+ "DC0061": {
+  "analytics_citing": 179,
+  "deprecated": false,
+  "name": "File Modification"
+ },
+ "DC0062": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Snapshot Metadata"
+ },
+ "DC0063": {
+  "analytics_citing": 89,
+  "deprecated": false,
+  "name": "Windows Registry Key Modification"
+ },
+ "DC0064": {
+  "analytics_citing": 339,
+  "deprecated": false,
+  "name": "Command Execution"
+ },
+ "DC0065": {
+  "analytics_citing": 3,
+  "deprecated": false,
+  "name": "Service Modification"
+ },
+ "DC0066": {
+  "analytics_citing": 18,
+  "deprecated": false,
+  "name": "Active Directory Object Modification"
+ },
+ "DC0067": {
+  "analytics_citing": 95,
+  "deprecated": false,
+  "name": "Logon Session Creation"
+ },
+ "DC0068": {
+  "analytics_citing": 1,
+  "deprecated": false,
+  "name": "Active Directory Object Deletion"
+ },
+ "DC0069": {
+  "analytics_citing": 24,
+  "deprecated": false,
+  "name": "Cloud Service Modification"
+ },
+ "DC0070": {
+  "analytics_citing": 10,
+  "deprecated": false,
+  "name": "Cloud Service Metadata"
+ },
+ "DC0071": {
+  "analytics_citing": 6,
+  "deprecated": false,
+  "name": "Active Directory Object Access"
+ },
+ "DC0072": {
+  "analytics_citing": 8,
+  "deprecated": false,
+  "name": "Container Creation"
+ },
+ "DC0073": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Instance Modification"
+ },
+ "DC0074": {
+  "analytics_citing": 1,
+  "deprecated": false,
+  "name": "Driver Metadata"
+ },
+ "DC0075": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Instance Enumeration"
+ },
+ "DC0076": {
+  "analytics_citing": 3,
+  "deprecated": false,
+  "name": "Instance Creation"
+ },
+ "DC0077": {
+  "analytics_citing": 4,
+  "deprecated": false,
+  "name": "Container Start"
+ },
+ "DC0078": {
+  "analytics_citing": 176,
+  "deprecated": false,
+  "name": "Network Traffic Flow"
+ },
+ "DC0079": {
+  "analytics_citing": 16,
+  "deprecated": false,
+  "name": "Driver Load"
+ },
+ "DC0080": {
+  "analytics_citing": 11,
+  "deprecated": false,
+  "name": "Instance Start"
+ },
+ "DC0081": {
+  "analytics_citing": 1,
+  "deprecated": false,
+  "name": "Instance Deletion"
+ },
+ "DC0082": {
+  "analytics_citing": 246,
+  "deprecated": false,
+  "name": "Network Connection Creation"
+ },
+ "DC0083": {
+  "analytics_citing": 10,
+  "deprecated": false,
+  "name": "Cloud Service Enumeration"
+ },
+ "DC0084": {
+  "analytics_citing": 9,
+  "deprecated": false,
+  "name": "Active Directory Credential Request"
+ },
+ "DC0085": {
+  "analytics_citing": 253,
+  "deprecated": false,
+  "name": "Network Traffic Content"
+ },
+ "DC0086": {
+  "analytics_citing": 3,
+  "deprecated": false,
+  "name": "Instance Metadata"
+ },
+ "DC0087": {
+  "analytics_citing": 4,
+  "deprecated": false,
+  "name": "Active Directory Object Creation"
+ },
+ "DC0088": {
+  "analytics_citing": 47,
+  "deprecated": false,
+  "name": "Logon Session Metadata"
+ },
+ "DC0089": {
+  "analytics_citing": 4,
+  "deprecated": false,
+  "name": "Instance Stop"
+ },
+ "DC0090": {
+  "analytics_citing": 4,
+  "deprecated": false,
+  "name": "Cloud Service Disable"
+ },
+ "DC0091": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Container Enumeration"
+ },
+ "DC0092": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Volume Modification"
+ },
+ "DC0093": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Certificate Registration"
+ },
+ "DC0094": {
+  "analytics_citing": 1,
+  "deprecated": false,
+  "name": "Group Modification"
+ },
+ "DC0095": {
+  "analytics_citing": 0,
+  "deprecated": false,
+  "name": "Volume Enumeration"
+ },
+ "DC0096": {
+  "analytics_citing": 5,
+  "deprecated": false,
+  "name": "Passive DNS"
+ },
+ "DC0097": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Volume Creation"
+ },
+ "DC0098": {
+  "analytics_citing": 2,
+  "deprecated": false,
+  "name": "Volume Deletion"
+ },
+ "DC0099": {
+  "analytics_citing": 3,
+  "deprecated": false,
+  "name": "Group Enumeration"
+ },
+ "DC0100": {
+  "analytics_citing": 0,
+  "deprecated": false,
+  "name": "Volume Metadata"
+ },
+ "DC0101": {
+  "analytics_citing": 6,
+  "deprecated": false,
+  "name": "Domain Registration"
+ },
+ "DC0102": {
+  "analytics_citing": 11,
+  "deprecated": false,
+  "name": "Network Share Access"
+ },
+ "DC0103": {
+  "analytics_citing": 5,
+  "deprecated": false,
+  "name": "Active DNS"
+ },
+ "DC0104": {
+  "analytics_citing": 28,
+  "deprecated": false,
+  "name": "Response Content"
+ },
+ "DC0105": {
+  "analytics_citing": 1,
+  "deprecated": false,
+  "name": "Group Metadata"
+ },
+ "DC0106": {
+  "analytics_citing": 7,
+  "deprecated": false,
+  "name": "Response Metadata"
+ },
+ "DC0120": {
+  "analytics_citing": 0,
+  "deprecated": true,
+  "name": "Cluster Metadata"
+ },
+ "DC0121": {
+  "analytics_citing": 0,
+  "deprecated": true,
+  "name": "Pod Metadata"
+ },
+ "DC0122": {
+  "analytics_citing": 0,
+  "deprecated": true,
+  "name": "Container Metadata"
+ }
+}

@@ -113,12 +113,47 @@ review note rather than being guessed upward.
 | `status` and `phase` on a use case overlap | The schema argues they are deliberately separate axes. A decision to reaffirm, not a defect |
 | Baseline owner seat is empty | Confirmed; the validator now says so on every run |
 
-## 9. Still open, needing a decision from the program lead
+## 9. Decisions taken 2026-09-11, and what was built on them
 
-1. How scenario 021 gets its scores back, so one record exercises the scoring path.
-2. Whether to vendor the pinned framework artifacts now (network access, the ATT&CK bundle
-   is about 53 MB and is excluded from git by `.gitignore`), which would also allow a
-   technique and data component reference catalog to be derived from them.
-3. Whether the environment definition becomes a record type now. The brief's 5.7 says yes;
-   the beyond-AI decision list says it is parked.
-4. Whether discovery mode (branch `v2`, uncommitted) is in scope for the model.
+All four open items were decided by the program lead the same day.
+
+1. **Scenario 021 scores restored.** The record's earlier scored state was restored from
+   git history, labeled in its header and its notes as an illustrative reference
+   assessment, and returned to `published`. The spec and sealed prediction were re-emitted
+   from it on the current code, both run records were re-bound to the new prediction digest
+   and re-scored, and the validator, rollup, snapshot and viewer all run against it. It is
+   the one record that exercises every path. Its author and reviewer are still placeholders;
+   a real person has to stand behind it before it is cited outside the program.
+2. **Framework artifacts pinned.** `tools/pin_frameworks.py` vendored ATT&CK 19.1, ATLAS
+   2026.07, the OWASP LLM 2025 PDF and the DeTT&CT 2.2.0 tree with checksums. The OWASP
+   Agentic PDF has no fetchable URL and is still to be downloaded by hand. A new
+   `tools/index_frameworks.py` projects the pins into `frameworks/pinned/2026.07/index/`, a
+   small committed set of tables (858 ATT&CK techniques with revoked and deprecated flags and
+   the revoked-by walk, 15 tactics, 109 data components, 178 ATLAS techniques with the 37
+   attack references, 16 ATLAS tactics, 37 mitigations, 20 OWASP slots). The validator now
+   verifies every framework id on every record against the index: unknown and revoked ids
+   are errors on a published record, deprecated ids warn. The snapshot reads its version
+   tuple and artifact hashes from the pins.
+3. **Environment is a record type.** `schema/environment.schema.json`, records under
+   `environments/`, an optional `environment.definition` on the run record that the
+   validator cross-checks (kind, pipeline and targets must agree). Two illustrative records
+   describe the labs the 021 runs cite. The external stand-in set is a component role on the
+   definition, as the brief's 5.7 asked.
+4. **Discovery mode is in scope.** Branch `v2` was committed and merged. The discovery run
+   record and the per row `score_provenance` field are entities in the model.
+
+## 10. Findings for an analyst, not fixed here
+
+- Scenario 021 rows 2 and 6 cite data component `DC0074`, which the pinned bundle names
+  "Driver Metadata". Both rows describe network egress; the components that fit are
+  `DC0078` Network Traffic Flow, `DC0085` Network Traffic Content, or `DC0082` Network
+  Connection Creation. The id exists, so the validator accepts it; the mapping is an
+  analyst's call and the record is illustrative.
+- Scenario 021 row 5 cites `DC0057`, "Snapshot Creation", on a row about container escape
+  and credential use read from Kubernetes audit and CloudTrail. `DC0019` Pod Creation,
+  `DC0072` Container Creation or `DC0069` Cloud Service Modification fit better. Same
+  status: the id exists, the mapping is an analyst's call.
+- Two incidents have no tier 0 source and now say so on every validator run.
+- `score_run.py --write` reflows long strings in the run record on rewrite. Comments
+  survive; line breaks inside folded scalars do not. Cosmetic, worth knowing before
+  reading a diff.

@@ -13,6 +13,13 @@
     "url": "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack-19.1.json",
     "version": "19.1 (spec 3.3.0)"
   },
+  "dettect": {
+    "bytes": null,
+    "filename": "DeTTECT-2.2.0/",
+    "sha256": "directory",
+    "url": null,
+    "version": "2.2.0"
+  },
   "owasp_llm": {
     "bytes": 10716216,
     "filename": "OWASP-Top-10-for-LLMs-2025.pdf",

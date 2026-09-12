@@ -44,6 +44,9 @@ RUN_SCHEMA = ROOT / "schema" / "run-record.schema.json"
 INC_SCHEMA = ROOT / "schema" / "incident.schema.json"
 BASE_SCHEMA = ROOT / "schema" / "framework-baseline.schema.json"
 OV_SCHEMA = ROOT / "schema" / "coverage-overlay.schema.json"
+ENV_SCHEMA = ROOT / "schema" / "environment.schema.json"
+FRAMEWORK_INDEXES: dict[str, dict | None] = {}   # baseline -> index, loaded once per run
+ENVIRONMENTS: dict[tuple[str, int], dict] = {}   # (id, version) -> record, loaded once per run
 
 # Slide geometry limits, measured against the rendered template. Exceeding these
 # does not corrupt the deck -- it produces text that overflows its shape, which is
@@ -145,6 +148,80 @@ def load_use_case_covers() -> dict[str, set[int]]:
                 covered.setdefault(str(c.get("scenario")), set()).update(
                     s for s in (c.get("steps") or []) if isinstance(s, int))
     return covered
+
+
+def load_framework_index(baseline: str) -> dict | None:
+    """The offline projection of the pinned artifacts, written by tools/index_frameworks.py.
+    None when it has not been built, in which case ids are not verified and the baseline
+    check says so. No id is ever confirmed from memory."""
+    import json as _json
+    d = ROOT / "frameworks" / "pinned" / baseline / "index"
+    if not (d / "INDEX.json").exists():
+        return None
+    load = lambda name: _json.loads((d / name).read_text(encoding="utf-8"))
+    return {"attack": load("attack-techniques.json"),
+            "attack_tactics": load("attack-tactics.json"),
+            "data_components": load("attack-data-components.json"),
+            "atlas": {**load("atlas-techniques.json"), **load("atlas-tactics.json"),
+                      **load("atlas-mitigations.json")},
+            "owasp": load("owasp.json")}
+
+
+def check_framework_ids(rec: dict, f: Findings, indexes: dict[str, dict | None]) -> None:
+    """Every framework id on the record must exist in the pinned baseline the record
+    names, and must not be revoked. Deprecated ids are frozen: they stay coverage
+    eligible so history survives, but no new record should map to them. Unknown and
+    revoked ids are errors on a published record and warnings on a draft."""
+    published = rec.get("status") == "published"
+    fm = rec.get("framework_mapping") or {}
+    baseline = fm.get("baseline")
+    if not baseline:
+        return
+    if baseline not in indexes:
+        indexes[baseline] = load_framework_index(baseline)
+    idx = indexes[baseline]
+    if idx is None:
+        f.warn("framework_mapping", f"baseline {baseline} has no index under frameworks/pinned/; "
+                                    "framework ids were not verified. Run tools/pin_frameworks.py "
+                                    "then tools/index_frameworks.py")
+        return
+    sev = f.err if published else f.warn
+
+    def check(where: str, fid: str, table: dict, label: str) -> None:
+        entry = table.get(fid)
+        if entry is None:
+            sev(where, f"{fid} is not in pinned {label} for baseline {baseline}")
+            return
+        if entry.get("revoked"):
+            sev(where, f"{fid} is revoked in {label}"
+                       + (f", replaced by {entry['revoked_by']}" if entry.get("revoked_by") else ""))
+        elif entry.get("deprecated"):
+            f.warn(where, f"{fid} is deprecated in {label}; frozen, do not map new records to it")
+
+    for fid in fm.get("attack", []) or []:
+        check("framework_mapping.attack", fid, idx["attack"], "ATT&CK")
+    for fid in fm.get("attack_tactics", []) or []:
+        check("framework_mapping.attack_tactics", fid, idx["attack_tactics"], "ATT&CK tactics")
+    for fid in fm.get("atlas", []) or []:
+        check("framework_mapping.atlas", fid, idx["atlas"], "ATLAS")
+    for key in ("owasp_llm", "owasp_agentic"):
+        for fid in fm.get(key, []) or []:
+            if fid not in idx["owasp"]:
+                sev(f"framework_mapping.{key}", f"{fid} is not a slot of the {key} edition pinned "
+                                                f"in baseline {baseline}")
+    for step in rec.get("attack_path", []) or []:
+        for fid in step.get("attack", []) or []:
+            check(f"attack_path[{step.get('step')}].attack", fid, idx["attack"], "ATT&CK")
+        for fid in step.get("atlas", []) or []:
+            check(f"attack_path[{step.get('step')}].atlas", fid, idx["atlas"], "ATLAS")
+    for r in rec.get("telemetry", []) or []:
+        for dc in r.get("data_components", []) or []:
+            entry = idx["data_components"].get(dc)
+            if entry is None:
+                sev(f"telemetry[{r.get('step')}].data_components",
+                    f"{dc} is not an ATT&CK data component in baseline {baseline}")
+            elif entry.get("deprecated"):
+                f.warn(f"telemetry[{r.get('step')}].data_components", f"{dc} is deprecated")
 
 
 def check_lengths(rec: dict, f: Findings) -> None:
@@ -411,6 +488,7 @@ def validate_file(path: pathlib.Path, validator, incidents: set[str],
 
     check_lengths(rec, f)
     check_quality_bar(rec, f, incidents, uc_covered)
+    check_framework_ids(rec, f, FRAMEWORK_INDEXES)
     return f
 
 
@@ -653,6 +731,58 @@ def load_incident_citations() -> dict[str, set[str]]:
     return out
 
 
+def load_environments() -> dict[tuple[str, int], dict]:
+    """(id, version) -> environment record, for runs to cite."""
+    out: dict[tuple[str, int], dict] = {}
+    for p in sorted((ROOT / "environments").glob("*.yaml")):
+        if p.name.startswith("_"):
+            continue
+        try:
+            rec = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            continue
+        if rec.get("id") and isinstance(rec.get("version"), int):
+            out[(rec["id"], rec["version"])] = rec
+    return out
+
+
+def validate_environment_file(path: pathlib.Path, validator) -> Findings:
+    """An environment definition: the versioned identity a run cites. Checks the file
+    name, the target ids are unique, observation components name the sources they serve,
+    and a current record has a review date."""
+    f = Findings()
+    rec = _load(path, f)
+    if rec is None:
+        return f
+    for e in sorted(validator.iter_errors(rec), key=lambda e: list(e.path)):
+        f.err("/".join(str(p) for p in e.path) or "(root)", e.message)
+    if f.errors:
+        return f
+    if path.stem not in (rec["id"], f"{rec['id']}-v{rec['version']}"):
+        f.err("filename", f"should be {rec['id']}.yaml or {rec['id']}-v{rec['version']}.yaml")
+    ids = [t["id"] for t in rec.get("targets", [])]
+    if len(ids) != len(set(ids)):
+        f.err("targets", "duplicate target ids")
+    for i, c in enumerate(rec.get("components", [])):
+        if c.get("role") == "observation" and not c.get("serves_sources"):
+            f.warn(f"components[{i}]", "observation component names no evidence row source it "
+                                       "serves, so a spec's required_sources cannot be checked "
+                                       "against this environment")
+        if c.get("role") == "stand-in" and not c.get("stands_in_for"):
+            f.warn(f"components[{i}]", "stand-in with no stands_in_for")
+        if c.get("fidelity") == "exact" and not c.get("product_version"):
+            f.warn(f"components[{i}]", "fidelity exact with no product_version recorded; exact "
+                                       "is a claim about a specific product and version")
+    if rec.get("status") == "current" and not rec.get("review_due"):
+        f.warn("review_due", "current environment with no review date")
+    if rec.get("status") == "superseded" and not rec.get("supersedes") and rec["version"] > 1:
+        f.warn("supersedes", "version above 1 with no supersedes")
+    if not (rec.get("provenance") or {}).get("illustrative") and \
+            "worked example" in path.read_text(encoding="utf-8")[:600].lower():
+        f.warn("provenance", "the header says worked example but illustrative is not set")
+    return f
+
+
 def validate_discovery_run_file(path: pathlib.Path, validator,
                                 scenario_steps: dict[str, list[int]]) -> Findings:
     """A discovery run record: what an agent saw, and the scores it PROPOSES. There is
@@ -784,6 +914,30 @@ def validate_run_file(path: pathlib.Path, validator,
     bad = sorted({o["step"] for o in rec.get("observations", [])} - set(scenario_steps[sid]))
     if bad:
         f.err("observations", f"steps {bad} are not in scenario {sid}'s attack path")
+    env = rec.get("environment") or {}
+    ref = env.get("definition")
+    if ref:
+        envs = ENVIRONMENTS if ENVIRONMENTS else load_environments()
+        ENVIRONMENTS.update(envs)
+        defn = envs.get((ref["id"], ref["version"]))
+        if defn is None:
+            f.err("environment.definition", f"{ref['id']} v{ref['version']} has no record in "
+                                            "environments/")
+        else:
+            for k in ("kind", "telemetry_pipeline"):
+                if env.get(k) != defn.get(k):
+                    f.err(f"environment.{k}", f"run says {env.get(k)!r} but {ref['id']} "
+                                              f"v{ref['version']} is {defn.get(k)!r}; the "
+                                              "environment decides what a run can prove, so "
+                                              "these must agree")
+            known = {t["id"] for t in defn.get("targets", [])}
+            unknown = sorted(set(env.get("targets_used", []) or []) - known)
+            if unknown:
+                f.err("environment.targets_used", f"{unknown} are not targets of {ref['id']} "
+                                                  f"v{ref['version']}")
+    else:
+        f.warn("environment", "no environment.definition; two runs of one spec against a lab "
+                              "that changed are indistinguishable without one")
     return f
 
 
@@ -800,6 +954,8 @@ def record_kind(path: pathlib.Path) -> str:
         return "run"
     if parent == "incidents":
         return "incident"
+    if parent == "environments":
+        return "environment"
     if parent == "frameworks":
         return "baseline"
     if resolved.parent.parent.name == "coverage":
@@ -821,7 +977,8 @@ def main() -> int:
                "run": yaml.safe_load(RUN_SCHEMA.read_text()),
                "incident": yaml.safe_load(INC_SCHEMA.read_text()),
                "baseline": yaml.safe_load(BASE_SCHEMA.read_text()),
-               "overlay": yaml.safe_load(OV_SCHEMA.read_text())}
+               "overlay": yaml.safe_load(OV_SCHEMA.read_text()),
+               "environment": yaml.safe_load(ENV_SCHEMA.read_text())}
     # One layer vocabulary. The discovery schema carries its own copy of aiLayer so it
     # stands alone as a document, and this is what stops the copy drifting.
     if schemas["discovery-run"]["$defs"]["aiLayer"]["enum"] != \
@@ -841,6 +998,7 @@ def main() -> int:
             sorted((ROOT / "incidents").glob("*.yaml")) + \
             sorted((ROOT / "frameworks").glob("baseline-*.yaml")) + \
             sorted((ROOT / "coverage").glob("*/*.yaml")) + \
+            sorted((ROOT / "environments").glob("*.yaml")) + \
             sorted((ROOT / "runs").glob("RUN-*.yaml")) + \
             sorted((ROOT / "runs").glob("DISC-*.yaml"))
     paths = [p for p in paths if not p.name.startswith("_")]
@@ -872,6 +1030,8 @@ def main() -> int:
             f = validate_baseline_file(path, validators[kind])
         elif kind == "overlay":
             f = validate_overlay_file(path, validators[kind], scenario_rows)
+        elif kind == "environment":
+            f = validate_environment_file(path, validators[kind])
         else:
             f = validate_file(path, validators[kind], incidents, uc_covered)
         n_err += len(f.errors)

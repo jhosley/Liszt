@@ -1,0 +1,113 @@
+{
+ "AML.M0000": {
+  "name": "Limit Public Release of Information"
+ },
+ "AML.M0001": {
+  "name": "Limit Model Artifact Release"
+ },
+ "AML.M0002": {
+  "name": "Predictive AI Output Obfuscation"
+ },
+ "AML.M0003": {
+  "name": "Predictive AI Model Hardening"
+ },
+ "AML.M0004": {
+  "name": "Limit AI Service Query Volume and Rate"
+ },
+ "AML.M0005": {
+  "name": "Control Access to AI Models and Data at Rest"
+ },
+ "AML.M0006": {
+  "name": "Predictive AI Ensembles"
+ },
+ "AML.M0007": {
+  "name": "Sanitize Training Data"
+ },
+ "AML.M0008": {
+  "name": "Validate AI Model"
+ },
+ "AML.M0009": {
+  "name": "Predictive AI Multi-Sensor Fusion"
+ },
+ "AML.M0010": {
+  "name": "Predictive AI Input Restoration"
+ },
+ "AML.M0011": {
+  "name": "Restrict Library Loading"
+ },
+ "AML.M0012": {
+  "name": "Encrypt Sensitive Information"
+ },
+ "AML.M0013": {
+  "name": "Code Signing"
+ },
+ "AML.M0014": {
+  "name": "Verify AI Artifacts"
+ },
+ "AML.M0015": {
+  "name": "Predictive AI Adversarial Input Detection"
+ },
+ "AML.M0016": {
+  "name": "Vulnerability Scanning"
+ },
+ "AML.M0017": {
+  "name": "AI Model Distribution Methods"
+ },
+ "AML.M0018": {
+  "name": "User Training"
+ },
+ "AML.M0019": {
+  "name": "Control Access to AI Models and Data in Production"
+ },
+ "AML.M0020": {
+  "name": "Generative AI Guardrails"
+ },
+ "AML.M0021": {
+  "name": "Generative AI Guidelines"
+ },
+ "AML.M0022": {
+  "name": "Generative AI Model Alignment"
+ },
+ "AML.M0023": {
+  "name": "AI Bill of Materials"
+ },
+ "AML.M0024": {
+  "name": "AI Telemetry Logging"
+ },
+ "AML.M0025": {
+  "name": "Maintain AI Dataset Provenance"
+ },
+ "AML.M0026": {
+  "name": "Privileged AI Agent Permissions Configuration"
+ },
+ "AML.M0027": {
+  "name": "Single-User AI Agent Permissions Configuration"
+ },
+ "AML.M0028": {
+  "name": "AI Agent Tools Permissions Configuration"
+ },
+ "AML.M0029": {
+  "name": "Human In-the-Loop for AI Agent Actions"
+ },
+ "AML.M0030": {
+  "name": "Restrict AI Agent Tool Invocation on Untrusted Data"
+ },
+ "AML.M0031": {
+  "name": "Memory Hardening"
+ },
+ "AML.M0032": {
+  "name": "Segmentation of AI Agent Components"
+ },
+ "AML.M0033": {
+  "name": "Input and Output Validation for AI Agent Components"
+ },
+ "AML.M0034": {
+  "name": "Deepfake Detection"
+ },
+ "AML.M0035": {
+  "name": "AI Red Team"
+ },
+ "AML.M0036": {
+  "name": "Limit AI Workload Resource Consumption"
+ }
+}

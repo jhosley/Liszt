@@ -114,6 +114,8 @@ field. So:
 | A failure, not an attack | `classification.mode: failure`, relaxes framework and incident checks |
 | Nothing to cite | `evidence: seen-in-research` or `doomsday`; ground it in `provenance.sources` |
 | Per-org differences | `coverage/<org>/<id>.yaml` overlay; report with `--org` |
+| Verify a framework ID offline | `frameworks/pinned/<baseline>/index/`; the validator checks every ID against it |
+| Where a test run executed | `environments/<id>.yaml`, cited by the run's `environment.definition` |
 | A control **held** | `control_held: true` on the step. Most commonly omitted field |
 
 ## The three metric families, keep them apart

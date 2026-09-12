@@ -39,6 +39,15 @@
       "additionalProperties": false,
       "required": ["kind", "telemetry_pipeline", "teardown_confirmed"],
       "properties": {
+        "definition": {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "version"],
+          "description": "The environment definition this run executed in, by id and version (schema/environment.schema.json, environments/). Optional until every lab has a record; once present it binds the run to a versioned environment the way prediction_digest binds it to a prediction, so two runs of one spec against different environment versions are visibly not comparable. kind and telemetry_pipeline below must agree with the cited definition; the validator checks.",
+          "properties": {
+            "id": { "type": "string", "pattern": "^ENV-[A-Z0-9]+(-[A-Z0-9]+)*$" },
+            "version": { "type": "integer", "minimum": 1 }
+          }
+        },
         "kind": { "enum": ["lab-ephemeral", "lab-persistent", "production"] },
         "telemetry_pipeline": {
           "enum": ["mirrored", "scratch", "none"],

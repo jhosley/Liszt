@@ -2,9 +2,9 @@ prediction_version: 1
 spec_id: ST-021
 scenario: '021'
 baseline: '2026.07'
-sealed: '2026-08-05'
+sealed: '2026-09-11'
 sealed_by: J. Hosley
-spec_digest: 036f07713b0e6959d0795ea0d458ed37ec9c37d4132cdf315625eeb959d5f9db
+spec_digest: 291ef8626e7130485f234bada1c0d7affcbf4c0ebbe923638cf6b3fa4c5de931
 assessment: reference
 rows:
 - step: 1

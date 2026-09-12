@@ -23,7 +23,8 @@ scenario: '021'
 # Binds this run to the exact prediction it is scored against. The scorer recomputes
 # this and refuses if it has moved, which is what makes a prediction quietly edited
 # after the fact detectable rather than merely discouraged.
-prediction_digest: f197d387abfc764a3baac2ceedb6e15d12a72e10f508d86d8fcdc6e71d30eb01
+prediction_digest: 8428c2c4ba6fd98f539b03b9e6e31a7d3f007965b25290ec35fee6def48f64ed
+spec_digest: 291ef8626e7130485f234bada1c0d7affcbf4c0ebbe923638cf6b3fa4c5de931
 
 executed: '2026-08-05'
 executed_by: Detection Engineering, with AI Platform observing
@@ -34,6 +35,9 @@ agent:
   model: none, a human executed the procedure
 
 environment:
+  # The versioned lab this run executed in; see environments/. kind and pipeline below
+  # must agree with it, and the validator checks that they do.
+  definition: {id: ENV-LAB-021-SCRATCH, version: 1}
   kind: lab-ephemeral
   telemetry_pipeline: scratch
   targets_used:
@@ -45,11 +49,10 @@ environment:
       The spec asked for a mirrored pipeline and the environment delivered scratch. The
       scorer reads THIS field, not the spec's, which is why the run degrades honestly
       instead of scoring claims it cannot see.
-    - The lab cluster runs one node group; production runs three with different
-      instance profiles, so a metadata credential path that exists in production may
-      be absent here.
-    - Artifactory in the lab is a standalone instance, not the production cluster
-      behind the CDN, so proxy access log formats match but volume and caching do not.
+    - The lab cluster runs one node group; production runs three with different instance profiles, 
+      so a metadata credential path that exists in production may be absent here.
+    - Artifactory in the lab is a standalone instance, not the production cluster behind the CDN, so
+      proxy access log formats match but volume and caching do not.
 
 autonomy_used: lab-only
 stop_conditions_triggered: []
@@ -134,9 +137,10 @@ observations:
     observed: absent
     observed_source: ''
     detection_fired: false
-    latency_seconds: null
+    latency_seconds:
     artifacts:
-      - "query: EKS control-plane audit, CloudWatch /aws/eks/lab/cluster -> no entries for the metadata read"
+      - "query: EKS control-plane audit, CloudWatch /aws/eks/lab/cluster -> no entries for the metadata
+        read"
       - "query: CloudTrail -> no entries; the read never reaches the control plane"
     surprises: []
     notes: >-
@@ -156,3 +160,118 @@ observations:
     observed: unscoreable
     surprises: []
     notes: Deferred to the next run, once the lab has an internal C2 stand-in.
+scorecard:
+  computed: '2026-08-05'
+  computed_by: tools/score_run.py
+  rows:
+    - step: 1
+      predicted_coverage: Blind
+      observed: logged-only
+      source_match:
+      delta: 1
+      verdict: underestimate
+    - step: 2
+      predicted_coverage: Have
+      observed: detected
+      source_match: true
+      verdict: unscoreable
+      note: "predicted Have depends on whether our detection fires, and the pipeline was 'scratch'. The
+        signal half was still scored: correct."
+    - step: 3
+      predicted_coverage: Collectable
+      observed: logged-only
+      source_match: false
+      verdict: unscoreable
+      note: "predicted Collectable depends on whether our detection fires, and the pipeline was 'scratch'.
+        The signal half was still scored: correct."
+    - step: 4
+      predicted_coverage: Have
+      observed: logged-only
+      source_match: true
+      verdict: unscoreable
+      note: "predicted Have depends on whether our detection fires, and the pipeline was 'scratch'. The
+        signal half was still scored: correct."
+    - step: 5
+      predicted_coverage: Collectable
+      observed: absent
+      source_match:
+      verdict: unscoreable
+      note: "predicted Collectable depends on whether our detection fires, and the pipeline was 'scratch'.
+        The signal half was still scored: WRONG."
+    - step: 6
+      predicted_coverage: Have
+      observed: unscoreable
+      verdict: not-executed
+      note: The procedure requires reaching public web services for the C2 and exfiltration channel,
+        and authorization.egress is deny-all. Executing it would have required widening the 
+        allowlist beyond the lab boundary, which is a stop condition. Needs a lab-internal stand-in 
+        for the paste and file-drop services before this step can run.
+  totals:
+    rows: 6
+    scored: 1
+    unscoreable: 4
+    not_executed: 1
+    confirmed: 0
+    overestimates: 0
+    severe_overestimates: 0
+    underestimates: 1
+    exact_match_rate: 0.0
+    optimism_index: -1.0
+    source_precision: 0.667
+    surprise_count: 2
+  by_class:
+    signal_presence:
+      scored: 5
+      correct: 3
+      rate: 0.6
+    source_attribution:
+      scored: 3
+      correct: 2
+      rate: 0.667
+    detection_fires:
+      scored: 0
+      correct: 0
+      rate:
+      note: "not under test: the pipeline was 'scratch'. Detection claims are only testable where our
+        real collectors, parsers and detection content run."
+  by_layer:
+    L3 Orchestration and Agent:
+      scored: 1
+      confirmed: 0
+  caveats:
+    - Pipeline was 'scratch', so no detection claim was scored and every predicted Have or 
+      Collectable is unscoreable at the coverage level. What this run CAN settle is whether the 
+      artifacts exist and where they land.
+    - "environment deviation: The spec asked for a mirrored pipeline and the environment delivered scratch.
+      The scorer reads THIS field, not the spec's, which is why the run degrades honestly instead of scoring
+      claims it cannot see."
+    - 'environment deviation: The lab cluster runs one node group; production runs three with different
+      instance profiles, so a metadata credential path that exists in production may be absent here.'
+    - 'environment deviation: Artifactory in the lab is a standalone instance, not the production cluster
+      behind the CDN, so proxy access log formats match but volume and caching do not.'
+feedback:
+  proposed_rescores:
+    - step: 1
+      from: Blind
+      to: Collectable
+      field: visibility
+      reason: the record says nothing is emitted, and the run found an artifact in Agent platform 
+        run manifest, emitted to the eval harness job log (lab index=agent_evals, field 
+        run.safety_profile). Free coverage the library did not know it had.
+  method_findings:
+    - Only 1 row(s) were scoreable, so the rates above are a data point and not a trend. Report the 
+      counts, not the percentages, until the denominator is worth a percentage.
+    - At least one artifact appeared somewhere other than the system named on the row. The 
+      visibility judgment was right and the source field was wrong, which sends an investigator to 
+      the wrong log on the day it matters. Worth a look at whether sources are being captured with 
+      the system owner in the room.
+    - '2 unpredicted signal(s) recorded. These are the cheapest coverage in the program: sources that
+      already work and are on no record.'
+  lab_findings:
+    - Pipeline mode 'scratch' capped what this run could prove. To test detection claims the lab has
+      to ship to the same collectors and detection content as the estate being scored.
+    - Environment deviations were recorded; each one is a candidate requirement for the next lab 
+      build.
+  new_sources_found:
+    - 'step 1: Agent platform run manifest, emitted to the eval harness job log (lab index=agent_evals,
+      field run.safety_profile)'

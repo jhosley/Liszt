@@ -1,0 +1,95 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# WORKED EXAMPLE. This environment was never built. It describes the lab the two
+# RUN-021 worked examples say they executed in, so the run records can cite an
+# environment by id and version the way they cite a prediction by digest. Invented
+# reference material; provenance.illustrative says so.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+environment_version: 1
+id: ENV-LAB-021
+version: 1
+name: Ephemeral AI evaluation lab, mirrored telemetry
+description: >-
+  A disposable EKS cluster with a dataset-processing worker, standing in for the agent
+  evaluation sandbox in scenario 021. Telemetry ships to the estate's real collectors into
+  a quarantined index, and production detection content is replayed against it, so a
+  detection claim is genuinely under test here.
+kind: lab-ephemeral
+telemetry_pipeline: mirrored
+status: current
+owner: Detection Engineering, with AI Platform
+review_due: '2027-03-31'
+
+targets:
+  - id: lab-eks-liszt-021
+    kind: lab-ephemeral
+    description: One node group EKS cluster hosting the evaluation sandbox and the worker pods.
+    layers: ['L0 · Infrastructure', 'L3 · Orchestration & Agent']
+  - id: lab-dataproc-021
+    kind: lab-ephemeral
+    description: The dataset-processing worker that consumes untrusted dataset configs.
+    layers: ['L1 · Data']
+
+components:
+  - name: Agent evaluation harness
+    role: target
+    fidelity: equivalent
+    product_version: internal eval harness, May 2026 build
+    note: The run manifest it writes was not on the scenario record; RUN-01 found it.
+  - name: Package proxy
+    role: target
+    fidelity: equivalent
+    product_version: Artifactory 7.161.14, standalone
+    note: Standalone instance, not the production cluster behind the CDN. Log formats match; volume and caching do not.
+  - name: Palo Alto NGFW and Zscaler egress logs
+    role: observation
+    fidelity: exact
+    serves_sources:
+      - Palo Alto NGFW traffic logs + Zscaler proxy, index=net_egress; Artifactory access.log
+  - name: CrowdStrike Falcon and containerd runtime events
+    role: observation
+    fidelity: exact
+    serves_sources:
+      - CrowdStrike Falcon ProcessRollup2, index=edr_main; containerd runtime events
+  - name: EKS control plane audit and CloudTrail
+    role: observation
+    fidelity: exact
+    serves_sources:
+      - EKS control-plane audit log, CloudWatch group /aws/eks/prod/cluster; AWS CloudTrail
+  - name: Dataset worker application log
+    role: observation
+    fidelity: exact
+    serves_sources:
+      - dataset-worker application logs, index=app_dataproc, source=worker.jsonl
+  - name: Zscaler proxy transaction logs and Symantec DLP
+    role: observation
+    fidelity: exact
+    serves_sources:
+      - Zscaler proxy transaction logs, index=net_proxy; Symantec DLP egress events
+  - name: Quarantined SIEM index with production detection content replayed
+    role: observation
+    fidelity: exact
+    note: The long pole of a mirrored lab. Rules fire into the quarantine, never into production paging.
+
+egress: deny-all
+ingestion_lag_seconds: 180
+
+teardown:
+  method: Delete the cluster and the worker namespace through the provisioning pipeline at the end of the time box plus ingestion lag.
+  evidence: A post-teardown query against the cloud account listing no resources tagged liszt-021, attached to the run record.
+
+known_deviations:
+  - The lab cluster runs one node group; production runs three with different instance profiles, so a metadata credential path that exists in production may be absent here.
+  - Artifactory is a standalone instance, not the production cluster behind the CDN.
+  - No internal stand-in exists yet for public paste, file-drop or request-capture services, so a step that needs one cannot execute under deny-all egress.
+
+provenance:
+  authored_by: Detection Engineering
+  created: '2026-09-11'
+  last_updated: '2026-09-11'
+  illustrative: true
+
+notes: >-
+  Written after the fact from the two RUN-021 worked examples, so the runs could cite an
+  environment. The three known deviations are the ones those runs recorded by hand; once an
+  environment record exists they are recorded once here and inherited by every run.

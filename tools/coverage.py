@@ -337,7 +337,11 @@ def period_ledgers(records: list[dict], prior: dict | None) -> dict:
                     continue
                 before = prior_rows.get((rec["id"], r["step"]))
                 now = derive_coverage(r.get("dettect"))
-                if before is not None and before.get("coverage") != now and not r.get("backlog_ref"):
+                # A first scoring is not a rescore: unscored to scored moves completeness,
+                # which is where it belongs. A rescore is a scored tag that changed with
+                # no ticket behind it.
+                if before is not None and before.get("coverage") is not None \
+                        and before.get("coverage") != now and not r.get("backlog_ref"):
                     rescored.append({"id": rec["id"], "step": r["step"],
                                      "from": before.get("coverage"), "to": now,
                                      "backlog_ref": None})
