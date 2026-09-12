@@ -106,10 +106,13 @@ outcome:                          # What is produced and who acts. Two axes, kep
                                   # purpose: kind is the artifact, autonomy is who acts. An
                                   # accurate alert nobody triages looks like coverage on one
                                   # axis and is invisible on the other.
-  kind: alert                     # alert | report | trend | dashboard | enrichment | response.
-                                  # The ARTIFACT. A detection that always resolves with no
-                                  # action required has the wrong kind, not the wrong logic:
-                                  # it should probably be a trend or a report, not an alert.
+  kind: alert                     # alert | report | trend | dashboard | monitoring |
+                                  # enrichment | response. The ARTIFACT. A detection that
+                                  # always resolves with no action required has the wrong
+                                  # kind, not the wrong logic: it should probably be a trend
+                                  # or a report, not an alert. monitoring: watched
+                                  # deliberately with no alert attached, a real answer when
+                                  # the volume will not support one yet.
   autonomy: notify                # notify | assisted | autonomous. WHO ACTS. A ladder, earned
                                   # in order, never a menu. notify: an operator is told and
                                   # acts. assisted: automation assembles the known investigation

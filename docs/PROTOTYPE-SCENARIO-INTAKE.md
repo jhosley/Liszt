@@ -56,7 +56,7 @@ The input is a two-block switch: fill in the **published incident** block or the
 hypothesis** block. Which block is filled decides the provenance fields and nothing else:
 
 - An incident sets `classification.evidence: "seen-in-the-wild"` and fills `incidents`,
-  where `tier` grades the source, 1 first party, 2 reputable secondary, 3 press.
+  where `tier` grades the source on the schema scale, "0" first party, "1" reputable secondary, "2" press, stored as quoted strings.
 - A hypothesis adds top-level `origin: "hypothesis"` and `proposed_by: "AI Threat
   Modeler"`, sets `classification.evidence: "seen-in-research"`, and omits `incidents`.
   Those two strings are how Liszt tags the record so it can never be mistaken for a real

@@ -217,6 +217,8 @@ The validator enforces the same asymmetry: an unscored row is a **warning** on a
 
 ## 5 · The snapshot record
 
+Defined by `schema/snapshot.schema.json`; `tools/coverage.py --json` validates against it before writing and refuses otherwise. Pass `--prior <last snapshot>` to fill the period ledgers and `--supersedes <snapshot_id>` when correcting one.
+
 Every metric run emits an immutable snapshot. Without it, a year-over-year delta is uninterpretable, two of the four frameworks made breaking changes inside 18 months (`frameworks/baseline-2026.07.yaml`), and a coverage "drop" caused by MITRE splitting a tactic looks identical to a coverage drop caused by a control being switched off.
 
 The baseline's migration rules already require this: *"Record the FULL version tuple with every metric snapshot."* This is that tuple, plus the library state needed to make the delta attributable.
@@ -230,11 +232,11 @@ generated_by:
 org: acme                           # exactly one org per snapshot (section 6)
 baseline: '2026.07'                 # frameworks/baseline-2026.07.yaml
 
-frameworks:                         # the full version tuple. Read it from the PINNED ARTIFACTS
-  attack:                           # once they are vendored into frameworks/pinned/ with
-                                    # checksums; until that directory exists, tools/coverage.py
-                                    # copies the tuple out of the baseline file and the sha256
-                                    # lines below cannot be filled
+frameworks:                         # the full version tuple. tools/coverage.py reads the sha256
+  tuple_source: pinned-artifacts    # values from frameworks/pinned/<baseline>/CHECKSUMS.json once
+  attack:                           # tools/pin_frameworks.py has populated it, and records which
+                                    # source it used; until then tuple_source is baseline-file and
+                                    # the sha256 lines are null
     version: '19.1'
     spec_version: '3.3.0'           # x_mitre_attack_spec_version off the collection object
     pinned_artifact: enterprise-attack/enterprise-attack-19.1.json
@@ -284,7 +286,7 @@ non_comparable_with:                # populated at every migration, from the new
 
 **The scenario library is org-independent. Coverage assessments are per-org.**
 
-An attack path is a property of the technology, not of an estate. `attack_path[]`, `framework_mapping`, `hardening[]`, `incidents[]`, `commentary`, none of these change when a different organization reads the record. What changes is whether *that org* sees each step. So `telemetry[].dettect`, `coverage`, `owner`, `evidence` and `backlog_ref` are org-scoped, and everything else is not.
+An attack path is a property of the technology, not of an estate. `attack_path[]`, `framework_mapping`, `hardening[]`, `incidents[]`, `commentary`, none of these change when a different organization reads the record. What changes is whether *that org* sees each step, and in which of *that org's* systems. So the org-scoped fields of an evidence row are `dettect`, `coverage`, `source`, `owner`, `evidence`, `backlog_ref`, `notes` and `research_needed`, and everything else on the row is not. `source` is org-scoped because one estate runs one product and another runs a different one: the reference record's source is the reference org's answer, not the attack's. The attack side of the row, `signal`, `emitted_at`, `detection_opportunity` and `data_components`, is shared. The list is enforced by `schema/coverage-overlay.schema.json` and the same tuple in `tools/coverage.py`, `tools/emit_testspec.py` and `tools/apply_session.py`.
 
 ### The pattern
 
@@ -300,20 +302,22 @@ The scenario record carries a **reference assessment**, the scores the authoring
 
 ### Overlay format
 
+Defined by `schema/coverage-overlay.schema.json`; the validator checks every file under `coverage/`.
+
 ```yaml
-schema_version: 1
-org: acme
 scenario: '021'
-baseline: '2026.07'            # must match the scenario's framework_mapping.baseline
+org: acme
+baseline: '2026.07'            # optional; when present must match the scenario's framework_mapping.baseline
 assessed_by: <named individual>
-assessed: 2026-08-01
-rows:
+assessed: '2026-08-01'
+telemetry:
   - step: 1
     dettect:
       visibility: 1
       detection: 0
       quality: {device_completeness: 2, data_field_completeness: 1, timeliness: 2, consistency: 1, retention: 3}
     coverage: Collectable      # derived; validator recomputes and errors on mismatch
+    source: Splunk index=k8s_audit   # THIS org's system, when it differs from the reference
     owner: Platform Engineering
     backlog_ref: ACME-4417
   - step: 3
@@ -324,7 +328,7 @@ rows:
 
 1. **Row-level, not record-level.** For scenario `s` and org `o`, row `r` resolves to the overlay row with the matching `step` if one exists, otherwise to the scenario's reference row.
 2. **`inherit: true` marks a row this org has not assessed.** An inherited row is excluded from that org's `S(s)`, it is unscored *for that org* even though the reference record has numbers. This falls straight out of section 4: the reference org's assessment is not evidence about your estate. Inherited rows show up in `completeness`, which is exactly where they belong.
-3. **A row silently absent from the overlay resolves to the reference row and is treated as inherited.** Explicit `inherit: true` is preferred because it records that someone looked and deferred, rather than that someone forgot.
+3. **A row silently absent from the overlay is treated as inherited**, which is to say unscored for this org. The row keeps its attack-side fields and loses its scores. Explicit `inherit: true` is preferred because it records that someone looked and deferred, rather than that someone forgot. An org with an overlay that assesses two rows of six reports completeness 0.33 for that scenario, which is the truth.
 4. **The same derivation rule applies to overlays.** `derive_coverage()` is not org-configurable. This is the one thing that must not be negotiable, because it is what makes two orgs' numbers mean the same thing.
 5. **The overlay may not change anything outside the org-scoped fields.** An overlay that redefines `attack_path` is a fork, not an overlay, split the scenario in the library instead.
 6. **One snapshot per org.** There is no cross-org aggregate coverage number, because there is no such estate. Cross-org comparison is a table of per-org figures with their completeness values, side by side.

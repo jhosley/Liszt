@@ -1,1 +1,23 @@
-{}
+{
+  "atlas": {
+    "bytes": 717172,
+    "filename": "ATLAS-2026.07.yaml",
+    "sha256": "0e07bb07fc6423d72cdf24ddc2038a6905bcbc00ba571064153119ee1a5888d4",
+    "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/v6/ATLAS-2026.07.yaml",
+    "version": "2026.07 (format 6.0.0)"
+  },
+  "attack": {
+    "bytes": 53277393,
+    "filename": "enterprise-attack-19.1.json",
+    "sha256": "bdf1ce86a4e604214c5076d37ae4dcb322678afc528df8492e6fdc1b554f5da3",
+    "url": "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack-19.1.json",
+    "version": "19.1 (spec 3.3.0)"
+  },
+  "owasp_llm": {
+    "bytes": 10716216,
+    "filename": "OWASP-Top-10-for-LLMs-2025.pdf",
+    "sha256": "d8596f2c6b3384081574d392619ee3e9065c4f86e5b1fed1bb56be78de2ce382",
+    "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/assets/PDF/OWASP-Top-10-for-LLMs-v2025.pdf",
+    "version": "2025"
+  }
+}

@@ -76,18 +76,11 @@ def sha256_bytes(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
 
 
-def derive_coverage(dettect: dict | None) -> str | None:
-    """The one derivation rule. Mirrors tools/validate.py::derive_coverage() exactly;
-    if these two ever disagree the program has two definitions of coverage, which is the
-    one thing docs/04-measurement.md says must never happen."""
-    if not dettect:
-        return None
-    vis, det = dettect.get("visibility"), dettect.get("detection")
-    if vis is None or det is None:
-        return None
-    if vis == 0:
-        return "Blind"
-    return "Have" if det >= 1 else "Collectable"
+# The one derivation rule lives in tools/validate.py and nowhere else. A second copy here
+# would be a second definition of coverage, which docs/04-measurement.md says must never
+# exist. Imported, not restated.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from validate import derive_coverage  # noqa: E402
 
 
 def guess_layer(step: dict) -> str:
@@ -116,20 +109,25 @@ def load_overlay(sid: str, org: str) -> dict | None:
 
 
 def resolve_rows(rec: dict, overlay: dict | None) -> dict[int, dict]:
-    """Row level resolution, exactly as docs/04-measurement.md defines it: a step takes
-    the overlay row when one exists and is not inherit, otherwise the reference row."""
+    """Row level resolution, exactly as docs/04-measurement.md section 6 defines it: a
+    step takes the overlay entry when one exists and is not inherit. A row the org did
+    not assess is UNSCORED for that org; the reference assessment is not evidence about
+    this estate, so its scores are cleared rather than borrowed. The attack side of the
+    row (signal, emitted_at, detection_opportunity, data components) is kept."""
     rows = {r["step"]: dict(r) for r in rec.get("telemetry", [])
             if r.get("kind", "attack-step") == "attack-step"}
     if not overlay:
         return rows
-    for orow in overlay.get("telemetry", []):
-        step = orow.get("step")
-        if step not in rows or orow.get("inherit"):
-            continue
-        merged = dict(rows[step])
-        for k, v in orow.items():
-            if k not in ("step", "inherit"):
-                merged[k] = v
+    org_fields = ("dettect", "coverage", "source", "owner", "evidence", "backlog_ref",
+                  "notes", "research_needed")
+    by_step = {o.get("step"): o for o in overlay.get("telemetry", [])}
+    for step, row in rows.items():
+        merged = {k: v for k, v in row.items() if k not in org_fields}
+        orow = by_step.get(step)
+        if orow and not orow.get("inherit"):
+            for k in org_fields:
+                if k in orow:
+                    merged[k] = orow[k]
         rows[step] = merged
     return rows
 

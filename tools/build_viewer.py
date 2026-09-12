@@ -1697,7 +1697,7 @@ JSON shape, PUBLISHED INCIDENT form:
     "owasp_llm": ["LLM06:2025"],
     "owasp_agentic": ["ASI10:2026"]
   },
-  "incidents": [ { "title": "source title", "url": "source URL", "tier": 1 } ],
+  "incidents": [ { "title": "source title", "url": "source URL", "tier": "0" } ],
   "_check": {
     "layer_reason": "", "layer_runner_up": "", "steps_merged": "", "confidence": "",
     "check_1_layer_lands": "", "check_2_geometry": "", "check_3_fields": ""
@@ -1739,7 +1739,7 @@ not copy its content into your answer.
     { "step": 3, "signal": "answer citing the planted passage", "emitted_at": "inference gateway log", "detection_opportunity": "responses whose citations trace to recent external ingests" }
   ],
   "framework_mapping": { "baseline": "2026.07", "attack": ["T1566"], "atlas": [], "owasp_llm": ["LLM06:2025"], "owasp_agentic": [] },
-  "incidents": [ { "title": "Vendor writeup of a RAG poisoning incident", "url": "https://example.com/writeup", "tier": 2 } ],
+  "incidents": [ { "title": "Vendor writeup of a RAG poisoning incident", "url": "https://example.com/writeup", "tier": "1" } ],
   "_check": {
     "layer_reason": "The corpus is the asset corrupted; the model behaves as designed on poisoned retrieval",
     "layer_runner_up": "L2 · Model",
@@ -1802,13 +1802,13 @@ Rules:
   - 3 to 6 distinct steps. SIX IS A HARD CEILING enforced by the schema; a chain that needs
     more is two scenarios, so split it rather than fusing unlike moves to fit.
   - incidents[].tier grades the SOURCE, not the severity, and is filled only for a published
-    incident. Use the number, not a word:
-      1  first party. The affected organization's own disclosure, or a research team's
-         own technical writeup of work they did themselves.
-      2  reputable secondary technical reporting that adds detail: a vendor research team
-         analyzing someone else's incident, a national CERT advisory.
-      3  press, aggregators and summaries. Good for the fact that it happened, not for
-         technical detail. If all you have is a press story, tier 3 is the honest answer.
+    incident. Use the quoted number, not a word; this is the schema's own scale:
+      "0"  first party. The affected organization's own disclosure, or a research team's
+           own technical writeup of work they did themselves.
+      "1"  reputable secondary technical reporting that adds detail: a vendor research team
+           analyzing someone else's incident, a national CERT advisory.
+      "2"  press, aggregators and summaries. Good for the fact that it happened, not for
+           technical detail. If all you have is a press story, tier "2" is the honest answer.
   - Valid JSON only, one object, no trailing commas, no commentary. Every key except the
     leading-underscore "_check" is a scenario field; "_check" is read by the reviewer and
     dropped on import, so the rest promotes to a permanent record by copy and fill.
@@ -1890,7 +1890,7 @@ what you changed) into "_check".
     no-score rules above, character for character for the layer string. Then the branch
     fields:
       - Incident: classification.evidence == "seen-in-the-wild", and incidents is present
-        with a real url and a tier of 1, 2, or 3.
+        with a real url and a tier of "0", "1", or "2".
       - Hypothesis: top-level origin == "hypothesis", top-level proposed_by is set,
         classification.evidence == "seen-in-research", and there is NO incidents key.
     The output is a single JSON object: no prose, no code fence, no trailing commas. Record
@@ -1927,7 +1927,7 @@ Rules:
   - Layer is PROVISIONAL, your quick read: L0 Infrastructure, L1 Data, L2 Model,
     L3 Orchestration and Agent, or L4 Application. The conversion prompt re-derives it with a
     stricter rule, so do not agonize over it.
-  - Tier grades the SOURCE: 1 first party, 2 reputable press or research, 3 community.
+  - Tier grades the SOURCE: "0" first party, "1" reputable press or research, "2" community.
   - Prefer confirmed incidents over demos, and label any notable demo "research, not in the
     wild"; no marketing; do not speculate; mark unknown details "unknown".
 
@@ -1958,7 +1958,7 @@ Rules:
     the more first-party link.
   - Layer is PROVISIONAL, your quick read: L0 Infrastructure, L1 Data, L2 Model,
     L3 Orchestration and Agent, or L4 Application. The conversion prompt re-derives it.
-  - Tier grades the SOURCE: 1 first party, 2 reputable research, 3 community. Prefer confirmed
+  - Tier grades the SOURCE: "0" first party, "1" reputable research, "2" community. Prefer confirmed
     incidents and concrete technical findings over opinion; mark unknown details "unknown".
 
 I will pick one row by its number and hand it to the conversion prompt.`;
@@ -2659,19 +2659,22 @@ function shortenStepLayer(value) {
            note: "truncated to 18 characters; rewrite it as a short seam tag", seam: "" };
 }
 
-/* Source tiers grade the sourcing, not the severity: 1 first party, 2 reputable secondary
-   technical reporting, 3 press and aggregators. Models return these as words, as strings,
-   or as the placeholder "1, 2, or 3", so everything is coerced and anything unreadable is
-   surfaced rather than defaulted quietly. */
+/* Source tiers grade the sourcing, not the severity. The schema vocabulary, on every
+   record type, is "0" first party, "1" reputable secondary technical reporting, "2" press
+   and aggregators, stored as quoted strings. Models return these as words, as numbers, or
+   as the placeholder "0, 1, or 2", so everything is coerced to the schema strings and
+   anything unreadable is surfaced rather than defaulted quietly. An unreadable tier lands
+   as "2", the lowest grade, with a needs_review note: guessing upward would manufacture a
+   primary source. */
 function normalizeTier(v) {
   const raw = String(v == null ? "" : v).trim().toLowerCase();
-  if (!raw) return { tier: 0, note: "no source tier given" };
-  const m = raw.match(/^[^0-9]*([123])(?![0-9])/);
-  if (m && !/,|or\b/.test(raw)) return { tier: Number(m[1]), note: "" };
-  if (/first[- ]?party|vendor own|own disclosure/.test(raw)) return { tier: 1, note: "" };
-  if (/secondary|research|cert|advisory/.test(raw))          return { tier: 2, note: "" };
-  if (/press|news|aggregat|summary|blog post/.test(raw))     return { tier: 3, note: "" };
-  return { tier: 0, note: "source tier \"" + String(v).slice(0, 40) + "\" is not 1, 2 or 3" };
+  if (!raw) return { tier: "2", note: "no source tier given; graded as press until a reviewer says otherwise" };
+  const m = raw.match(/^[^0-9]*([012])(?![0-9])/);
+  if (m && !/,|or\b/.test(raw)) return { tier: m[1], note: "" };
+  if (/first[- ]?party|vendor own|own disclosure|post[- ]?mortem/.test(raw)) return { tier: "0", note: "" };
+  if (/secondary|research|cert|advisory/.test(raw))          return { tier: "1", note: "" };
+  if (/press|news|aggregat|summary|blog post/.test(raw))     return { tier: "2", note: "" };
+  return { tier: "2", note: "source tier \"" + String(v).slice(0, 40) + "\" is not 0, 1 or 2; graded as press" };
 }
 
 /* Framework IDs, shaped exactly as the schema defines them. A model handed a JSON skeleton
@@ -2788,10 +2791,10 @@ function normalizeImported(raw) {
       const src = (inc && typeof inc === "object") ? inc : {};
       const tn = normalizeTier(src.tier);
       if (tn.note) review.push("incidents[" + (i + 1) + "] " + tn.note
-        + ". Tier grades the sourcing: 1 first party, 2 reputable secondary technical "
-        + "reporting, 3 press or aggregator.");
+        + ". Tier grades the sourcing: \"0\" first party, \"1\" reputable secondary "
+        + "technical reporting, \"2\" press or aggregator.");
       return { title: String(src.title || "").trim(), url: String(src.url || "").trim(),
-               tier: tn.tier || 3 };
+               tier: tn.tier };
     }) : [],
     provenance: s.provenance || {}
   };

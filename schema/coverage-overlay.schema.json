@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.internal/liszt/schema/coverage-overlay.schema.json",
+  "title": "Coverage Overlay",
+  "description": "One organization's assessment of one scenario's evidence rows. The scenario library is organization independent: the attack path, the signals and the framework mapping are properties of the attack. Whether an organization would see each step is a property of that organization's estate, and it lives here, in coverage/<org>/<scenario-id>.yaml, so the shared library stays publishable while each organization's gaps stay its own. An overlay may only carry the organization scoped fields of a row. It may not restate the attack path, the signals, or anything else about the scenario; that would be a fork, not an overlay. The scenario record's own scores are the reference assessment and are read exactly like any other organization's.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scenario", "org", "assessed_by", "assessed", "telemetry"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "scenario": {
+      "type": "string",
+      "pattern": "^[0-9]{3}$",
+      "description": "The scenario this overlay assesses. Must exist in scenarios/ and must equal the filename."
+    },
+    "org": {
+      "type": "string",
+      "pattern": "^[a-z0-9_][a-z0-9_-]*$",
+      "maxLength": 40,
+      "description": "The organization identifier. Must equal the directory name. Coverage is always evaluated for exactly one org; there is no cross-org aggregate because there is no such estate."
+    },
+    "baseline": {
+      "type": "string",
+      "pattern": "^[0-9]{4}\\.[0-9]{2}$",
+      "description": "The framework baseline this assessment was made against. When present it must match the scenario's framework_mapping.baseline; an assessment does not survive a baseline migration unchecked."
+    },
+    "assessed_by": {
+      "type": "string",
+      "minLength": 3,
+      "description": "The named individual who ran or signed the assessment. Accountability does not transfer to a team."
+    },
+    "assessed": {
+      "type": "string",
+      "format": "date",
+      "description": "The date of the assessment, YYYY-MM-DD. Quote it."
+    },
+    "telemetry": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One entry per assessed row, keyed by the row's step number. A row absent from this list, or marked inherit, is UNSCORED for this organization: the reference assessment is not evidence about this estate. Absent rows count against this organization's completeness, which is where they belong.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step"],
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8,
+            "description": "The telemetry row number in the scenario record this entry overrides."
+          },
+          "inherit": {
+            "type": "boolean",
+            "description": "True means this organization looked at the row and deliberately did not assess it. Preferred over leaving the row out, because it records that someone looked. An inherited row carries no other fields."
+          },
+          "dettect": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["visibility", "detection"],
+            "properties": {
+              "visibility": { "type": "integer", "minimum": 0, "maximum": 4 },
+              "detection": { "type": "integer", "minimum": -1, "maximum": 5 },
+              "quality": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "device_completeness": { "type": "integer", "minimum": 0, "maximum": 5 },
+                  "data_field_completeness": { "type": "integer", "minimum": 0, "maximum": 5 },
+                  "timeliness": { "type": "integer", "minimum": 0, "maximum": 5 },
+                  "consistency": { "type": "integer", "minimum": 0, "maximum": 5 },
+                  "retention": { "type": "integer", "minimum": 0, "maximum": 5 }
+                }
+              }
+            }
+          },
+          "coverage": {
+            "enum": ["Have", "Collectable", "Blind"],
+            "description": "Derived from dettect by the one rule, stored as a cache. The validator recomputes it and errors on mismatch. The rule is not organization configurable; that is what makes two organizations' numbers mean the same thing."
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "The exact system this signal comes from in THIS organization's estate. Organization scoped because one estate runs one product and another runs a different one; the reference record's source is the reference organization's answer."
+          },
+          "owner": { "type": "string", "description": "The team in this organization accountable for the source." },
+          "evidence": { "type": "string", "description": "The re-runnable artifact behind a Have: a saved search that returns rows, a rule id, a ticket." },
+          "backlog_ref": { "type": "string", "description": "This organization's ticket for the instrumentation work." },
+          "notes": { "type": "string", "maxLength": 1500 },
+          "research_needed": { "type": "boolean", "description": "The room could not answer. The row stays unscored for this organization and the blank is a known unknown with follow-up owed." }
+        }
+      }
+    }
+  }
+}

@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-Validate scenario AND use case records against their schemas AND the quality bar.
+Validate every record type against its schema AND the quality bar: scenarios, use cases,
+incidents, framework baselines and per-org coverage overlays.
 
     python tools/validate.py                       # everything
     python tools/validate.py scenarios/021-*.yaml  # one record
     python tools/validate.py use-cases/UC-001*.yaml # one use case record
+    python tools/validate.py incidents/*.yaml        # incident records
+    python tools/validate.py coverage/acme/*.yaml    # one org's overlays
     python tools/validate.py --strict               # warnings become errors (use in CI)
     python tools/validate.py --publishable          # only check records with status: published
 
@@ -20,6 +23,7 @@ Exit codes: 0 clean, 1 errors present, 2 warnings present under --strict.
 from __future__ import annotations
 
 import argparse
+import collections
 import glob
 import pathlib
 import re
@@ -34,6 +38,9 @@ except ImportError:
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCHEMA = ROOT / "schema" / "scenario.schema.json"
 UC_SCHEMA = ROOT / "schema" / "use-case.schema.json"
+INC_SCHEMA = ROOT / "schema" / "incident.schema.json"
+BASE_SCHEMA = ROOT / "schema" / "framework-baseline.schema.json"
+OV_SCHEMA = ROOT / "schema" / "coverage-overlay.schema.json"
 
 # Slide geometry limits, measured against the rendered template. Exceeding these
 # does not corrupt the deck -- it produces text that overflows its shape, which is
@@ -447,6 +454,187 @@ def validate_use_case_file(path: pathlib.Path, validator,
     return f
 
 
+def _stringify_dates(obj):
+    """YAML turns an unquoted 2026-07-30 into a date object. The schemas want strings,
+    and the records are allowed to leave dates unquoted, so normalize before checking."""
+    import datetime
+    if isinstance(obj, dict):
+        return {k: _stringify_dates(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_stringify_dates(v) for v in obj]
+    if isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
+    return obj
+
+
+def _load(path: pathlib.Path, f: Findings) -> dict | None:
+    try:
+        rec = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        f.err("yaml", f"unparseable: {e}")
+        return None
+    if not isinstance(rec, dict):
+        f.err("yaml", "top level is not a mapping")
+        return None
+    return _stringify_dates(rec)
+
+
+def validate_incident_file(path: pathlib.Path, validator,
+                           scenario_steps: dict[str, list[int]],
+                           cited_by: dict[str, set[str]]) -> Findings:
+    """An incident is the evidence a scenario stands on. Both ends of the join are
+    checked: every scenario it names must exist, and every scenario that cites it
+    should name it back, so the join reads the same from either side."""
+    f = Findings()
+    rec = _load(path, f)
+    if rec is None:
+        return f
+    for e in sorted(validator.iter_errors(rec), key=lambda e: list(e.path)):
+        f.err("/".join(str(p) for p in e.path) or "(root)", e.message)
+    if f.errors:
+        return f
+    if path.stem != rec["slug"]:
+        f.err("filename", f"should be {rec['slug']}.yaml")
+    for sid in rec.get("scenarios", []):
+        if sid not in scenario_steps:
+            f.err("scenarios", f"'{sid}' does not exist in scenarios/")
+    back = cited_by.get(rec["slug"], set())
+    forward = set(rec.get("scenarios", []))
+    for sid in sorted(back - forward):
+        f.warn("scenarios", f"scenario {sid} cites this incident but is not listed here; "
+                            "list it so the join reads the same from both sides")
+    if not any(r.get("tier") == "0" for r in rec.get("references", [])):
+        f.warn("references", "no tier 0 source. An incident grounded only in secondary "
+                             "reporting should say so in notes")
+    for c in rec.get("contested", []):
+        if c.get("status") == "resolved" and not c.get("note"):
+            f.warn("contested", "resolved with no note saying how; the resolution is the "
+                                "part a reader needs")
+    blob = yaml.safe_dump(rec, allow_unicode=True)
+    for pattern, why in BANNED:
+        if pattern.search(blob):
+            f.warn("language", why)
+    return f
+
+
+def validate_baseline_file(path: pathlib.Path, validator) -> Findings:
+    """The baseline is the vocabulary every mapping speaks. It has an owner, a status
+    and a review date, and the pinned artifacts it names should exist with checksums."""
+    f = Findings()
+    rec = _load(path, f)
+    if rec is None:
+        return f
+    for e in sorted(validator.iter_errors(rec), key=lambda e: list(e.path)):
+        f.err("/".join(str(p) for p in e.path) or "(root)", e.message)
+    if f.errors:
+        return f
+    if path.stem != f"baseline-{rec['baseline']}":
+        f.err("filename", f"should be baseline-{rec['baseline']}.yaml")
+    if "unassigned" in str(rec.get("owner", "")).lower():
+        f.warn("owner", "the baseline owner seat is empty. The migration procedure assumes a "
+                        "named individual; name one before the first migration")
+    lock = ROOT / "frameworks" / "pinned" / rec["baseline"] / "CHECKSUMS.json"
+    try:
+        import json as _json
+        pinned = _json.loads(lock.read_text()) if lock.exists() else {}
+    except ValueError:
+        pinned = {}
+    if not pinned:
+        f.warn("pinned", f"frameworks/pinned/{rec['baseline']}/CHECKSUMS.json is empty; "
+                         "framework ids cannot be verified offline and snapshots cannot "
+                         "carry artifact hashes. Run tools/pin_frameworks.py")
+    if rec.get("status") == "superseded" and not rec.get("superseded_by"):
+        f.warn("status", "superseded with no superseded_by")
+    return f
+
+
+def validate_overlay_file(path: pathlib.Path, validator,
+                          scenario_rows: dict[str, dict]) -> Findings:
+    """An overlay is one org's assessment of one scenario. It may override only the org
+    scoped fields, its rows must exist in the scenario, and its coverage tag must derive
+    from its scores by the same rule as everyone else's."""
+    f = Findings()
+    rec = _load(path, f)
+    if rec is None:
+        return f
+    for e in sorted(validator.iter_errors(rec), key=lambda e: list(e.path)):
+        f.err("/".join(str(p) for p in e.path) or "(root)", e.message)
+    if f.errors:
+        return f
+    sid = str(rec["scenario"])
+    if path.stem != sid:
+        f.err("filename", f"should be {sid}.yaml")
+    if path.parent.name != rec["org"]:
+        f.err("org", f"'{rec['org']}' does not match directory coverage/{path.parent.name}/")
+    scen = scenario_rows.get(sid)
+    if scen is None:
+        f.err("scenario", f"'{sid}' does not exist in scenarios/")
+        return f
+    if rec.get("baseline") and rec["baseline"] != scen["baseline"]:
+        f.err("baseline", f"overlay assessed against {rec['baseline']} but the scenario "
+                          f"speaks {scen['baseline']}; re-assess after migration")
+    seen = set()
+    for r in rec.get("telemetry", []):
+        step = r["step"]
+        if step in seen:
+            f.err(f"telemetry[{step}]", "duplicate step")
+        seen.add(step)
+        if step not in scen["rows"]:
+            f.err(f"telemetry[{step}]", f"scenario {sid} has no telemetry row {step}")
+        if r.get("inherit") and len(r) > 2:
+            f.warn(f"telemetry[{step}]", "inherit is true but other fields are present; "
+                                         "an inherited row carries nothing else")
+        d = derive_coverage(r.get("dettect"))
+        if d is not None and "coverage" in r and r["coverage"] != d:
+            f.err(f"telemetry[{step}]",
+                  f"coverage is '{r['coverage']}' but DeTT&CT scores derive '{d}'")
+        if d is None and not r.get("inherit") and not r.get("research_needed") \
+                and any(k in r for k in ("coverage", "owner", "evidence", "backlog_ref")):
+            f.warn(f"telemetry[{step}]", "fields set but no scores; this row is unscored for "
+                                         "the org and its coverage tag is an opinion")
+        if d in ("Have", "Collectable") and not (r.get("source") or scen["rows"][step].get("source")):
+            f.warn(f"telemetry[{step}]", f"{d} with no source named on the overlay or the record")
+        if d == "Have" and not r.get("evidence"):
+            f.warn(f"telemetry[{step}]", "Have with no evidence")
+        if d in ("Blind", "Collectable") and not r.get("owner"):
+            f.warn(f"telemetry[{step}]", f"{d} with no owner")
+    return f
+
+
+def load_scenario_rows() -> dict[str, dict]:
+    """Scenario id -> baseline and its telemetry rows by step, for overlay checks."""
+    out: dict[str, dict] = {}
+    for p in sorted((ROOT / "scenarios").glob("*.yaml")):
+        if p.name.startswith("_"):
+            continue
+        try:
+            rec = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            continue
+        if rec.get("id"):
+            out[str(rec["id"])] = {
+                "baseline": (rec.get("framework_mapping") or {}).get("baseline"),
+                "rows": {r.get("step"): r for r in rec.get("telemetry", [])
+                         if isinstance(r, dict)},
+            }
+    return out
+
+
+def load_incident_citations() -> dict[str, set[str]]:
+    """Incident slug -> scenario ids that cite it."""
+    out: dict[str, set[str]] = {}
+    for p in sorted((ROOT / "scenarios").glob("*.yaml")):
+        if p.name.startswith("_"):
+            continue
+        try:
+            rec = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            continue
+        for slug in rec.get("incidents", []) or []:
+            out.setdefault(str(slug), set()).add(str(rec.get("id")))
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -457,13 +645,21 @@ def main() -> int:
 
     validator = Draft202012Validator(yaml.safe_load(SCHEMA.read_text()))
     uc_validator = Draft202012Validator(yaml.safe_load(UC_SCHEMA.read_text()))
+    inc_validator = Draft202012Validator(yaml.safe_load(INC_SCHEMA.read_text()))
+    base_validator = Draft202012Validator(yaml.safe_load(BASE_SCHEMA.read_text()))
+    ov_validator = Draft202012Validator(yaml.safe_load(OV_SCHEMA.read_text()))
     incidents = {p.stem for p in (ROOT / "incidents").glob("*.yaml")}
     scenario_steps = load_scenario_steps()
+    scenario_rows = load_scenario_rows()
     uc_covered = load_use_case_covers()
+    cited_by = load_incident_citations()
 
     paths = [pathlib.Path(p) for pat in args.paths for p in glob.glob(pat)] or \
             sorted((ROOT / "scenarios").glob("*.yaml")) + \
-            sorted((ROOT / "use-cases").glob("*.yaml"))
+            sorted((ROOT / "use-cases").glob("*.yaml")) + \
+            sorted((ROOT / "incidents").glob("*.yaml")) + \
+            sorted((ROOT / "frameworks").glob("baseline-*.yaml")) + \
+            sorted((ROOT / "coverage").glob("*/*.yaml"))
     paths = [p for p in paths if not p.name.startswith("_")]
 
     if args.publishable:
@@ -476,11 +672,33 @@ def main() -> int:
                 keep.append(p)
         paths = keep
 
-    is_uc = lambda p: p.resolve().parent.name == "use-cases"
+    def kind(p: pathlib.Path) -> str:
+        parent = p.resolve().parent
+        if parent.name == "use-cases":
+            return "use case"
+        if parent.name == "incidents":
+            return "incident"
+        if parent.name == "frameworks":
+            return "baseline"
+        if parent.parent.name == "coverage":
+            return "overlay"
+        return "scenario"
+
     n_err = n_warn = 0
+    kinds = collections.Counter()
     for path in paths:
-        f = (validate_use_case_file(path, uc_validator, scenario_steps) if is_uc(path)
-             else validate_file(path, validator, incidents, uc_covered))
+        k = kind(path)
+        kinds[k] += 1
+        if k == "use case":
+            f = validate_use_case_file(path, uc_validator, scenario_steps)
+        elif k == "incident":
+            f = validate_incident_file(path, inc_validator, scenario_steps, cited_by)
+        elif k == "baseline":
+            f = validate_baseline_file(path, base_validator)
+        elif k == "overlay":
+            f = validate_overlay_file(path, ov_validator, scenario_rows)
+        else:
+            f = validate_file(path, validator, incidents, uc_covered)
         n_err += len(f.errors)
         n_warn += len(f.warns)
         if f.errors or f.warns:
@@ -491,9 +709,8 @@ def main() -> int:
             for where, msg in f.warns:
                 print(f"  warn   {where}: {msg}")
 
-    n_uc = sum(1 for p in paths if is_uc(p))
-    print(f"\n{len(paths) - n_uc} scenario record(s) · {n_uc} use case record(s) · "
-          f"{n_err} error(s) · {n_warn} warning(s)")
+    counted = " · ".join(f"{n} {k} record(s)" for k, n in kinds.items())
+    print(f"\n{counted} · {n_err} error(s) · {n_warn} warning(s)")
     if n_err:
         return 1
     if n_warn and args.strict:

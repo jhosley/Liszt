@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.internal/liszt/schema/framework-baseline.schema.json",
+  "title": "Framework Baseline",
+  "description": "A pinned snapshot of every external framework the records speak, taken at one moment and named YYYY.MM. Every scenario names exactly one baseline and every framework identifier in it is expressed in that baseline's vocabulary. A baseline is never edited after records cite it and never deleted after it is superseded; a migration cuts a new one. Files live in frameworks/baseline-<YYYY.MM>.yaml; the vendored artifacts and their checksums live in frameworks/pinned/<YYYY.MM>/.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["baseline", "status", "declared", "owner", "review_due", "frameworks", "migration"],
+  "properties": {
+    "baseline": {
+      "type": "string",
+      "pattern": "^[0-9]{4}\\.[0-9]{2}$",
+      "description": "The baseline name. Records point at it through framework_mapping.baseline. Must equal the filename's version part."
+    },
+    "status": {
+      "enum": ["current", "superseded"],
+      "description": "Exactly one baseline is current outside a migration window. During a migration two are current for one full reporting cycle, and both are reported against."
+    },
+    "declared": { "type": "string", "format": "date", "description": "The date the pin was cut." },
+    "owner": {
+      "type": "string",
+      "minLength": 3,
+      "description": "A named individual, not a team. Someone has to run the migration. The validator warns while this reads UNASSIGNED."
+    },
+    "review_due": { "type": "string", "format": "date", "description": "When the next migration decision is due. Aligned to the ATT&CK April release." },
+    "supersedes": { "type": "string", "pattern": "^[0-9]{4}\\.[0-9]{2}$", "description": "The prior baseline, when this one replaced it." },
+    "superseded_by": { "type": "string", "pattern": "^[0-9]{4}\\.[0-9]{2}$", "description": "Set on the old baseline when a new one is cut. The file stays." },
+    "frameworks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attack", "atlas", "owasp_llm", "owasp_agentic", "dettect"],
+      "description": "One entry per framework. Each carries the exact version tuple, where the pinned artifact came from, how its identifiers behave over time, and what broke since the prior pin. Prose fields are allowed because the reasoning is the point.",
+      "properties": {
+        "attack": {
+          "type": "object",
+          "required": ["name", "version", "spec_version", "released", "pinned_artifact", "pinned_url", "id_stability", "breaking_changes_since_prior_baseline"],
+          "properties": {
+            "name": { "type": "string" },
+            "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$", "description": "ATT&CK content version, for example 19.1." },
+            "spec_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "description": "x_mitre_attack_spec_version off the collection object of the pinned bundle. Recorded separately because it moves on its own." },
+            "released": { "type": "string", "format": "date" },
+            "pinned_artifact": { "type": "string", "description": "Immutable filename, never a floating pointer." },
+            "pinned_url": { "type": "string" },
+            "id_stability": { "type": "string" },
+            "breaking_changes_since_prior_baseline": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "atlas": {
+          "type": "object",
+          "required": ["name", "version", "format_version", "released", "pinned_artifact", "pinned_url", "id_stability"],
+          "properties": {
+            "name": { "type": "string" },
+            "version": { "type": "string", "pattern": "^[0-9]{4}\\.[0-9]{2}$", "description": "ATLAS content version, YYYY.MM." },
+            "format_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "description": "ATLAS data format version, decoupled from content since 2026.05. Record both." },
+            "released": { "type": "string", "format": "date" },
+            "pinned_artifact": { "type": "string" },
+            "pinned_url": { "type": "string" },
+            "contents_at_pin": { "type": "object", "properties": { "tactics": { "type": "integer" }, "techniques": { "type": "integer" }, "mitigations": { "type": "integer" }, "case_studies": { "type": "integer" } } },
+            "id_stability": { "type": "string" }
+          }
+        },
+        "owasp_llm": {
+          "type": "object",
+          "required": ["name", "edition", "published", "ids", "id_stability"],
+          "properties": {
+            "name": { "type": "string" },
+            "edition": { "type": "string", "pattern": "^[0-9]{4}$", "description": "Edition year. Every LLM identifier in a record is qualified with it, LLM03:2025, because slot numbers move between editions." },
+            "published": { "type": "string", "format": "date" },
+            "id_stability": { "type": "string" },
+            "ids": {
+              "type": "object",
+              "description": "The ten slots of this edition, identifier to name. This is the controlled vocabulary the validator resolves LLMnn:edition against.",
+              "propertyNames": { "pattern": "^LLM(0[1-9]|10)$" },
+              "additionalProperties": { "type": "string" },
+              "minProperties": 10, "maxProperties": 10
+            }
+          }
+        },
+        "owasp_agentic": {
+          "type": "object",
+          "required": ["name", "edition", "published", "id_prefix", "ids"],
+          "properties": {
+            "name": { "type": "string" },
+            "edition": { "type": "string", "pattern": "^[0-9]{4}$" },
+            "published": { "type": "string", "format": "date" },
+            "id_prefix": { "const": "ASI" },
+            "ids": {
+              "type": "object",
+              "propertyNames": { "pattern": "^ASI(0[1-9]|10)$" },
+              "additionalProperties": { "type": "string" },
+              "minProperties": 10, "maxProperties": 10
+            }
+          }
+        },
+        "dettect": {
+          "type": "object",
+          "required": ["name", "version", "targets_attack", "scales"],
+          "properties": {
+            "name": { "type": "string" },
+            "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+            "targets_attack": { "type": "string", "description": "The ATT&CK version this DeTT&CT release was built against. Not necessarily the ATT&CK version pinned above, and the gap is the most common source of an unexplained score shift." },
+            "scales": {
+              "type": "object",
+              "required": ["visibility", "detection", "quality_dimensions"],
+              "description": "The scoring scales every evidence row is scored on. Pinned here so a scale change is a baseline event, not a silent drift.",
+              "properties": {
+                "visibility": { "type": "object", "minProperties": 5, "maxProperties": 5, "description": "0 to 4, value to label." },
+                "detection": { "type": "object", "minProperties": 7, "maxProperties": 7, "description": "-1 to 5, value to label." },
+                "quality_dimensions": { "type": "object", "minProperties": 5, "maxProperties": 5, "description": "The five 0 to 5 quality dimensions, name to question." }
+              }
+            }
+          }
+        }
+      }
+    },
+    "crosswalks": {
+      "type": "object",
+      "description": "What, if anything, links one framework's identifiers to another's. Recorded so nobody presents an editorial mapping as upstream endorsed.",
+      "properties": {
+        "atlas_to_attack": { "type": "object" },
+        "owasp_to_mitre": { "type": "object" },
+        "our_position": { "type": "string" }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "required": ["cadence", "dual_report_period", "rules"],
+      "properties": {
+        "cadence": { "type": "string" },
+        "dual_report_period": { "type": "string" },
+        "rules": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    }
+  }
+}

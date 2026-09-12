@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.internal/liszt/schema/incident.schema.json",
+  "title": "Incident Record",
+  "description": "One real world event, written once and cited by every scenario that draws on it. An incident is the evidence a scenario stands on: the scenario says what an attacker did and what we would see, the incident says it actually happened, to whom, and who said so. Disagreement between sources is recorded in `contested`, never resolved by the analyst. Files live in incidents/<slug>.yaml and the validator enforces that every slug a scenario cites exists here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slug", "title", "date", "what_happened", "source", "scenarios", "references"],
+  "properties": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "maxLength": 80,
+      "description": "Stable kebab-case handle. Must equal the filename without .yaml. Immutable once a scenario cites it."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 120,
+      "description": "What happened, as a headline a non-specialist can read."
+    },
+    "date": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 21,
+      "description": "When it happened, YYYY-MM-DD. A range is written YYYY-MM-DD/YYYY-MM-DD when the event spanned days. Quote it in YAML so it stays a string."
+    },
+    "disclosed": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 10,
+      "description": "When it became public, YYYY-MM-DD, when that differs from date. The gap between the two is itself a fact worth keeping."
+    },
+    "what_happened": {
+      "type": "string",
+      "minLength": 40,
+      "maxLength": 1200,
+      "description": "The event in plain terms. What was reached, by what route, and what the consequence was. No speculation; unresolved claims go in contested."
+    },
+    "source": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 160,
+      "description": "Attribution line: who disclosed or researched it, and when. The citations themselves are in references."
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[0-9]{3}$" },
+      "description": "Scenario ids this incident grounds. The validator checks each exists and warns when a scenario cites this incident without appearing here, so the join reads the same from both sides."
+    },
+    "references": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Tiered citations. Same shape as scenario provenance.sources and use case sources, deliberately, so a citation reads identically on every record type.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tier", "url"],
+        "properties": {
+          "tier": {
+            "enum": ["0", "1", "2"],
+            "description": "0 first party: the affected party's own disclosure or the researcher's own writeup. 1 reputable secondary technical reporting. 2 press, aggregators and summaries. Quoted strings."
+          },
+          "url": { "type": "string", "minLength": 8 },
+          "title": { "type": "string", "maxLength": 200 },
+          "note": { "type": "string", "maxLength": 600, "description": "What this source contributes, or what it gets wrong. Disagreement between sources is recorded here and in contested, not resolved." }
+        }
+      }
+    },
+    "contested": {
+      "type": "array",
+      "description": "Claims the parties disagree about. Each holds every position verbatim with its attribution. The analyst records the disagreement and its status; the analyst does not pick a winner.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim", "positions", "status"],
+        "properties": {
+          "claim": { "type": "string", "minLength": 10, "maxLength": 300 },
+          "positions": {
+            "type": "array",
+            "minItems": 2,
+            "items": { "type": "string", "minLength": 10, "maxLength": 600 },
+            "description": "One entry per party, prefixed with the party in square brackets, quoting their words."
+          },
+          "status": { "enum": ["unresolved", "resolved"] },
+          "note": { "type": "string", "maxLength": 600 }
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Analyst working notes. Why the incident is in the library, what secondary reporting gets wrong, what to verify before citing externally. Never rendered."
+    }
+  }
+}
