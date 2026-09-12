@@ -116,6 +116,7 @@ field. So:
 | Per-org differences | `coverage/<org>/<id>.yaml` overlay; report with `--org` |
 | Verify a framework ID offline | `frameworks/pinned/<baseline>/index/`; the validator checks every ID against it |
 | Where a test run executed | `environments/<id>.yaml`, cited by the run's `environment.definition` |
+| A run produced by the agentic platform | `./liszt import run.json` writes `runs/RUN-*` or `runs/DISC-*` from `schema/agent-run-import.schema.json`; then score or review as usual |
 | A control **held** | `control_held: true` on the step. Most commonly omitted field |
 
 ## The three metric families, keep them apart

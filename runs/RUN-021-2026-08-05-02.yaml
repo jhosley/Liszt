@@ -37,8 +37,7 @@ agent:
 environment:
   # The versioned lab this run executed in; see environments/. kind and pipeline below
   # must agree with it, and the validator checks that they do.
-  definition: {id: ENV-LAB-021-SCRATCH, version: 1}
-  kind: lab-ephemeral
+  definition: {id: ENV-EVAL-021-SCRATCH, version: 1}
   telemetry_pipeline: scratch
   targets_used:
     - lab-eks-liszt-021

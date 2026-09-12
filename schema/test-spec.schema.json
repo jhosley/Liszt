@@ -60,10 +60,9 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "kind", "scope_note"],
+            "required": ["id", "scope_note"],
             "properties": {
-              "id": { "type": "string", "description": "The lab identifier: namespace, cluster, account or host label." },
-              "kind": { "enum": ["lab-ephemeral", "lab-persistent", "production"] },
+              "id": { "type": "string", "description": "The target identifier, as defined on the environment record: namespace, cluster, account or host label." },
               "scope_note": { "type": "string", "minLength": 10, "description": "What this target stands in for, and what it deliberately does not." }
             }
           }
@@ -83,7 +82,7 @@
         },
         "teardown_required": {
           "type": "boolean",
-          "description": "Whether the environment must be destroyed and the destruction asserted in the run record. True for every lab-ephemeral target."
+          "description": "Whether the environment must be destroyed and the destruction asserted in the run record. True for every ephemeral environment."
         },
         "prohibited": {
           "type": "array",

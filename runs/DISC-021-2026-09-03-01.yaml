@@ -31,7 +31,6 @@ agent:
   model: none, this record was authored by a person as a worked example
 
 environment:
-  kind: lab-ephemeral
   telemetry_pipeline: scratch
   targets_used:
     - lab-k8s-cluster (kind, single node)

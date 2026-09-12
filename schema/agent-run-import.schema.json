@@ -1,0 +1,482 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.internal/liszt/schema/agent-run-import.schema.json",
+  "title": "Agent Run Import",
+  "description": "The JSON a single purpose sub-agent produces after running one scenario on the agentic platform, built from the traces it collected, and hands to Liszt for import. One document per scenario per run. The importer validates it against this schema, checks it against the scenario and, in test mode, against the sealed prediction it claims to have tested, and writes an immutable run record under runs/. It writes nothing else: the scenario record is only ever changed by a person, through the session path, after the run has been scored or its proposals reviewed. The shape follows the run record closely on purpose, so the mapping is one to one and reviewable; what this document adds is where each observation came from (trace and observation identifiers in the tracing platform) and who produced it (orchestrator, sub-agent, model). Two modes: test, where a sealed prediction exists and the run will be scored against it; discovery, where the record is unscored and the agent proposes first scores for a person to accept or reject.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "import_version",
+    "mode",
+    "scenario",
+    "spec_id",
+    "produced_at",
+    "produced_by",
+    "traces",
+    "executed",
+    "environment",
+    "autonomy_used",
+    "steps"
+  ],
+  "properties": {
+    "_comment": {
+      "type": "string",
+      "maxLength": 600,
+      "description": "Free text for the reader of the document. Ignored by the importer. Worked examples use it to say they are invented."
+    },
+    "import_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Shape version of this document. Bump on breaking change."
+    },
+    "mode": {
+      "enum": [
+        "test",
+        "discovery"
+      ],
+      "description": "test: a sealed prediction exists for this spec and the run is scored against it; spec_digest and prediction_digest are required and must match the files on disk. discovery: the scenario is unscored, there is no prediction, and each executed step carries proposed scores."
+    },
+    "scenario": {
+      "type": "string",
+      "pattern": "^[0-9]{3}$"
+    },
+    "spec_id": {
+      "type": "string",
+      "pattern": "^(ST|DISC)-[0-9]{3}$",
+      "description": "ST-<id> in test mode, DISC-<id> in discovery mode. The importer refuses a mismatch between prefix and mode."
+    },
+    "spec_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "sha256 of the spec.yaml (test) or discovery.yaml (discovery) the agent executed. Required in test mode."
+    },
+    "prediction_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "sha256 of the prediction.yaml the run is bound to. Required in test mode, forbidden in discovery mode. The importer refuses to import if the prediction on disk no longer hashes to this."
+    },
+    "produced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this document was written, ISO 8601 with offset."
+    },
+    "produced_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "orchestrator_run_id",
+        "agent"
+      ],
+      "description": "Who produced the document. Part of the experimental setup: a change of runner can move a result with nothing about the estate changing.",
+      "properties": {
+        "orchestrator_run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The orchestrator's identifier for the overall run that dispatched this sub-agent."
+        },
+        "agent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "The single purpose sub-agent, by name."
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "description": "Its build, tag or commit."
+            },
+            "model": {
+              "type": "string",
+              "maxLength": 120,
+              "description": "The model that drove it, with version."
+            },
+            "adapter": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "What bound the spec's technique ids to concrete actions, if anything."
+            }
+          }
+        }
+      }
+    },
+    "traces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "trace_ids"
+      ],
+      "description": "Where the raw evidence lives. The run record carries pointers, never the traces themselves.",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "description": "The tracing platform, for example langfuse."
+        },
+        "host": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Base URL of the tracing platform, so a pointer can be opened."
+        },
+        "project": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "trace_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "description": "Every trace this run produced, top level. Per step observation ids go on the steps."
+        }
+      }
+    },
+    "executed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "started_at",
+        "ended_at"
+      ],
+      "properties": {
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "ended_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "by": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "The human or team accountable for the run, when known. The orchestrator is not accountable; a person is."
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "telemetry_pipeline",
+        "teardown_confirmed"
+      ],
+      "properties": {
+        "definition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version"
+          ],
+          "description": "The environment definition (environments/) this run executed in, by id and version. Strongly preferred; without it two runs against infrastructure that changed are indistinguishable.",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^ENV-[A-Z0-9]+(-[A-Z0-9]+)*$"
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "telemetry_pipeline": {
+          "enum": [
+            "mirrored",
+            "scratch",
+            "none"
+          ],
+          "description": "What the telemetry path ACTUALLY was. Decides which claims can be scored. The scorer reads this, not the spec's request."
+        },
+        "targets_used": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Target ids actually touched. Must be targets of the cited environment definition."
+        },
+        "teardown_confirmed": {
+          "type": "boolean"
+        },
+        "teardown_evidence": {
+          "type": "string",
+          "maxLength": 400,
+          "description": "The receipt: a query that returned nothing, a pipeline job id."
+        },
+        "deviations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "description": "Differences from the environment definition found during the run. Each becomes a caveat on the scorecard."
+        }
+      }
+    },
+    "autonomy_used": {
+      "enum": [
+        "lab-only",
+        "production-observe",
+        "production-active"
+      ],
+      "description": "The rung the agent actually ran at. The executor refuses anything above the enabled rung."
+    },
+    "stop_conditions_triggered": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "condition",
+          "at_step"
+        ],
+        "properties": {
+          "condition": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "at_step": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 600
+          }
+        }
+      },
+      "description": "A triggered stop condition is a successful guardrail, not a failed run."
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One entry per attack path step the agent addressed. A step in the scenario with no entry is reported by the importer as not addressed; say why in notes.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "step",
+          "executed",
+          "observed"
+        ],
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "executed": {
+            "type": "boolean"
+          },
+          "not_executed_reason": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observed": {
+            "enum": [
+              "detected",
+              "logged-only",
+              "absent",
+              "unscoreable"
+            ],
+            "description": "detected: the artifact appeared AND a detection fired. logged-only: it appeared in a log, nothing alerted. absent: nothing appeared anywhere checked. unscoreable: the venue for the claim did not exist in this environment. unscoreable is a legitimate answer; guessing is what corrupts the calibration."
+          },
+          "observed_source": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Where the artifact actually turned up, and ONLY that. Compared against the predicted source. Where it was NOT found goes in notes."
+          },
+          "observed_layer": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "enum": [
+                "L1 · Data",
+                "L2 · Model",
+                "L3 · Orchestration & Agent",
+                "L4 · Application",
+                "L0 · Infrastructure"
+              ]
+            },
+            "description": "One or two of the five canonical layers, exact strings. Two when the artifact sits on a seam."
+          },
+          "out_of_estate": {
+            "type": "boolean",
+            "description": "True when the step reached a third party and a stand-in was used."
+          },
+          "detection_fired": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "detection_artifact_observed": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "The rule, saved search or alert that fired, by name."
+          },
+          "latency_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Action to artifact queryable. Null when nothing was observed."
+          },
+          "artifacts": {
+            "type": "array",
+            "description": "Pointers to the evidence, each re-runnable or openable by a third party.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "ref"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "query",
+                    "trace",
+                    "log",
+                    "screenshot",
+                    "file",
+                    "rule",
+                    "other"
+                  ]
+                },
+                "ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 600,
+                  "description": "The query text, the path, the URL, the rule id."
+                },
+                "trace_id": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "description": "Trace in the tracing platform this artifact was captured in."
+                },
+                "observation_id": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "description": "The span or observation within the trace."
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$",
+                  "description": "Hash of a captured file, when the artifact is a file."
+                },
+                "note": {
+                  "type": "string",
+                  "maxLength": 400
+                }
+              }
+            }
+          },
+          "surprises": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 600
+            },
+            "description": "Anything seen that nobody predicted, including signals from sources not on the record. The most valuable free output of a run."
+          },
+          "proposed_visibility": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4,
+            "description": "Discovery mode only. The visibility score the agent proposes for this row."
+          },
+          "proposed_detection": {
+            "type": "integer",
+            "minimum": -1,
+            "maximum": 5,
+            "description": "Discovery mode only. Must be -1 when the pipeline was scratch or none, because no detection content was in the path."
+          },
+          "proposal_rationale": {
+            "type": "string",
+            "maxLength": 1200,
+            "description": "Discovery mode only. The reasoning a reviewer can disagree with."
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 1500
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Run level notes: what did not go to plan, what to change next time."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "test"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "spec_digest",
+          "prediction_digest"
+        ],
+        "properties": {
+          "spec_id": {
+            "pattern": "^ST-[0-9]{3}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "discovery"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "prediction_digest"
+          ]
+        },
+        "properties": {
+          "spec_id": {
+            "pattern": "^DISC-[0-9]{3}$"
+          }
+        }
+      }
+    }
+  ]
+}

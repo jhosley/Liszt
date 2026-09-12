@@ -181,6 +181,6 @@ per run rather than shared, the cost shape inverts.
    version identifier that runs can cite. **Answered 2026-09-11: yes.**
    `schema/environment.schema.json` defines it, `environments/` holds the records, and a
    run cites one through `environment.definition`. The two RUN-021 worked examples cite
-   `ENV-LAB-021` and `ENV-LAB-021-SCRATCH`, both illustrative. Note 3's stand-in set is a
+   `ENV-EVAL-021` and `ENV-EVAL-021-SCRATCH`, both illustrative. Note 3's stand-in set is a
    component role on the definition, and note 6's product versions are a field on each
    component, so a fidelity gap is recorded once rather than rediscovered per run.

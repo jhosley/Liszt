@@ -26,6 +26,7 @@ usage: ./liszt <command> [options]
   session       apply a session file back into the records
   emit          emit an agent test spec and sealed prediction from a scored, published scenario
   discover      emit a discovery spec from an unscored scenario, no prediction, proposals only
+  import        import an agent run JSON from the agentic platform into an immutable run record
   render        rebuild the slide deck (needs the deck packages)
   publish       write the records out as Markdown pages
   pin           vendor the pinned framework artifacts (needs network)
@@ -68,6 +69,8 @@ case "$CMD" in
     need_venv; exec "$VENV_PY" "$ROOT/tools/emit_testspec.py" "$@" ;;
   discover)
     need_venv; exec "$VENV_PY" "$ROOT/tools/emit_discovery.py" "$@" ;;
+  import)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/import_agent_run.py" "$@" ;;
   render)
     need_venv
     if ! "$VENV_PY" -c "import pptx" >/dev/null 2>&1; then

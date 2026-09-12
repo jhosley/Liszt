@@ -157,3 +157,34 @@ All four open items were decided by the program lead the same day.
 - `score_run.py --write` reflows long strings in the run record on rewrite. Comments
   survive; line breaks inside folded scalars do not. Cosmetic, worth knowing before
   reading a diff.
+
+## 11. Changes on 2026-09-11, later the same day
+
+**The lab distinction is gone from the model.** The program lead ruled that runs execute
+against infrastructure, which will usually be a disposable build but is not to be encoded as
+such. The `kind` field (lab-ephemeral, lab-persistent, production) is removed from the
+environment definition, its targets, the run record, the discovery run record, and the test
+spec's target allowlist. The environment carries `lifetime` (ephemeral or persistent), which
+decides whether teardown must be proven, and `telemetry_pipeline`, which decides what a run
+can prove. What the agent may do stays on the autonomy rung of the run and the spec. The
+rung names (lab-only, production-observe, production-active) are doctrine and were not
+renamed; renaming them is a separate decision for the program lead. The two environment
+records are now `ENV-EVAL-021` and `ENV-EVAL-021-SCRATCH`. The word lab remains in the
+older prose of docs/12 and the lab notes; a sweep of that prose is deferred.
+
+**The agent run import is defined and works end to end.** The agentic platform's
+orchestrator dispatches single purpose sub-agents, one per scenario, which collect traces
+(Langfuse in the pilot) and hand Liszt one JSON document per scenario per run.
+`schema/agent-run-import.schema.json` defines that document. `tools/import_agent_run.py`
+validates it, checks the scenario and its steps, in test mode refuses a spec or prediction
+digest that does not match disk, checks the cited environment and its pipeline mode, and
+writes one immutable run record under `runs/` (`RUN-` in test mode, `DISC-` in discovery
+mode). It writes nothing else. Trace and observation ids travel into the record as
+`trace_refs` on each observation and an `imported_from` block on the run; the traces
+themselves stay in the tracing platform. Two worked examples under
+`reference/agent-run-import/` were imported, scored and validated; the discovery example
+correctly stops at the bridge because 021 now carries a person's scores, which is the
+doctrine working.
+
+**Entity list.** Environment and Target lines reworded; a fifth family, Interfaces, names
+the Agent Run Import and the Session File so the contractor scopes both endpoints.

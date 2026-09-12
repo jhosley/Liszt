@@ -45,6 +45,7 @@ unscored scenario record (draft or in-review)
    run it (lab-only)
       |
       |  (c) runs/DISC-NNN-YYYY-MM-DD-NN.yaml       the agent's answer, one file per run, immutable
+      |      from the platform: ./liszt import run.json, an agent run import in discovery mode
       |      ./liszt validate                       schema plus consistency between observed and proposed
       v
    a person reads the proposals

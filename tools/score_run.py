@@ -328,7 +328,9 @@ def report(run: dict, out: dict) -> None:
     W = 78
     print("=" * W)
     print(f"  {run['run_id']}   scenario {run['scenario']}   spec {run['spec_id']}")
-    print(f"  environment {run['environment']['kind']}, pipeline "
+    defn = (run["environment"].get("definition") or {})
+    env_name = f"{defn['id']} v{defn['version']}" if defn else "environment not cited"
+    print(f"  {env_name}, pipeline "
           f"{run['environment']['telemetry_pipeline']}, autonomy {run['autonomy_used']}")
     print("=" * W)
     print()

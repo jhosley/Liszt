@@ -65,11 +65,12 @@ frameworks/     the pinned framework baseline, the vendored artifacts with check
                 lets the validator verify every framework ID offline
 environments/   versioned definitions of the labs test runs execute in, so a run can cite
                 the environment by id and version the way it cites a prediction by digest
-reference/      scenario 021 carried gate by gate, mistakes intact. The teaching example
+reference/      scenario 021 carried gate by gate, mistakes intact. The teaching example.
+                Also the worked example agent run imports the platform hands over
 use-cases/      one YAML record per operational use case, and _TEMPLATE.yaml
 docs/diagrams/  the two system diagrams, and the script that draws them
 tools/          the Python that reads the records: validate · render · coverage · viewer ·
-                serve · doctor · session · pin · publish
+                serve · doctor · session · pin · index · import · publish
 tools/manual/   the generator for the Word installation and operating manual
 install.sh · install.ps1 · liszt · liszt.cmd   the installer, and the dispatcher every
                 command runs through

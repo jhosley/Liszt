@@ -924,20 +924,19 @@ def validate_run_file(path: pathlib.Path, validator,
             f.err("environment.definition", f"{ref['id']} v{ref['version']} has no record in "
                                             "environments/")
         else:
-            for k in ("kind", "telemetry_pipeline"):
-                if env.get(k) != defn.get(k):
-                    f.err(f"environment.{k}", f"run says {env.get(k)!r} but {ref['id']} "
-                                              f"v{ref['version']} is {defn.get(k)!r}; the "
-                                              "environment decides what a run can prove, so "
-                                              "these must agree")
+            if env.get("telemetry_pipeline") != defn.get("telemetry_pipeline"):
+                f.err("environment.telemetry_pipeline",
+                      f"run says {env.get('telemetry_pipeline')!r} but {ref['id']} "
+                      f"v{ref['version']} is {defn.get('telemetry_pipeline')!r}; the "
+                      "environment decides what a run can prove, so these must agree")
             known = {t["id"] for t in defn.get("targets", [])}
             unknown = sorted(set(env.get("targets_used", []) or []) - known)
             if unknown:
                 f.err("environment.targets_used", f"{unknown} are not targets of {ref['id']} "
                                                   f"v{ref['version']}")
     else:
-        f.warn("environment", "no environment.definition; two runs of one spec against a lab "
-                              "that changed are indistinguishable without one")
+        f.warn("environment", "no environment.definition; two runs of one spec against "
+                              "infrastructure that changed are indistinguishable without one")
     return f
 
 

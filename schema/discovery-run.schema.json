@@ -35,7 +35,10 @@
       "pattern": "^[0-9]{3}$"
     },
     "scenario_status": {
-      "enum": ["draft", "in-review"],
+      "enum": [
+        "draft",
+        "in-review"
+      ],
       "description": "The status the scenario record had when the spec was emitted. Recorded so a reader of this run knows the record it ran against had not been stood behind by anyone. published is not a legal value because a published record is already scored and belongs to the testing path, not discovery."
     },
     "spec_digest": {
@@ -72,41 +75,81 @@
     "environment": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "telemetry_pipeline", "teardown_confirmed"],
+      "required": [
+        "telemetry_pipeline",
+        "teardown_confirmed"
+      ],
       "properties": {
-        "kind": {
-          "enum": ["lab-ephemeral", "lab-persistent", "production"]
+        "definition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version"
+          ],
+          "description": "The environment definition (environments/) this run executed in, by id and version. telemetry_pipeline must agree with it; the validator checks.",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^ENV-[A-Z0-9]+(-[A-Z0-9]+)*$"
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         },
         "telemetry_pipeline": {
-          "enum": ["mirrored", "scratch", "none"],
+          "enum": [
+            "mirrored",
+            "scratch",
+            "none"
+          ],
           "description": "What the pipeline ACTUALLY was. In discovery mode this bounds what may be proposed: a scratch pipeline can support a visibility proposal but not a detection proposal, because our detection content was not in the path. Record unscoreable rather than guess."
         },
         "targets_used": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         },
         "teardown_confirmed": {
           "type": "boolean"
         },
         "deviations": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
     "autonomy_used": {
-      "enum": ["lab-only", "production-observe", "production-active"]
+      "enum": [
+        "lab-only",
+        "production-observe",
+        "production-active"
+      ]
     },
     "stop_conditions_triggered": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["condition", "at_step"],
+        "required": [
+          "condition",
+          "at_step"
+        ],
         "properties": {
-          "condition": {"type": "string"},
-          "at_step": {"type": "integer"},
-          "note": {"type": "string"}
+          "condition": {
+            "type": "string"
+          },
+          "at_step": {
+            "type": "integer"
+          },
+          "note": {
+            "type": "string"
+          }
         }
       },
       "description": "Any guardrail that fired. A triggered stop condition is a successful guardrail, not a failed run."
@@ -118,7 +161,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["step", "executed", "observed"],
+        "required": [
+          "step",
+          "executed",
+          "observed"
+        ],
         "properties": {
           "step": {
             "type": "integer",
@@ -133,7 +180,12 @@
             "type": "string"
           },
           "observed": {
-            "enum": ["detected", "logged-only", "absent", "unscoreable"],
+            "enum": [
+              "detected",
+              "logged-only",
+              "absent",
+              "unscoreable"
+            ],
             "description": "Same vocabulary as the run record, exactly. detected: the artifact appeared AND something alerted on it. logged-only: the artifact appeared in a log, nothing alerted. absent: nothing appeared anywhere that was checked. unscoreable: the venue for this observation did not exist in this environment. unscoreable is a legitimate and common answer; guessing instead of recording it is what corrupts a proposal."
           },
           "observed_source": {
@@ -145,31 +197,43 @@
             "minItems": 1,
             "maxItems": 2,
             "uniqueItems": true,
-            "items": {"$ref": "#/$defs/aiLayer"},
+            "items": {
+              "$ref": "#/$defs/aiLayer"
+            },
             "description": "Which layer the response came from, using the scenario schema's aiLayer vocabulary and no other. One value normally; two when the artifact genuinely sits on a seam, for example an app log line that carries the model's output. Agent behavior and MCP servers are L3. Model or LLM output is L2. Retrieval and data stores are L1. App surface is L4. Hosts, cloud and network are L0. There is no value for 'outside the estate': that is out_of_estate below, because a third party is not a layer of ours."
           },
           "out_of_estate": {
             "type": "boolean",
-            "description": "True when the step reaches a third party and what was observed (or not) belongs to a stand-in inside the lab boundary rather than to our estate. The run still records what our side saw."
+            "description": "True when the step reaches a third party and what was observed (or not) belongs to a stand-in inside the environment rather than to our estate. The run still records what our side saw."
           },
           "detection_fired": {
-            "type": ["boolean", "null"]
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "detection_artifact_observed": {
             "type": "string"
           },
           "latency_seconds": {
-            "type": ["number", "null"],
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0
           },
           "artifacts": {
             "type": "array",
-            "items": {"type": "string"},
+            "items": {
+              "type": "string"
+            },
             "description": "Pointers to the evidence: query used, screenshot, log excerpt path. Must be re-runnable by a third party, because a proposal with no artifact behind it rests on the agent's word."
           },
           "surprises": {
             "type": "array",
-            "items": {"type": "string"}
+            "items": {
+              "type": "string"
+            }
           },
           "proposed_visibility": {
             "type": "integer",
@@ -190,25 +254,78 @@
           },
           "notes": {
             "type": "string"
+          },
+          "trace_refs": {
+            "type": "array",
+            "description": "Pointers into the tracing platform for this observation: the trace and the span it was captured in. Written by tools/import_agent_run.py from an agent run import; the traces themselves never enter the record.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "provider",
+                "trace_id"
+              ],
+              "properties": {
+                "provider": {
+                  "type": "string"
+                },
+                "trace_id": {
+                  "type": "string"
+                },
+                "observation_id": {
+                  "type": "string"
+                }
+              }
+            }
           }
         },
         "allOf": [
           {
             "if": {
-              "properties": {"observed": {"enum": ["detected", "logged-only"]}},
-              "required": ["observed"]
+              "properties": {
+                "observed": {
+                  "enum": [
+                    "detected",
+                    "logged-only"
+                  ]
+                }
+              },
+              "required": [
+                "observed"
+              ]
             },
             "then": {
-              "required": ["observed_source", "observed_layer"]
+              "required": [
+                "observed_source",
+                "observed_layer"
+              ]
             }
           },
           {
             "if": {
-              "properties": {"observed": {"enum": ["detected", "logged-only", "absent"]}, "executed": {"const": true}},
-              "required": ["observed", "executed"]
+              "properties": {
+                "observed": {
+                  "enum": [
+                    "detected",
+                    "logged-only",
+                    "absent"
+                  ]
+                },
+                "executed": {
+                  "const": true
+                }
+              },
+              "required": [
+                "observed",
+                "executed"
+              ]
             },
             "then": {
-              "required": ["proposed_visibility", "proposed_detection", "proposal_rationale"]
+              "required": [
+                "proposed_visibility",
+                "proposed_detection",
+                "proposal_rationale"
+              ]
             }
           }
         ]
@@ -221,18 +338,94 @@
       "properties": {
         "method_findings": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         },
         "lab_findings": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         },
         "new_sources_found": {
           "type": "array",
-          "items": {"type": "string"},
+          "items": {
+            "type": "string"
+          },
           "description": "Sources that produced useful artifacts and are not on any evidence row. In discovery mode this is often the main result."
         }
       }
+    },
+    "imported_from": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "import_version",
+        "produced_at",
+        "orchestrator_run_id",
+        "agent",
+        "traces",
+        "source_sha256"
+      ],
+      "description": "Present when the run record was written by tools/import_agent_run.py from an agent run import (schema/agent-run-import.schema.json) rather than by hand. Records who produced the import, where its traces live, and the hash of the import document, so the record traces back to the platform run that produced it.",
+      "properties": {
+        "import_version": {
+          "type": "integer"
+        },
+        "produced_at": {
+          "type": "string"
+        },
+        "orchestrator_run_id": {
+          "type": "string"
+        },
+        "agent": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "adapter": {
+              "type": "string"
+            }
+          }
+        },
+        "traces": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string"
+            },
+            "host": {
+              "type": "string"
+            },
+            "project": {
+              "type": "string"
+            },
+            "trace_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Run level working notes: what did not go to plan, what to change next time. Never scored."
     }
   },
   "$defs": {

@@ -447,7 +447,7 @@ def render_markdown(spec: dict, pred: dict) -> str:
     L.append("")
     if a["targets"]:
         for t in a["targets"]:
-            L.append(f"- `{t['id']}` ({t['kind']}): {t['scope_note']}")
+            L.append(f"- `{t['id']}`: {t['scope_note']}")
     else:
         L.append("- _None assigned yet. With an empty allowlist the run MUST refuse to start._")
     L.append("")

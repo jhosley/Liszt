@@ -2,89 +2,246 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.internal/liszt/schema/environment.schema.json",
   "title": "Environment Definition",
-  "description": "A versioned description of a place a test run executes: the targets it may touch, the components that stand in for the estate and how faithfully, the telemetry path the observer reads, and how the environment proves it was torn down. Runs bind to the spec and the prediction by digest and were rigorous about both; they bound to the environment by prose, so two runs of the same spec against a lab that had quietly changed were indistinguishable and the scorecard reported environment drift as a library finding. This record gives the environment an identity a run can cite. A change to anything a run's result could depend on is a new version; the old version stays, the same way a superseded framework baseline stays. Files live in environments/<id>.yaml, one file per id carrying every version, or one file per version named <id>-v<n>.yaml.",
+  "description": "A versioned description of the infrastructure a run executes against: the targets it may touch, the components that stand in for or are the estate and how faithfully, the telemetry path the observer reads, and how the environment proves it was torn down. Runs bind to the spec and the prediction by digest and were rigorous about both; they bound to the environment by prose, so two runs of the same spec against infrastructure that had quietly changed were indistinguishable and the scorecard reported environment drift as a library finding. This record gives the environment an identity a run can cite. A change to anything a run's result could depend on is a new version; the old version stays, the same way a superseded framework baseline stays. Whether the infrastructure is a disposable build or the estate itself is not encoded here: what a run can prove is decided by telemetry_pipeline, and what the agent may do is decided by the autonomy rung on the run. Files live in environments/<id>.yaml.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["environment_version", "id", "version", "name", "kind", "telemetry_pipeline", "status", "owner", "targets", "components", "teardown", "provenance"],
+  "required": [
+    "environment_version",
+    "id",
+    "version",
+    "name",
+    "lifetime",
+    "telemetry_pipeline",
+    "status",
+    "owner",
+    "targets",
+    "components",
+    "teardown",
+    "provenance"
+  ],
   "properties": {
-    "environment_version": { "type": "integer", "const": 1, "description": "Shape version of this record type." },
+    "environment_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Shape version of this record type."
+    },
     "id": {
       "type": "string",
       "pattern": "^ENV-[A-Z0-9]+(-[A-Z0-9]+)*$",
       "description": "Stable identity of the environment across its versions. A run cites id plus version."
     },
-    "version": { "type": "integer", "minimum": 1, "description": "Bumped on any change a run result could depend on: a component version, a collector, a parser, the pipeline mode, a target. The old version is never edited." },
-    "name": { "type": "string", "minLength": 5, "maxLength": 90 },
-    "description": { "type": "string", "maxLength": 1200 },
-    "kind": { "enum": ["lab-ephemeral", "lab-persistent", "production"], "description": "Same vocabulary as the run record and the spec's target kinds." },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bumped on any change a run result could depend on: a component version, a collector, a parser, the pipeline mode, a target. The old version is never edited."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 90
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1200
+    },
+    "lifetime": {
+      "enum": [
+        "ephemeral",
+        "persistent"
+      ],
+      "description": "ephemeral: built for a run and destroyed after it, so teardown must be proven. persistent: stands between runs, so drift between runs is the risk and the version must move when it changes."
+    },
     "telemetry_pipeline": {
-      "enum": ["mirrored", "scratch", "none"],
+      "enum": [
+        "mirrored",
+        "scratch",
+        "none"
+      ],
       "description": "Part of the environment's identity, not a per run choice, because it decides what a run here can prove. mirrored ships to the estate's real collectors and detection content; scratch collects with its own tooling; none collects nothing."
     },
-    "status": { "enum": ["current", "superseded", "retired"] },
-    "supersedes": { "type": "integer", "minimum": 1, "description": "The prior version this one replaces." },
-    "owner": { "type": "string", "minLength": 3, "description": "The team that builds and maintains this environment, as a role or team." },
-    "review_due": { "type": "string", "format": "date" },
+    "status": {
+      "enum": [
+        "current",
+        "superseded",
+        "retired"
+      ]
+    },
+    "supersedes": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The prior version this one replaces."
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 3,
+      "description": "The team that builds and maintains this environment, as a role or team."
+    },
+    "review_due": {
+      "type": "string",
+      "format": "date"
+    },
     "targets": {
       "type": "array",
       "minItems": 1,
       "description": "The things a run may act on here. A spec's authorization.targets allowlist is drawn from this list; a target not defined on the environment cannot be allowlisted.",
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["id", "kind", "description"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "description"
+        ],
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
-          "kind": { "enum": ["lab-ephemeral", "lab-persistent", "production"] },
-          "description": { "type": "string", "minLength": 10, "maxLength": 400 },
-          "layers": { "type": "array", "items": { "type": "string" }, "description": "Which AI infrastructure layers this target stands in for, using the five canonical strings." }
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 400
+          },
+          "layers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Which AI infrastructure layers this target stands in for, using the five canonical strings."
+          }
         }
       }
     },
     "components": {
       "type": "array",
       "minItems": 1,
-      "description": "What the environment reproduces from the estate and how faithfully. Fidelity is a per component argument and the cheap answer is usually wrong: an observation component set to equivalent when the parser produces the field under test reports a false source miss.",
+      "description": "What the environment provides and how faithfully it matches the estate. Fidelity is a per component argument and the cheap answer is usually wrong: an observation component set to equivalent when the parser produces the field under test reports a false source miss.",
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["name", "role", "fidelity"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "role",
+          "fidelity"
+        ],
         "properties": {
-          "name": { "type": "string", "minLength": 3, "maxLength": 160 },
-          "role": { "enum": ["target", "observation", "stand-in"], "description": "target: something the agent acts on. observation: a collector, index or detection content the observer reads. stand-in: an internal substitute for something outside the estate (a paste service, a file drop, a request capture endpoint), so deny-all egress does not make late steps permanently untestable." },
-          "stands_in_for": { "type": "string", "maxLength": 200, "description": "For stand-ins: the external thing it substitutes. The artifacts that matter are produced by the attempt, not by the real destination existing." },
-          "fidelity": { "enum": ["exact", "equivalent", "stub"] },
-          "product_version": { "type": "string", "maxLength": 120, "description": "The product and version actually deployed. This is what makes a fidelity gap show up as a deviation instead of a false finding." },
-          "serves_sources": { "type": "array", "items": { "type": "string" }, "description": "For observation components: the evidence row source strings this component answers, verbatim, so a spec's required_sources can be checked against the environment before a run." },
-          "note": { "type": "string", "maxLength": 600 }
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          },
+          "role": {
+            "enum": [
+              "target",
+              "observation",
+              "stand-in"
+            ],
+            "description": "target: something the agent acts on. observation: a collector, index or detection content the observer reads. stand-in: an internal substitute for something outside the estate (a paste service, a file drop, a request capture endpoint), so deny-all egress does not make late steps permanently untestable."
+          },
+          "stands_in_for": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "For stand-ins: the external thing it substitutes. The artifacts that matter are produced by the attempt, not by the real destination existing."
+          },
+          "fidelity": {
+            "enum": [
+              "exact",
+              "equivalent",
+              "stub"
+            ]
+          },
+          "product_version": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "The product and version actually deployed. This is what makes a fidelity gap show up as a deviation instead of a false finding."
+          },
+          "serves_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "For observation components: the evidence row source strings this component answers, verbatim, so a spec's required_sources can be checked against the environment before a run."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 600
+          }
         }
       }
     },
-    "egress": { "enum": ["deny-all", "allowlist"], "description": "The environment's network posture. A spec may be stricter than the environment, never looser." },
-    "ingestion_lag_seconds": { "type": "integer", "minimum": 0, "description": "How long the observer must wait after the last action before the last artifact has landed. The environment's lifetime must exceed this; tearing down at the time box boundary can delete a target before its own logs arrive." },
+    "egress": {
+      "enum": [
+        "deny-all",
+        "allowlist"
+      ],
+      "description": "The environment's network posture. A spec may be stricter than the environment, never looser."
+    },
+    "ingestion_lag_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How long the observer must wait after the last action before the last artifact has landed. The environment's lifetime must exceed this; tearing down at the time box boundary can delete a target before its own logs arrive."
+    },
     "teardown": {
-      "type": "object", "additionalProperties": false,
-      "required": ["method", "evidence"],
-      "description": "How the environment is destroyed and how that is proven. A delete that returns success is not evidence; a subsequent query that returns nothing is.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "evidence"
+      ],
+      "description": "How the environment is destroyed and how that is proven, when it is ephemeral. A delete that returns success is not evidence; a subsequent query that returns nothing is. For a persistent environment, describe how run residue is removed.",
       "properties": {
-        "method": { "type": "string", "minLength": 10, "maxLength": 400 },
-        "evidence": { "type": "string", "minLength": 10, "maxLength": 400, "description": "The receipt a run record can cite in teardown_confirmed." }
+        "method": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 400
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 400,
+          "description": "The receipt a run record can cite in teardown_confirmed."
+        }
       }
     },
     "known_deviations": {
       "type": "array",
-      "items": { "type": "string", "maxLength": 400 },
+      "items": {
+        "type": "string",
+        "maxLength": 400
+      },
       "description": "Standing differences from the estate that every run here inherits. Each becomes a caveat on every scorecard, so it is recorded once here rather than rediscovered per run."
     },
     "provenance": {
-      "type": "object", "additionalProperties": false,
-      "required": ["authored_by", "created", "last_updated"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authored_by",
+        "created",
+        "last_updated"
+      ],
       "properties": {
-        "authored_by": { "type": "string" },
-        "reviewed_by": { "type": "string" },
-        "created": { "type": "string", "format": "date" },
-        "last_updated": { "type": "string", "format": "date" },
-        "illustrative": { "type": "boolean", "description": "True when this record describes a worked example rather than a lab anyone has built." }
+        "authored_by": {
+          "type": "string"
+        },
+        "reviewed_by": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "format": "date"
+        },
+        "last_updated": {
+          "type": "string",
+          "format": "date"
+        },
+        "illustrative": {
+          "type": "boolean",
+          "description": "True when this record describes a worked example rather than infrastructure anyone has built."
+        }
       }
     },
-    "notes": { "type": "string", "maxLength": 2000 }
+    "notes": {
+      "type": "string",
+      "maxLength": 2000
+    }
   }
 }

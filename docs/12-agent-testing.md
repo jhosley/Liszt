@@ -45,6 +45,9 @@ specs/ST-NNN-slug/
       |
       |  (c) COMMIT prediction.yaml. The commit is the seal.
       |  (d) assign targets, approve, run
+      |      by hand: author the run record before reading the prediction
+      |      by the platform: the sub-agent emits an agent run import (JSON) and
+      |      python3 tools/import_agent_run.py run.json writes the record
       v
 runs/RUN-NNN-DATE-NN.yaml     observations, authored before reading the prediction
       |
@@ -54,6 +57,8 @@ scorecard + feedback  ->  proposed rescores, method findings, lab findings
 ```
 
 Step (c) is not administrative. It is the step that makes the rest honest.
+
+**The platform path.** When the agentic platform runs a scenario, its sub-agent hands Liszt one JSON document per scenario per run, in the shape of `schema/agent-run-import.schema.json`: who produced it, where its traces live, the environment it ran in, and per step what was observed with pointers to the trace and span it was captured in. `tools/import_agent_run.py` validates the document, refuses a spec or prediction digest that does not match disk, checks the cited environment, and writes the run record. It writes nothing else. From there the path is the same as a hand authored run: score it, read the proposals, apply what a person accepts through the session path.
 
 ---
 
@@ -239,7 +244,7 @@ The feedback block turns the score into work, as **proposals only**:
 - **Method findings** are what the run says about how we *predict*, rather than about the estate. This is the tuning signal: which layers and techniques we are worst at, and which recurring assumption keeps being wrong.
 - **Lab findings** are requirements for the next environment.
 
-**The environment has an identity.** A run binds to the spec and the prediction by digest, and it binds to the environment by citing an environment definition, `environments/<id>.yaml`, by id and version (`schema/environment.schema.json`). The definition carries the targets a spec may allowlist, the components and their fidelity, the telemetry pipeline mode, the stand-ins for the world outside the estate, and how teardown is proven. Anything a result could depend on bumps the version; the old version stays. Two runs of one spec against different environment versions are not comparable, and the run record now says so instead of leaving it to be discovered in the scorecard. The validator checks that a run's `kind`, `telemetry_pipeline` and `targets_used` agree with the definition it cites.
+**The environment has an identity.** A run binds to the spec and the prediction by digest, and it binds to the environment by citing an environment definition, `environments/<id>.yaml`, by id and version (`schema/environment.schema.json`). The definition carries the targets a spec may allowlist, the components and their fidelity, the telemetry pipeline mode, the stand-ins for the world outside the estate, and how teardown is proven. It does not say whether the infrastructure is a disposable build or the estate itself; what a run can prove is decided by the pipeline mode, and what the agent may do by the autonomy rung. Anything a result could depend on bumps the version; the old version stays. Two runs of one spec against different environment versions are not comparable, and the run record now says so instead of leaving it to be discovered in the scorecard. The validator checks that a run's `telemetry_pipeline` and `targets_used` agree with the definition it cites.
 - **New sources found** are systems that produced useful artifacts and are on no record.
 
 ---

@@ -1,0 +1,183 @@
+# DISC-021-2026-09-11-01. Imported by tools/import_agent_run.py from DISC-021-sample.json on 2026-09-11.
+# Produced by scenario-021-runner 0.3.1+git.9f2c1a0 under orchestrator run orch-2026-09-11-0007; traces in langfuse.
+# Immutable once committed. A correction is a new run, never an edit. Nothing in
+# this file has been written to a scenario record; scoring and acceptance are
+# separate, deliberate steps.
+# The import document said: WORKED EXAMPLE. Invented. The same run expressed as a discovery import: no prediction, proposed scores per executed step.
+
+run_version: 1
+run_id: DISC-021-2026-09-11-01
+spec_id: DISC-021
+scenario: '021'
+executed: '2026-09-11'
+executed_by: Detection Engineering, pilot operator on shift
+agent:
+  adapter: atomic-red-team bindings by technique id, v2026.08
+  build: scenario-021-runner 0.3.1+git.9f2c1a0
+  model: claude-fable-5-1
+environment:
+  definition:
+    id: ENV-EVAL-021-SCRATCH
+    version: 1
+  telemetry_pipeline: scratch
+  targets_used:
+  - lab-eks-liszt-021
+  - lab-dataproc-021
+  teardown_confirmed: true
+  deviations:
+  - The cluster runs one node group; production runs three with different instance profiles.
+  - 'teardown evidence: post-teardown inventory query returned 0 resources tagged liszt-021, job td-4471'
+autonomy_used: lab-only
+stop_conditions_triggered: []
+observations:
+- step: 1
+  executed: true
+  observed: logged-only
+  observed_source: Agent platform run manifest, emitted to the eval harness job log (index=agent_evals,
+    field run.safety_profile)
+  observed_layer:
+  - L3 · Orchestration & Agent
+  out_of_estate: false
+  detection_fired: false
+  latency_seconds: 4
+  artifacts:
+  - 'query: index=agent_evals run.safety_profile=* | table run_id, safety_profile [trace tr_021_0007_root
+    / obs_s1_q1]'
+  - 'screenshot: evidence/orch-0007/step1-manifest.png [trace tr_021_0007_root / obs_s1_shot] sha256=3b1f2c4d5e6f7081'
+  surprises:
+  - The eval harness writes a run manifest including the safeguard profile; the record says nothing emits
+    this.
+  proposed_visibility: 1
+  proposed_detection: -1
+  proposal_rationale: A run manifest exists in the harness job log; nothing reads it. Visibility minimal,
+    retention seven days.
+  notes: executed 2026-09-11T21:04:10-04:00 to 2026-09-11T21:09:32-04:00. Retention on that index is seven
+    days, so this is real but thin coverage.
+  trace_refs:
+  - provider: langfuse
+    trace_id: tr_021_0007_root
+    observation_id: obs_s1_q1
+  - provider: langfuse
+    trace_id: tr_021_0007_root
+    observation_id: obs_s1_shot
+- step: 2
+  executed: true
+  observed: logged-only
+  observed_source: Palo Alto NGFW traffic logs, index=net_egress
+  observed_layer:
+  - L0 · Infrastructure
+  out_of_estate: false
+  detection_fired: false
+  latency_seconds: 96
+  artifacts:
+  - 'rule: saved search NET-EGRESS-ANOM-07, 1 row for the run window [trace tr_021_0007_root / obs_s2_rule]'
+  proposed_visibility: 3
+  proposed_detection: -1
+  proposal_rationale: Artifact landed in the egress logs; detection content was not in the path, so -1.
+  notes: executed 2026-09-11T21:12:00-04:00 to 2026-09-11T21:20:15-04:00
+  trace_refs:
+  - provider: langfuse
+    trace_id: tr_021_0007_root
+    observation_id: obs_s2_rule
+- step: 3
+  executed: true
+  observed: logged-only
+  observed_source: containerd runtime events, index=k8s_runtime
+  observed_layer:
+  - L1 · Data
+  - L0 · Infrastructure
+  out_of_estate: false
+  detection_fired: false
+  latency_seconds: 22
+  artifacts:
+  - 'query: index=app_dataproc source=worker.jsonl -> 0 results [trace tr_021_0007_root / obs_s3_q1]'
+  - 'query: index=k8s_runtime -> config parse and file read visible [trace tr_021_0007_root / obs_s3_q2]'
+  surprises:
+  - Config parsing happens in an init container that does not write to the application log. The artifact
+    exists, but not where the row says.
+  proposed_visibility: 2
+  proposed_detection: -1
+  proposal_rationale: Artifact exists in runtime events, not in the app log the row names.
+  notes: executed 2026-09-11T21:24:00-04:00 to 2026-09-11T21:33:48-04:00. The dataset-worker application
+    log named on the row contained nothing for this action.
+  trace_refs:
+  - provider: langfuse
+    trace_id: tr_021_0007_root
+    observation_id: obs_s3_q1
+  - provider: langfuse
+    trace_id: tr_021_0007_root
+    observation_id: obs_s3_q2
+- step: 4
+  executed: true
+  observed: logged-only
+  observed_source: CrowdStrike Falcon ProcessRollup2, index=edr_main
+  observed_layer:
+  - L1 · Data
+  out_of_estate: false
+  detection_fired: false
+  detection_artifact_observed: EDR-CONT-0113 did not fire
+  latency_seconds: 41
+  artifacts:
+  - 'log: process ancestry captured: containerd-shim -> python -> sh [trace tr_021_0007_root / obs_s4_anc]'
+  - 'rule: EDR-CONT-0113 evaluated against the events, no match [trace tr_021_0007_root / obs_s4_rule]'
+  proposed_visibility: 4
+  proposed_detection: -1
+  proposal_rationale: Process ancestry fully captured; detection not in the path.
+  notes: executed 2026-09-11T21:38:00-04:00 to 2026-09-11T21:47:05-04:00. The rule keys on a parent process
+    name the pod spec does not produce.
+  trace_refs:
+  - provider: langfuse
+    trace_id: tr_021_0007_root
+    observation_id: obs_s4_anc
+  - provider: langfuse
+    trace_id: tr_021_0007_root
+    observation_id: obs_s4_rule
+- step: 5
+  executed: true
+  observed: absent
+  observed_layer:
+  - L0 · Infrastructure
+  out_of_estate: false
+  detection_fired: false
+  latency_seconds: null
+  artifacts:
+  - 'query: EKS control-plane audit, CloudWatch /aws/eks/lab/cluster -> no entries for the metadata read
+    [trace tr_021_0007_root / obs_s5_q1]'
+  - 'query: CloudTrail -> no entries; the read never reaches the control plane [trace tr_021_0007_root
+    / obs_s5_q2]'
+  proposed_visibility: 0
+  proposed_detection: -1
+  proposal_rationale: Nothing appeared in audit or CloudTrail; the read never touches the API server.
+  notes: executed 2026-09-11T21:52:00-04:00 to 2026-09-11T22:04:30-04:00. The metadata read never touches
+    the API server, so the audit log has nothing to record. The privileged pod creation is captured; the
+    metadata read is not.
+  trace_refs:
+  - provider: langfuse
+    trace_id: tr_021_0007_root
+    observation_id: obs_s5_q1
+  - provider: langfuse
+    trace_id: tr_021_0007_root
+    observation_id: obs_s5_q2
+- step: 6
+  executed: false
+  not_executed_reason: authorization.egress is deny-all and the step needs public web services; no internal
+    stand-in exists yet.
+  observed: unscoreable
+imported_from:
+  import_version: 1
+  produced_at: '2026-09-11T22:40:12-04:00'
+  orchestrator_run_id: orch-2026-09-11-0007
+  agent:
+    name: scenario-021-runner
+    version: 0.3.1+git.9f2c1a0
+    model: claude-fable-5-1
+    adapter: atomic-red-team bindings by technique id, v2026.08
+  traces:
+    provider: langfuse
+    host: https://langfuse.internal.example
+    project: liszt-pilot
+    trace_ids:
+    - tr_021_0007_root
+  source_sha256: 4a073adcf9a0f0263079288d0520bae45ce1727b0d3e5231a13f4b3bf619f269
+notes: First platform-produced run for 021. Step 6 remains blocked on an egress stand-in, as in the hand
+  authored runs.

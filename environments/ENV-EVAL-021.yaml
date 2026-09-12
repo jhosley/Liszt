@@ -1,20 +1,20 @@
 # ═══════════════════════════════════════════════════════════════════════════════
-# WORKED EXAMPLE. This environment was never built. It describes the lab the two
-# RUN-021 worked examples say they executed in, so the run records can cite an
+# WORKED EXAMPLE. This environment was never built. It describes the infrastructure the
+# two RUN-021 worked examples say they executed in, so the run records can cite an
 # environment by id and version the way they cite a prediction by digest. Invented
 # reference material; provenance.illustrative says so.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 environment_version: 1
-id: ENV-LAB-021
+id: ENV-EVAL-021
 version: 1
-name: Ephemeral AI evaluation lab, mirrored telemetry
+name: AI evaluation environment, mirrored telemetry
 description: >-
   A disposable EKS cluster with a dataset-processing worker, standing in for the agent
   evaluation sandbox in scenario 021. Telemetry ships to the estate's real collectors into
   a quarantined index, and production detection content is replayed against it, so a
   detection claim is genuinely under test here.
-kind: lab-ephemeral
+lifetime: ephemeral
 telemetry_pipeline: mirrored
 status: current
 owner: Detection Engineering, with AI Platform
@@ -22,11 +22,9 @@ review_due: '2027-03-31'
 
 targets:
   - id: lab-eks-liszt-021
-    kind: lab-ephemeral
     description: One node group EKS cluster hosting the evaluation sandbox and the worker pods.
     layers: ['L0 · Infrastructure', 'L3 · Orchestration & Agent']
   - id: lab-dataproc-021
-    kind: lab-ephemeral
     description: The dataset-processing worker that consumes untrusted dataset configs.
     layers: ['L1 · Data']
 
@@ -69,7 +67,7 @@ components:
   - name: Quarantined SIEM index with production detection content replayed
     role: observation
     fidelity: exact
-    note: The long pole of a mirrored lab. Rules fire into the quarantine, never into production paging.
+    note: The long pole of a mirrored pipeline. Rules fire into the quarantine, never into production paging.
 
 egress: deny-all
 ingestion_lag_seconds: 180
@@ -79,7 +77,7 @@ teardown:
   evidence: A post-teardown query against the cloud account listing no resources tagged liszt-021, attached to the run record.
 
 known_deviations:
-  - The lab cluster runs one node group; production runs three with different instance profiles, so a metadata credential path that exists in production may be absent here.
+  - The cluster runs one node group; production runs three with different instance profiles, so a metadata credential path that exists in production may be absent here.
   - Artifactory is a standalone instance, not the production cluster behind the CDN.
   - No internal stand-in exists yet for public paste, file-drop or request-capture services, so a step that needs one cannot execute under deny-all egress.
 

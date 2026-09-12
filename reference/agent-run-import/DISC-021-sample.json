@@ -1,0 +1,223 @@
+{
+  "_comment": "WORKED EXAMPLE. Invented. The same run expressed as a discovery import: no prediction, proposed scores per executed step.",
+  "import_version": 1,
+  "mode": "discovery",
+  "scenario": "021",
+  "spec_id": "DISC-021",
+  "produced_at": "2026-09-11T22:40:12-04:00",
+  "produced_by": {
+    "orchestrator_run_id": "orch-2026-09-11-0007",
+    "agent": {
+      "name": "scenario-021-runner",
+      "version": "0.3.1+git.9f2c1a0",
+      "model": "claude-fable-5-1",
+      "adapter": "atomic-red-team bindings by technique id, v2026.08"
+    }
+  },
+  "traces": {
+    "provider": "langfuse",
+    "host": "https://langfuse.internal.example",
+    "project": "liszt-pilot",
+    "trace_ids": [
+      "tr_021_0007_root"
+    ]
+  },
+  "executed": {
+    "started_at": "2026-09-11T21:02:00-04:00",
+    "ended_at": "2026-09-11T22:31:40-04:00",
+    "by": "Detection Engineering, pilot operator on shift"
+  },
+  "environment": {
+    "definition": {
+      "id": "ENV-EVAL-021-SCRATCH",
+      "version": 1
+    },
+    "telemetry_pipeline": "scratch",
+    "targets_used": [
+      "lab-eks-liszt-021",
+      "lab-dataproc-021"
+    ],
+    "teardown_confirmed": true,
+    "teardown_evidence": "post-teardown inventory query returned 0 resources tagged liszt-021, job td-4471",
+    "deviations": [
+      "The cluster runs one node group; production runs three with different instance profiles."
+    ]
+  },
+  "autonomy_used": "lab-only",
+  "stop_conditions_triggered": [],
+  "steps": [
+    {
+      "step": 1,
+      "executed": true,
+      "started_at": "2026-09-11T21:04:10-04:00",
+      "ended_at": "2026-09-11T21:09:32-04:00",
+      "observed": "logged-only",
+      "observed_source": "Agent platform run manifest, emitted to the eval harness job log (index=agent_evals, field run.safety_profile)",
+      "detection_fired": false,
+      "latency_seconds": 4,
+      "artifacts": [
+        {
+          "kind": "query",
+          "ref": "index=agent_evals run.safety_profile=* | table run_id, safety_profile",
+          "trace_id": "tr_021_0007_root",
+          "observation_id": "obs_s1_q1"
+        },
+        {
+          "kind": "screenshot",
+          "ref": "evidence/orch-0007/step1-manifest.png",
+          "trace_id": "tr_021_0007_root",
+          "observation_id": "obs_s1_shot",
+          "sha256": "3b1f2c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f809"
+        }
+      ],
+      "surprises": [
+        "The eval harness writes a run manifest including the safeguard profile; the record says nothing emits this."
+      ],
+      "notes": "Retention on that index is seven days, so this is real but thin coverage.",
+      "observed_layer": [
+        "L3 · Orchestration & Agent"
+      ],
+      "out_of_estate": false,
+      "proposed_visibility": 1,
+      "proposed_detection": -1,
+      "proposal_rationale": "A run manifest exists in the harness job log; nothing reads it. Visibility minimal, retention seven days."
+    },
+    {
+      "step": 2,
+      "executed": true,
+      "started_at": "2026-09-11T21:12:00-04:00",
+      "ended_at": "2026-09-11T21:20:15-04:00",
+      "observed": "logged-only",
+      "observed_source": "Palo Alto NGFW traffic logs, index=net_egress",
+      "detection_fired": false,
+      "latency_seconds": 96,
+      "artifacts": [
+        {
+          "kind": "rule",
+          "ref": "saved search NET-EGRESS-ANOM-07, 1 row for the run window",
+          "trace_id": "tr_021_0007_root",
+          "observation_id": "obs_s2_rule"
+        }
+      ],
+      "surprises": [],
+      "observed_layer": [
+        "L0 · Infrastructure"
+      ],
+      "out_of_estate": false,
+      "proposed_visibility": 3,
+      "proposed_detection": -1,
+      "proposal_rationale": "Artifact landed in the egress logs; detection content was not in the path, so -1."
+    },
+    {
+      "step": 3,
+      "executed": true,
+      "started_at": "2026-09-11T21:24:00-04:00",
+      "ended_at": "2026-09-11T21:33:48-04:00",
+      "observed": "logged-only",
+      "observed_source": "containerd runtime events, index=k8s_runtime",
+      "detection_fired": false,
+      "latency_seconds": 22,
+      "artifacts": [
+        {
+          "kind": "query",
+          "ref": "index=app_dataproc source=worker.jsonl -> 0 results",
+          "trace_id": "tr_021_0007_root",
+          "observation_id": "obs_s3_q1"
+        },
+        {
+          "kind": "query",
+          "ref": "index=k8s_runtime -> config parse and file read visible",
+          "trace_id": "tr_021_0007_root",
+          "observation_id": "obs_s3_q2"
+        }
+      ],
+      "surprises": [
+        "Config parsing happens in an init container that does not write to the application log. The artifact exists, but not where the row says."
+      ],
+      "notes": "The dataset-worker application log named on the row contained nothing for this action.",
+      "observed_layer": [
+        "L1 · Data",
+        "L0 · Infrastructure"
+      ],
+      "out_of_estate": false,
+      "proposed_visibility": 2,
+      "proposed_detection": -1,
+      "proposal_rationale": "Artifact exists in runtime events, not in the app log the row names."
+    },
+    {
+      "step": 4,
+      "executed": true,
+      "started_at": "2026-09-11T21:38:00-04:00",
+      "ended_at": "2026-09-11T21:47:05-04:00",
+      "observed": "logged-only",
+      "observed_source": "CrowdStrike Falcon ProcessRollup2, index=edr_main",
+      "detection_fired": false,
+      "detection_artifact_observed": "EDR-CONT-0113 did not fire",
+      "latency_seconds": 41,
+      "artifacts": [
+        {
+          "kind": "log",
+          "ref": "process ancestry captured: containerd-shim -> python -> sh",
+          "trace_id": "tr_021_0007_root",
+          "observation_id": "obs_s4_anc"
+        },
+        {
+          "kind": "rule",
+          "ref": "EDR-CONT-0113 evaluated against the events, no match",
+          "trace_id": "tr_021_0007_root",
+          "observation_id": "obs_s4_rule"
+        }
+      ],
+      "surprises": [],
+      "notes": "The rule keys on a parent process name the pod spec does not produce.",
+      "observed_layer": [
+        "L1 · Data"
+      ],
+      "out_of_estate": false,
+      "proposed_visibility": 4,
+      "proposed_detection": -1,
+      "proposal_rationale": "Process ancestry fully captured; detection not in the path."
+    },
+    {
+      "step": 5,
+      "executed": true,
+      "started_at": "2026-09-11T21:52:00-04:00",
+      "ended_at": "2026-09-11T22:04:30-04:00",
+      "observed": "absent",
+      "observed_source": "",
+      "detection_fired": false,
+      "latency_seconds": null,
+      "artifacts": [
+        {
+          "kind": "query",
+          "ref": "EKS control-plane audit, CloudWatch /aws/eks/lab/cluster -> no entries for the metadata read",
+          "trace_id": "tr_021_0007_root",
+          "observation_id": "obs_s5_q1"
+        },
+        {
+          "kind": "query",
+          "ref": "CloudTrail -> no entries; the read never reaches the control plane",
+          "trace_id": "tr_021_0007_root",
+          "observation_id": "obs_s5_q2"
+        }
+      ],
+      "surprises": [],
+      "notes": "The metadata read never touches the API server, so the audit log has nothing to record. The privileged pod creation is captured; the metadata read is not.",
+      "observed_layer": [
+        "L0 · Infrastructure"
+      ],
+      "out_of_estate": false,
+      "proposed_visibility": 0,
+      "proposed_detection": -1,
+      "proposal_rationale": "Nothing appeared in audit or CloudTrail; the read never touches the API server."
+    },
+    {
+      "step": 6,
+      "executed": false,
+      "not_executed_reason": "authorization.egress is deny-all and the step needs public web services; no internal stand-in exists yet.",
+      "observed": "unscoreable",
+      "surprises": []
+    }
+  ],
+  "notes": "First platform-produced run for 021. Step 6 remains blocked on an egress stand-in, as in the hand authored runs."
+}
