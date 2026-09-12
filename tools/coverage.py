@@ -20,6 +20,12 @@ questions for different audiences:
 The cardinal rule: an unscored row does not count as zero, it does not count at
 all. Scoring nothing and scoring badly must not produce the same number.
 
+The same rule, one step on: a row whose scores are agent-proposed (score_provenance
+from a discovery run, see docs/13-discovery-mode.md) is listed, and counted nowhere.
+A proposal a person has not accepted is not a measurement, and a rollup that averaged
+it in would read as measured when nothing had been. Proposed rows appear in their
+own column so their existence is visible and their numbers are not.
+
 The snapshot this writes is the shape schema/snapshot.schema.json defines, which is the
 shape docs/04-measurement.md section 5 specifies. It is validated before it is written.
 """
@@ -49,7 +55,7 @@ QUALITY_DIMS = ("device_completeness", "data_field_completeness",
 # The organization scoped fields of an evidence row, docs/04-measurement.md section 6.
 # Everything else on a row is a property of the attack and may not be overridden.
 ORG_FIELDS = ("dettect", "coverage", "source", "owner", "evidence", "backlog_ref",
-              "notes", "research_needed")
+              "notes", "research_needed", "score_provenance")
 
 
 def load_records(include_drafts: bool) -> list[dict]:
@@ -111,7 +117,12 @@ def apply_overlay(rec: dict, org: str) -> dict:
 
 def scenario_metrics(rec: dict) -> dict:
     rows = [r for r in rec.get("telemetry", []) if r.get("kind", "attack-step") == "attack-step"]
-    scored = [r for r in rows if derive_coverage(r.get("dettect")) is not None]
+    # A proposed row has numbers and is still not scored. It leaves this list here,
+    # once, and every metric below inherits the exclusion.
+    proposed = [r for r in rows if derive_coverage(r.get("dettect")) is not None
+                and r.get("score_provenance") == "agent-proposed"]
+    scored = [r for r in rows if derive_coverage(r.get("dettect")) is not None
+              and r not in proposed]
     tally = collections.Counter(derive_coverage(r["dettect"]) for r in scored)
     n = len(scored)
 
@@ -133,6 +144,8 @@ def scenario_metrics(rec: dict) -> dict:
         # 'mostly covered', it is mostly unmeasured.
         "rows": len(rows),
         "scored": n,
+        "proposed": len(proposed),
+        "proposed_steps": [r["step"] for r in proposed],
         "completeness": round(n / len(rows), 3) if rows else 0.0,
         "have": round(tally["Have"] / n, 3) if n else None,
         "collectable": round(tally["Collectable"] / n, 3) if n else None,
@@ -200,6 +213,10 @@ def gaming_checks(records: list[dict], metrics: list[dict]) -> list[str]:
         if m["completeness"] < 1.0 and m["have"] is not None:
             out.append(f"{tag}: coverage reported on {m['scored']}/{m['rows']} rows, "
                        "partial scoring inflates the ratio")
+        if rec.get("status") == "published" and m["proposed"]:
+            out.append(f"{tag}: published with agent-proposed scores at steps "
+                       f"{m['proposed_steps']}, a published number must have a person "
+                       "behind it")
         for r in rec.get("telemetry", []):
             d = r.get("dettect") or {}
             if derive_coverage(d) == "Have" and not r.get("evidence"):
@@ -412,11 +429,12 @@ def main():
 
     print(f"\nSCENARIO LIBRARY · {args.org or 'reference assessment'}"
           f" · {len(records)} record(s)\n")
-    print(f"{'id':>4}  {'pri':<9} {'cmp':>5} {'have':>5} {'coll':>5} {'blind':>5} "
+    print(f"{'id':>4}  {'pri':<9} {'cmp':>5} {'prop':>4} {'have':>5} {'coll':>5} {'blind':>5} "
           f"{'qual':>5} {'mat':>5}  coverage")
     for m in metrics:
         print(f"{m['id']:>4}  {m['priority']:<9} "
               f"{m['completeness']:>5.2f} "
+              f"{m['proposed'] or '':>4} "
               f"{m['have'] if m['have'] is not None else float('nan'):>5.2f} "
               f"{m['collectable'] if m['collectable'] is not None else float('nan'):>5.2f} "
               f"{m['blind'] if m['blind'] is not None else float('nan'):>5.2f} "
@@ -437,6 +455,14 @@ def main():
         print(f"           {len(unscored)} scenario(s) contribute nothing because they are "
               f"unscored: {', '.join(unscored)}")
         print("           Unscored is not zero. It is absent. Do not average it in.")
+    with_prop = [m for m in metrics if m["proposed"]]
+    if with_prop:
+        n_rows = sum(m["proposed"] for m in with_prop)
+        where = ", ".join(f"{m['id']} steps {m['proposed_steps']}" for m in with_prop)
+        print(f"\nPROPOSED   {n_rows} agent-proposed row(s) on {len(with_prop)} scenario(s), "
+              f"listed here and counted nowhere: {where}")
+        print("           A proposal is not a measurement until a person sets "
+              "score_provenance to human-session.")
 
     ex = agg["exposure"]
     print(f"\nEXPOSURE   {ex['now_exposed']} of {ex['now_total']} NOW-priority scenario(s) "

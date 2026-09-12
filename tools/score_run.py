@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import pathlib
 import re
@@ -419,9 +420,25 @@ def main() -> int:
         return 0
     report(run, out)
     if args.write:
-        run.update(out)
-        run_path.write_text(yaml.safe_dump(run, sort_keys=False, default_flow_style=False,
-                                           width=100, allow_unicode=True))
+        # Round-trip with ruamel, as apply_session.py does, so the banner comment and
+        # every inline note on the run record survive the write. PyYAML would drop them,
+        # and a run record with its worked-example banner silently removed is a
+        # different document from the one that was reviewed.
+        try:
+            from ruamel.yaml import YAML
+        except ImportError:
+            sys.exit("pip install ruamel.yaml   (it preserves the comments in run records; "
+                     "PyYAML does not)")
+        ry = YAML()
+        ry.preserve_quotes = True
+        ry.width = 100
+        ry.indent(mapping=2, sequence=4, offset=2)
+        doc = ry.load(run_path.read_text(encoding="utf-8"))
+        for k, v in out.items():
+            doc[k] = v
+        buf = io.StringIO()
+        ry.dump(doc, buf)
+        run_path.write_text(buf.getvalue(), encoding="utf-8")
         print(f"\n  scorecard written into {run_path}")
     return 0
 

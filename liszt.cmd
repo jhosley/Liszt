@@ -35,6 +35,8 @@ if /i "%CMD%"=="coverage"    ("%VENV_PY%" "%ROOT%tools\coverage.py" %ARGS% & exi
 if /i "%CMD%"=="viewer"      ("%VENV_PY%" "%ROOT%tools\build_viewer.py" %ARGS% & exit /b)
 if /i "%CMD%"=="serve"       ("%VENV_PY%" "%ROOT%tools\serve.py" %ARGS% & exit /b)
 if /i "%CMD%"=="session"     ("%VENV_PY%" "%ROOT%tools\apply_session.py" %ARGS% & exit /b)
+if /i "%CMD%"=="emit"        ("%VENV_PY%" "%ROOT%tools\emit_testspec.py" %ARGS% & exit /b)
+if /i "%CMD%"=="discover"    ("%VENV_PY%" "%ROOT%tools\emit_discovery.py" %ARGS% & exit /b)
 if /i "%CMD%"=="publish"     ("%VENV_PY%" "%ROOT%tools\publish_library.py" %ARGS% & exit /b)
 if /i "%CMD%"=="pin"         ("%VENV_PY%" "%ROOT%tools\pin_frameworks.py" %ARGS% & exit /b)
 if /i "%CMD%"=="verify-pin"  ("%VENV_PY%" "%ROOT%tools\pin_frameworks.py" --verify %ARGS% & exit /b)
@@ -83,6 +85,8 @@ echo   coverage      coverage, exposure, and maturity rollup
 echo   viewer        rebuild the static viewer page and liszt-data.json
 echo   serve         rebuild the viewer, then serve it on a local address
 echo   session       apply a session file back into the records
+echo   emit          emit an agent test spec and sealed prediction from a scored, published scenario
+echo   discover      emit a discovery spec from an unscored scenario, no prediction, proposals only
 echo   render        rebuild the slide deck, needs the deck packages
 echo   publish       write the records out as Markdown pages
 echo   pin           vendor the pinned framework artifacts, needs network

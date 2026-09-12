@@ -53,6 +53,8 @@ from coverage import load_records, apply_overlay, scenario_metrics, QUALITY_DIMS
 # it exactly; a second copy of the rule in JavaScript would drift the first time either
 # side was edited.
 from emit_testspec import readiness as testing_blockers, resolve_rows
+# The discovery gate, imported for the same reason: the page and the emitter cannot drift.
+from emit_discovery import discovery_readiness as discovery_blockers
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA_VERSION = 1
@@ -133,6 +135,12 @@ def build_data(include_drafts: bool, org: str | None) -> dict:
             "testing": {"blockers": testing_blockers(
                 rec, resolve_rows(rec, None),
                 ROOT / "scenarios" / f"{rec.get('id')}-{rec.get('slug')}.yaml")},
+            # The other door. Discovery does not need scores, so in a young library this
+            # list is usually empty where the one above is not, and that contrast is the
+            # point of showing both.
+            "discovery": {"blockers": discovery_blockers(
+                rec, resolve_rows(rec, None),
+                ROOT / "scenarios" / f"{rec.get('id')}-{rec.get('slug')}.yaml")},
         })
         fmm = rec.get("framework_mapping", {})
         for key in ("attack", "atlas", "owasp_llm", "owasp_agentic"):
@@ -163,6 +171,8 @@ def build_data(include_drafts: bool, org: str | None) -> dict:
             "published": sum(1 for s in scenarios if s["status"] == "published"),
             "scored": len(scored),
             "unscored_ids": [s["id"] for s in scenarios if s["metrics"]["completeness"] == 0],
+            # Agent-proposed rows exist on these. Listed, never averaged.
+            "proposed_ids": [s["id"] for s in scenarios if s["metrics"].get("proposed")],
             # mean Have across SCORED scenarios only. An unscored record is absent,
             # not zero, and is never averaged in.
             "mean_have": (round(sum(s["metrics"]["have"] or 0 for s in scored) / len(scored), 4)
@@ -283,6 +293,10 @@ nav .navact:hover{border-color:var(--brand);background:#F3F7FA;color:var(--brand
 .chip.near-term{background:#EDF2F5;color:#3F6E88}
 .chip.backlog,.chip.muted{background:var(--surface-3);color:var(--muted)}
 .chip.draft{background:var(--surface-3);color:var(--muted)}
+.chip.proposed{background:#efeafe;color:#5b3fd4;border:1px dashed #5b3fd4}
+.tpath{padding:10px 0;border-top:1px solid var(--surface-3)}
+.tpath .tmain{display:flex;gap:8px;align-items:center;margin-bottom:4px}
+.tpath code{display:inline-block;margin-top:6px}
 .chip.modeler{background:#F1ECFA;color:#5A3B9C}
 .chip.review{background:#FBEFEC;color:#A93F34;border:1px solid #E3B5AC}
 .reviewbox{margin:10px 0;padding:10px 13px;border-left:3px solid #A93F34;background:#FBEFEC;
@@ -894,8 +908,11 @@ function matches(s) {
   if (state.cov === "orphan" && !s.metrics.orphaned_gaps.length) return false;
   if (state.test) {
     const blocked = ((s.testing || {}).blockers || []).length > 0;
+    const dblocked = ((s.discovery || {}).blockers || []).length > 0;
     if (state.test === "ready" && blocked) return false;
     if (state.test === "blocked" && !blocked) return false;
+    if (state.test === "discover" && dblocked) return false;
+    if (state.test === "discover-blocked" && !dblocked) return false;
   }
   return true;
 }
@@ -923,6 +940,25 @@ function renderList() {
     </button>`;
   }).join("") : '<div class="empty">No scenario matches these filters.</div>';
   $$("#list .card").forEach(b => b.onclick = () => select(b.dataset.id));
+}
+
+/* The two doors out of a record, side by side. Each shows the command when its gate
+   passes and the gate's own words when it does not, so a reader learns what is missing
+   from the same text the emitter would print. In a young library the scoring path is
+   blocked and discovery is open, and seeing both is how that becomes obvious. */
+function pathsBlock(s) {
+  const tb = (s.testing || {}).blockers || [], db = (s.discovery || {}).blockers || [];
+  const path = (title, cmd, bl, why) => `<div class="tpath">
+    <div class="tmain"><strong>${title}</strong>
+      ${bl.length ? `<span class="chip blind">${bl.length} blocker${bl.length === 1 ? "" : "s"}</span>`
+                  : `<span class="chip have">available</span>`}</div>
+    <div class="sub">${why}</div>
+    ${bl.length ? `<ul class="tbl">${bl.map(b => `<li>${esc(b)}</li>`).join("")}</ul>`
+                : `<code>${esc(cmd)}</code>`}</div>`;
+  return path("Scoring path: test the claims", `./liszt emit ${s.id} --sealed-by "your name"`, tb,
+      "Checks whether the record's scores are right. Needs a published, fully scored record, and seals a prediction before the run.")
+    + path("Discovery path: establish the claims", `./liszt discover ${s.id}`, db,
+      "Runs the scenario to propose first scores where none exist. No prediction and no scorecard; every proposal waits for a person and is marked until one accepts it.");
 }
 
 /* ---------- detail ---------- */
@@ -1014,6 +1050,9 @@ function renderDetail() {
           <a href="${esc(src.url)}" target="_blank" rel="noopener">${esc(src.title || src.url)}</a>
           ${src.note ? `<span style="color:var(--muted)"> ${esc(src.note)}</span>` : ""}</li>`).join("")}</ul>` : ""}
 
+    <h3>Testing paths</h3>
+    ${pathsBlock(s)}
+
     <h3>Record</h3>
     <div style="color:var(--muted);font-size:13px">
       <code>scenarios/${esc(s.id)}-${esc(s.slug)}.yaml</code><br>
@@ -1042,7 +1081,9 @@ function telemetryBlock(s) {
           <td>${c === "Unscored" && e.research_needed
                 ? `<span class="chip research">Research</span>`
                 : `<span class="chip ${c}"><i class="dot ${c}"></i>${c}</span>`}
-              <div class="scores">${sc}</div></td>
+              <div class="scores">${sc}</div>
+              ${(e.score_provenance || t.score_provenance) === "agent-proposed"
+                ? `<span class="chip proposed" title="Proposed by a discovery run. Counted in no average until a person sets score_provenance to human-session.">agent-proposed</span>` : ""}</td>
           <td>${esc(t.detection_opportunity)}</td>
           <td style="color:var(--muted)">${esc(e.owner || "")}${e.backlog_ref ? `<div class="tag" style="margin-top:4px">${esc(e.backlog_ref)}</div>` : ""}</td></tr>`;
       }).join("")}</tbody></table>`;
@@ -2995,6 +3036,7 @@ function pickedBlock() {
    so the page and the emitter cannot drift. A record with no blockers is one the emitter
    would write a spec for today. */
 function testable(s) { return !((s.testing && s.testing.blockers) || []).length; }
+function discoverable(s) { return !((s.discovery && s.discovery.blockers) || []).length; }
 
 /* Which rows have their blockers open, and which slice of the library is shown. Eighty
    seven blocker lines rendered at once is a wall nobody reads; the count belongs on the
@@ -3006,22 +3048,29 @@ function readinessPane() {
   const all = DATA.scenarios.slice().sort((a, b) => (testable(b) - testable(a))
     || String(a.id).localeCompare(String(b.id)));
   const ready = all.filter(testable);
+  const disc = all.filter(discoverable);
   const shown = readyFilter === "ready" ? ready
-              : readyFilter === "blocked" ? all.filter(s => !testable(s)) : all;
+              : readyFilter === "blocked" ? all.filter(s => !testable(s))
+              : readyFilter === "discover" ? disc : all;
 
   const rows = shown.map(s => {
     const bl = (s.testing && s.testing.blockers) || [];
+    const dl = (s.discovery && s.discovery.blockers) || [];
     const open = !!openBlockers[s.id];
     return `<div class="trow ${bl.length ? "" : "ok"}">
-      <div class="tmain">${bl.length
+      <div class="tmain">${(bl.length || dl.length)
           ? `<button class="tx" data-blockers="${esc(s.id)}"
                aria-expanded="${open}" title="show what blocks this">${open ? "&minus;" : "+"}</button>`
           : `<span class="tx spacer"></span>`}
         <a href="#/scenario/${esc(s.id)}">${esc(s.id)}</a> ${esc(s.title)}</div>
       <div class="tv">${bl.length
         ? `<span class="chip blind">${bl.length} blocker${bl.length === 1 ? "" : "s"}</span>`
-        : `<span class="chip have">would emit</span>`}</div>
-      ${bl.length && open ? `<ul class="tbl">${bl.map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
+        : `<span class="chip have">would emit</span>`}
+        ${dl.length
+        ? `<span class="chip draft" title="discovery mode">discovery blocked</span>`
+        : `<span class="chip proposed" title="discovery mode">would discover</span>`}</div>
+      ${open && bl.length ? `<div class="sub">Scoring path</div><ul class="tbl">${bl.map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
+      ${open && dl.length ? `<div class="sub">Discovery path</div><ul class="tbl">${dl.map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
     </div>`;
   }).join("");
 
@@ -3034,8 +3083,10 @@ function readinessPane() {
       see here is what the emitter would do. A blocked record is a normal answer in a young
       library, and knowing which ones and why is itself a finding.</div>
     <div class="tsum"><strong>${ready.length} of ${all.length}</strong> scenarios would emit
-      a spec today. ${ready.length ? "Ready: " + ready.map(s => esc(s.id)).join(", ") + "." : ""}</div>
-    <div class="irail sm">${tab("all", "All " + all.length)}${tab("ready", "Would emit " + ready.length)}${tab("blocked", "Blocked " + (all.length - ready.length))}</div>
+      a test spec today. ${ready.length ? "Ready: " + ready.map(s => esc(s.id)).join(", ") + "." : ""}<br>
+      <strong>${disc.length} of ${all.length}</strong> would emit a discovery spec, the other
+      door: it needs no scores, proposes first ones, and seals nothing.</div>
+    <div class="irail sm">${tab("all", "All " + all.length)}${tab("ready", "Would emit " + ready.length)}${tab("blocked", "Blocked " + (all.length - ready.length))}${tab("discover", "Would discover " + disc.length)}</div>
     <div class="tlist">${rows}</div>
     <div class="note"><strong>Completing a blocked scenario.</strong> Almost every blocker
       above is one of two things, and both are ordinary work rather than a defect. A record
@@ -3045,7 +3096,10 @@ function readinessPane() {
       the scenario, score its rows on the two questions Liszt asks, export the session file,
       and apply it with <code>./liszt session</code>. Once the scores are in and the record
       is published, it appears here as ready and the other panes work on it. Designing use
-      cases does not wait for any of that.</div>
+      cases does not wait for any of that. When no room is available, the other door is
+      <code>./liszt discover NNN</code>: an agent runs the unscored scenario and proposes
+      first numbers, which land marked <em>agent-proposed</em> and count toward nothing until
+      a person accepts them. See <code>docs/13-discovery-mode.md</code>.</div>
     <div class="sub" style="margin:14px 0 4px">The judgment half is a person's call and does
       not come from the record. Run this against a scenario that clears the gate above.</div>
     ${promptBox("Readiness, the judgment half",
@@ -3143,7 +3197,27 @@ function rescorePane() {
       <code>runs/</code> are worked examples a person authored by hand. And the scorer's
       proposals name a direction, <em>Have</em> to <em>Collectable</em>, while records store
       DeTT&amp;CT integers, so applying one is still a hand translation. The source proposals
-      are the exception: they are directly applicable today.</div>`;
+      are the exception: they are directly applicable today.</div>
+    <h4 style="margin-top:18px">Discovery mode, the other door</h4>
+    <div class="sub" style="margin-bottom:6px">For a record with no scores at all. Same
+      procedure discipline, same stop conditions, and deliberately no prediction and no
+      scorecard, because nothing was claimed.</div>
+    <div class="tflow">
+      <div class="tstep"><span class="n">1</span><div><strong>Emit the discovery spec.</strong>
+        <code>./liszt discover NNN</code>
+        <span class="hint">Writes <code>specs/DISC-NNN-slug/discovery.yaml</code> and <code>.md</code>.
+        Nothing is sealed. <code>--check</code> runs only the gate.</span></div></div>
+      <div class="tstep"><span class="n">2</span><div><strong>Run it, and record what came out.</strong>
+        <span class="hint">Author <code>runs/DISC-NNN-YYYY-MM-DD-NN.yaml</code> against
+        <code>schema/discovery-run.schema.json</code>: what appeared, where, which layer, and the
+        proposed numbers with a written rationale each. <code>./liszt validate</code> checks that the
+        observation and the proposal tell one story.</span></div></div>
+      <div class="tstep"><span class="n">3</span><div><strong>Accept, deliberately.</strong>
+        <code>python3 tools/discovery_to_session.py runs/DISC-... --accepted-by "your name"</code>
+        <span class="hint">Writes a session file and nothing else. <code>./liszt session</code> applies
+        it, and every score lands with <code>score_provenance: agent-proposed</code>, listed in the
+        rollup and averaged nowhere until a person changes it.</span></div></div>
+    </div>`;
 }
 
 function renderTesting() {
@@ -4787,6 +4861,8 @@ def page(data: dict) -> str:
         tile(lib["full_maturity"], "Fully mature", "pass all seven process gates"),
         tile(len(lib["unscored_ids"]), "Not scored",
              "absent from the figures, not zero", "var(--muted)"),
+        tile(len(lib["proposed_ids"]), "Agent-proposed",
+             "scores awaiting a person, counted nowhere", "var(--muted)"),
     ])
 
     # The parked mockup is optional. No file, no tab, and every other view is
@@ -4857,7 +4933,9 @@ def page(data: dict) -> str:
       <option value="unscored">Not scored</option></select>
     <select id="f-test"><option value="">Any testability</option>
       <option value="ready">Would emit a spec</option>
-      <option value="blocked">Blocked from testing</option></select>
+      <option value="blocked">Blocked from testing</option>
+      <option value="discover">Would emit a discovery spec</option>
+      <option value="discover-blocked">Blocked from discovery</option></select>
     <span class="count" id="count"></span>
     <button class="clear" id="clear">Clear</button>
   </div>

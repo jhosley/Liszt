@@ -1,0 +1,172 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# WORKED EXAMPLE, discovery mode, scratch pipeline. INVENTED DATA.
+#
+# No agent has run this. Every observation, source name and proposed number below
+# was written by hand to show what a discovery run record looks like when it is
+# done honestly, and to give the round trip something to exercise:
+#
+#     python3 tools/validate.py runs/DISC-021-2026-09-03-01.yaml
+#     python3 tools/discovery_to_session.py runs/DISC-021-2026-09-03-01.yaml --accepted-by "Name"
+#     python3 tools/apply_session.py runs/DISC-021-2026-09-03-01.session.json --dry-run
+#
+# Read it against RUN-021-2026-08-05-02.yaml, the scratch-lab scored run. Same lab
+# shape, same scenario, opposite question: that run checked a prediction, this one
+# had no prediction to check and instead proposes the first numbers. Notice what
+# is not here. There is no prediction_digest, because nothing was predicted. There
+# is no scorecard and no verdict, because confirmed and overestimate mean
+# "compared to the prediction" and there was none. And every proposed_detection
+# is -1, because a scratch pipeline does not carry our detection content, so the
+# run saw nothing about how mature our detections are and says so.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+run_version: 1
+run_id: DISC-021-2026-09-03-01
+spec_id: DISC-021
+scenario: '021'
+scenario_status: draft
+executed: '2026-09-03'
+executed_by: Purple team lab, discovery agent build 0.1 (illustrative)
+agent:
+  adapter: hand-written action set, no runner bound (illustrative)
+  model: none, this record was authored by a person as a worked example
+
+environment:
+  kind: lab-ephemeral
+  telemetry_pipeline: scratch
+  targets_used:
+    - lab-k8s-cluster (kind, single node)
+    - lab-egress-proxy (Squid stand-in for the package proxy)
+    - lab-dataset-worker (the scenario's processing pod, rebuilt from its manifest)
+  teardown_confirmed: true
+  deviations:
+    - Scratch collectors only. No Palo Alto, Zscaler, CrowdStrike or EKS audit path
+      exists in this lab, so every source below is the lab stand-in that saw the
+      artifact, named so a reader knows which system class the estate would need.
+    - Step 6 was not executed. See stop_conditions_triggered.
+
+autonomy_used: lab-only
+
+stop_conditions_triggered:
+  - condition: Any interaction with an address or account outside authorization.targets.
+    at_step: 6
+    note: The C2 and exfiltration step rides public web services by design. No stand-in
+      for those exists inside the lab boundary, so the run stopped rather than reach one.
+
+observations:
+  - step: 1
+    executed: true
+    observed: absent
+    out_of_estate: false
+    latency_seconds: null
+    artifacts:
+      - "lab query: grep -r 'safety' lab-agent-platform/runs/*/manifest.json, 0 matching fields"
+    proposed_visibility: 0
+    proposed_detection: -1
+    proposal_rationale: The agent ran with its refusal classifier disabled and nothing
+      recorded that fact anywhere. The run manifest the platform writes has no field for
+      safeguard state, so there is no artifact to collect, not merely one we do not
+      collect. Visibility 0 is the honest number. The record already says Blind here;
+      this run agrees, and adds that the gap is in the platform, not the pipeline.
+    surprises:
+      - The platform does write the agent's tool allowlist to the manifest. That is not
+        the safeguard state, but it is adjacent, and a change to it might be a proxy.
+
+  - step: 2
+    executed: true
+    observed: logged-only
+    observed_source: lab-egress-proxy Squid access.log, index=lab_net
+    observed_layer: ["L0 · Infrastructure"]
+    out_of_estate: false
+    detection_fired: null
+    latency_seconds: 4
+    artifacts:
+      - "lab query: index=lab_net src=sandbox-* dst!=package-proxy | stats count by dst, 17 rows"
+      - "runs/artifacts/DISC-021-01/step2-squid.log"
+    proposed_visibility: 2
+    proposed_detection: -1
+    proposal_rationale: The sandbox's egress appeared in the proxy log within seconds, with
+      source, destination and bytes, but without the process or container identity that
+      would tie it back to the workload. That is Medium, not Good, because an analyst can
+      see that something in the sandbox range left, and cannot see what. Detection is -1
+      because the lab carries none of our detection content, so nothing about our
+      NET-EGRESS-ANOM-07 was observed either way.
+
+  - step: 3
+    executed: true
+    observed: absent
+    out_of_estate: true
+    latency_seconds: null
+    artifacts:
+      - "lab query: index=lab_net dst=lab-public-endpoint | stats count, 0 rows from our side"
+    proposed_visibility: 0
+    proposed_detection: -1
+    proposal_rationale: The step compromises a third party's public endpoint, which the
+      lab substituted with a stand-in outside the sandbox range. Nothing on our side of
+      the boundary recorded the compromise, which is the expected result and the honest
+      one. Visibility 0 for our estate; what the third party might see is not ours to
+      score.
+    surprises:
+      - The record's evidence row 3 describes an untrusted dataset config being processed,
+        which is the move step 4 makes, not step 3. Row and step have drifted. Flagged for
+        the author rather than scored around.
+
+  - step: 4
+    executed: true
+    observed: logged-only
+    observed_source: Falco runtime events on lab-k8s-cluster, index=lab_runtime; lab-dataset-worker stdout
+    observed_layer: ["L1 · Data", "L0 · Infrastructure"]
+    out_of_estate: false
+    detection_fired: null
+    latency_seconds: 2
+    artifacts:
+      - "lab query: index=lab_runtime rule='Terminal shell in container' k8s.pod=dataset-worker-*, 3 rows"
+      - "runs/artifacts/DISC-021-01/step4-falco.json"
+    proposed_visibility: 3
+    proposed_detection: -1
+    proposal_rationale: The malicious config was logged by the worker at parse time with
+      the offending template string, and the shell it spawned was caught by the runtime
+      sensor with full process ancestry. Two independent sources, both prompt, both
+      carrying the field an analyst would pivot on. Good rather than Excellent because
+      the worker log is unstructured stdout and the template string had to be found by
+      eye. The layer is recorded as two values because the artifact sits on the seam, where
+      the data layer logged the cause and the infrastructure layer logged the effect.
+
+  - step: 5
+    executed: true
+    observed: logged-only
+    observed_source: kind apiserver audit log, /var/log/kubernetes/audit.log on the lab node
+    observed_layer: ["L0 · Infrastructure"]
+    out_of_estate: false
+    detection_fired: null
+    latency_seconds: 1
+    artifacts:
+      - "lab query: jq 'select(.objectRef.resource==\"pods\" and .requestObject.spec.hostPID==true)' audit.log, 1 row"
+    proposed_visibility: 1
+    proposed_detection: -1
+    proposal_rationale: The privileged pod creation appears in the audit log, and nothing
+      else does. The metadata service read from inside the pod, and the token forgery
+      after it, left no artifact the lab could collect, because the lab has no cloud
+      metadata endpoint and no identity provider. Minimal, and honestly so, since the step's
+      first move is visible, the two that matter are not, and this lab cannot say what
+      the estate's CloudTrail would show.
+
+  - step: 6
+    executed: false
+    not_executed_reason: Stop condition. The action set requires reaching public paste
+      and file-drop services, which are outside authorization.targets, and no lab
+      stand-in was provisioned for them.
+    observed: unscoreable
+    notes: No proposal. A step that did not run produced no evidence to propose from.
+
+feedback:
+  method_findings:
+    - Row 3 and step 3 of the record describe different moves. Discovery found it
+      because the agent executed the step text and then looked for the row's signal.
+  lab_findings:
+    - A metadata service stand-in and a fake identity provider would make step 5
+      observable. Without them the lab cannot exercise the half of the step that matters.
+    - Public-service stand-ins for step 6 need a decision, not a build. The stop condition
+      is doing its job.
+  new_sources_found:
+    - The dataset worker's own stdout carries the parsed config, including the malicious
+      template string. The record names only EDR and the runtime for step 4.

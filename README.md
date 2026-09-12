@@ -37,6 +37,8 @@ document than a repository.
 | **Keeping it current as frameworks and threats change** | [`docs/06-keeping-current.md`](docs/06-keeping-current.md) |
 | **Integrating the library into another web app** | [`docs/07-viewer-data-contract.md`](docs/07-viewer-data-contract.md) |
 | **Asking what Liszt is not responsible for** | [`docs/08-boundaries.md`](docs/08-boundaries.md) |
+| **Testing a scored record's claims with an agent** | [`docs/12-agent-testing.md`](docs/12-agent-testing.md) |
+| **Getting a first score onto an unscored record with an agent** | [`docs/13-discovery-mode.md`](docs/13-discovery-mode.md) |
 
 The fastest way to understand the discipline is to read the reference scenario and its
 walkthrough. People learn a process by copying a good example far faster than by reading

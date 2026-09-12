@@ -27,6 +27,9 @@ is the same as `python3 tools/validate.py`.
 | `./liszt viewer` | rebuild the static viewer page and `liszt-data.json` |
 | `./liszt serve` | rebuild the viewer, then serve it on a local address for a session |
 | `./liszt session <file>` | write a viewer session file back into the records |
+| `./liszt emit NNN --check` / `--sealed-by "Name"` | test a scored, published record: spec + sealed prediction |
+| `./liszt discover NNN --check` / `./liszt discover NNN` | first scores for an unscored draft: spec, no prediction, proposals only |
+| `python3 tools/discovery_to_session.py runs/DISC-... --accepted-by "Name"` | accept an agent's proposals into a session file; they land marked `agent-proposed` |
 | `python3 tools/new_scenario.py` | start a record: next free id, slug, filename, template comments kept. Add `--use-case` for a use case |
 | `./liszt publish` | YAML → Markdown for SharePoint / Copilot |
 | `./liszt pin` / `./liszt verify-pin` | vendor framework artifacts / re-check offline |
