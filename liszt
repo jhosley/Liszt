@@ -24,6 +24,8 @@ usage: ./liszt <command> [options]
   viewer        rebuild the static viewer page and liszt-data.json
   serve         rebuild the viewer, then serve it on a local address
   session       apply a session file back into the records
+  emit          emit an agent test spec and sealed prediction from a scored, published scenario
+  discover      emit a discovery spec from an unscored scenario, no prediction, proposals only
   render        rebuild the slide deck (needs the deck packages)
   publish       write the records out as Markdown pages
   pin           vendor the pinned framework artifacts (needs network)
@@ -62,6 +64,10 @@ case "$CMD" in
     need_venv; exec "$VENV_PY" "$ROOT/tools/serve.py" "$@" ;;
   session)
     need_venv; exec "$VENV_PY" "$ROOT/tools/apply_session.py" "$@" ;;
+  emit)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/emit_testspec.py" "$@" ;;
+  discover)
+    need_venv; exec "$VENV_PY" "$ROOT/tools/emit_discovery.py" "$@" ;;
   render)
     need_venv
     if ! "$VENV_PY" -c "import pptx" >/dev/null 2>&1; then

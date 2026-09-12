@@ -99,17 +99,22 @@ Every field of the underlying record, plus two computed additions.
                            "source": "..",            // the exact system, named
                            "coverage": "Blind",
                            "dettect": { "visibility": 0, "detection": -1, "quality": {..} },
+                           "score_provenance": "agent-proposed",   // absent means a person scored it
                            "owner": "..", "evidence": "..", "backlog_ref": ".." } ],
   "commentary": {..}, "scaled_up": "..", "hardening": [..],
   "incidents": ["<slug>"], "provenance": {..},
 
   "counts":  { "Have": 3, "Collectable": 2, "Blind": 1, "Unscored": 0 },
   "metrics": { .. },
-  "use_case_ids": ["UC-001"]
+  "use_case_ids": ["UC-001"],
+  "testing":   { "blockers": [".."] },   // scoring path gate, from emit_testspec.readiness()
+  "discovery": { "blockers": [".."] }    // discovery path gate, from emit_discovery.discovery_readiness()
 }
 ```
 
-`counts`, `metrics` and `use_case_ids` are computed by the generator. Everything else
+`counts`, `metrics`, `use_case_ids`, `testing` and `discovery` are computed by the
+generator. The two blocker lists are the emitters' own gates run at build time, so an
+empty list means that emitter would write a spec for the record today. Everything else
 is the record as committed. Field-by-field definitions of the record itself are in
 `schema/scenario.schema.json`, which carries a description on every field.
 
@@ -117,7 +122,8 @@ is the record as committed. Field-by-field definitions of the record itself are 
 
 | Field | Meaning |
 |---|---|
-| `rows`, `scored` | Evidence rows present, and how many carry scores |
+| `rows`, `scored` | Evidence rows present, and how many carry scores a person stands behind |
+| `proposed`, `proposed_steps` | Rows whose scores are `agent-proposed` from a discovery run. Listed, counted in no ratio; `scored` excludes them |
 | `completeness` | `scored / rows`. **Gates everything else.** A scenario scored on 2 of 6 rows is mostly unmeasured, not mostly covered |
 | `have`, `collectable`, `blind` | Proportions **of scored rows**, or `null` when nothing is scored |
 | `quality` | Mean of the five DeTT&CT quality dimensions, normalized 0 to 1 |

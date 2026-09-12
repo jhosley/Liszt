@@ -635,7 +635,10 @@ def main() -> int:
         "environment": build_environment(rec, rows, args.pipeline),
         "procedure": procedure,
         "readiness": {
-            "verdict": "ready",
+            # Computed, not asserted. The gate passed or this code would not be running,
+            # but a spec that excludes steps is a narrower thing than one that does not,
+            # and the schema has a word for it.
+            "verdict": "ready-with-exclusions" if excluded else "ready",
             "validated_by": args.sealed_by,
             "validated": date,
             "checks": [

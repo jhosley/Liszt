@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liszt.local/schema/discovery-run.schema.json",
+  "title": "Discovery Run Record",
+  "description": "What a discovery run actually did and actually found, per step, plus the DeTT&CT scores the agent PROPOSES for a person to accept or reject. This record mirrors run-record.schema.json where the two share a concept, and deliberately does not where they do not: there is no prediction_digest because there was no prediction, and there is no scorecard because a verdict is defined as predicted-versus-observed and with nothing predicted it is undefined. A discovery run record is immutable once committed: a correction is a new run, not an edit. Nothing in it writes itself into a scenario record; the bridge (tools/discovery_to_session.py) turns accepted proposals into a session file for tools/apply_session.py, and every score that lands carries score_provenance: agent-proposed until a person changes it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_version",
+    "run_id",
+    "spec_id",
+    "scenario",
+    "executed",
+    "executed_by",
+    "environment",
+    "autonomy_used",
+    "observations"
+  ],
+  "properties": {
+    "run_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^DISC-[0-9]{3}-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}$",
+      "description": "DISC, the scenario number, the date, and a two digit sequence. Immutable, never reused. One scenario per record; an agent run over several scenarios produces several records."
+    },
+    "spec_id": {
+      "type": "string",
+      "pattern": "^DISC-[0-9]{3}$"
+    },
+    "scenario": {
+      "type": "string",
+      "pattern": "^[0-9]{3}$"
+    },
+    "scenario_status": {
+      "enum": ["draft", "in-review"],
+      "description": "The status the scenario record had when the spec was emitted. Recorded so a reader of this run knows the record it ran against had not been stood behind by anyone. published is not a legal value because a published record is already scored and belongs to the testing path, not discovery."
+    },
+    "spec_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "sha256 of the discovery.yaml this run followed. Optional, but binding the run to its spec is what lets a third party check the procedure the agent was actually given."
+    },
+    "executed": {
+      "type": "string",
+      "format": "date"
+    },
+    "executed_by": {
+      "type": "string",
+      "minLength": 3,
+      "description": "Role or team, plus the agent build if one was used."
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "type": "string",
+          "description": "Which emulation runner the abstract actions were bound to, and its version."
+        },
+        "build": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string",
+          "description": "If an LLM drove the run, which one. The driver is part of the experimental setup, and in discovery mode it is also the author of every proposed number, so it must be named."
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "telemetry_pipeline", "teardown_confirmed"],
+      "properties": {
+        "kind": {
+          "enum": ["lab-ephemeral", "lab-persistent", "production"]
+        },
+        "telemetry_pipeline": {
+          "enum": ["mirrored", "scratch", "none"],
+          "description": "What the pipeline ACTUALLY was. In discovery mode this bounds what may be proposed: a scratch pipeline can support a visibility proposal but not a detection proposal, because our detection content was not in the path. Record unscoreable rather than guess."
+        },
+        "targets_used": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "teardown_confirmed": {
+          "type": "boolean"
+        },
+        "deviations": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "autonomy_used": {
+      "enum": ["lab-only", "production-observe", "production-active"]
+    },
+    "stop_conditions_triggered": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["condition", "at_step"],
+        "properties": {
+          "condition": {"type": "string"},
+          "at_step": {"type": "integer"},
+          "note": {"type": "string"}
+        }
+      },
+      "description": "Any guardrail that fired. A triggered stop condition is a successful guardrail, not a failed run."
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "description": "What was seen, per step, and what the agent proposes the scores should be. Authored by the run, accepted or rejected by a person. Every proposal must carry its rationale in words, because a number with no reasoning cannot be reviewed, only believed.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step", "executed", "observed"],
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "executed": {
+            "type": "boolean",
+            "description": "Whether the action set actually ran. False means the step could not be performed, which is an environment result and not evidence about our visibility."
+          },
+          "not_executed_reason": {
+            "type": "string"
+          },
+          "observed": {
+            "enum": ["detected", "logged-only", "absent", "unscoreable"],
+            "description": "Same vocabulary as the run record, exactly. detected: the artifact appeared AND something alerted on it. logged-only: the artifact appeared in a log, nothing alerted. absent: nothing appeared anywhere that was checked. unscoreable: the venue for this observation did not exist in this environment. unscoreable is a legitimate and common answer; guessing instead of recording it is what corrupts a proposal."
+          },
+          "observed_source": {
+            "type": "string",
+            "description": "Where the artifact actually turned up: system plus index, log, table or topic name, and ONLY that. Prose about where it was not found belongs in notes. In discovery this is the field the agent is there to fill, since the record may name no source at all."
+          },
+          "observed_layer": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/aiLayer"},
+            "description": "Which layer the response came from, using the scenario schema's aiLayer vocabulary and no other. One value normally; two when the artifact genuinely sits on a seam, for example an app log line that carries the model's output. Agent behavior and MCP servers are L3. Model or LLM output is L2. Retrieval and data stores are L1. App surface is L4. Hosts, cloud and network are L0. There is no value for 'outside the estate': that is out_of_estate below, because a third party is not a layer of ours."
+          },
+          "out_of_estate": {
+            "type": "boolean",
+            "description": "True when the step reaches a third party and what was observed (or not) belongs to a stand-in inside the lab boundary rather than to our estate. The run still records what our side saw."
+          },
+          "detection_fired": {
+            "type": ["boolean", "null"]
+          },
+          "detection_artifact_observed": {
+            "type": "string"
+          },
+          "latency_seconds": {
+            "type": ["number", "null"],
+            "minimum": 0
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Pointers to the evidence: query used, screenshot, log excerpt path. Must be re-runnable by a third party, because a proposal with no artifact behind it rests on the agent's word."
+          },
+          "surprises": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "proposed_visibility": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4,
+            "description": "DeTT&CT visibility the agent proposes. 0 None, 1 Minimal, 2 Medium, 3 Good, 4 Excellent. A proposal, not a score, until a person accepts it."
+          },
+          "proposed_detection": {
+            "type": "integer",
+            "minimum": -1,
+            "maximum": 5,
+            "description": "DeTT&CT detection maturity the agent proposes. -1 None, 0 Forensics only, 1 Basic, 2 Fair, 3 Good, 4 Very good, 5 Excellent. In a scratch pipeline this should be -1 or absent with the reason in proposal_rationale, because our detection content was not under test."
+          },
+          "proposal_rationale": {
+            "type": "string",
+            "minLength": 40,
+            "description": "Why those two numbers, in words a reviewer can disagree with. Name what was seen, where, how completely, and what would have moved the number up or down."
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {"observed": {"enum": ["detected", "logged-only"]}},
+              "required": ["observed"]
+            },
+            "then": {
+              "required": ["observed_source", "observed_layer"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"observed": {"enum": ["detected", "logged-only", "absent"]}, "executed": {"const": true}},
+              "required": ["observed", "executed"]
+            },
+            "then": {
+              "required": ["proposed_visibility", "proposed_detection", "proposal_rationale"]
+            }
+          }
+        ]
+      }
+    },
+    "feedback": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What this run says beyond the per-step proposals. There is no proposed_rescores block here because nothing was scored to begin with; the proposals live on the observations.",
+      "properties": {
+        "method_findings": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "lab_findings": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "new_sources_found": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Sources that produced useful artifacts and are not on any evidence row. In discovery mode this is often the main result."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "aiLayer": {
+      "enum": [
+        "L1 · Data",
+        "L2 · Model",
+        "L3 · Orchestration & Agent",
+        "L4 · Application",
+        "L0 · Infrastructure"
+      ],
+      "description": "Must be byte-identical to scenario.schema.json $defs/aiLayer. tools/validate.py refuses to run if the two drift, so there is one layer vocabulary in the repository and not two."
+    }
+  }
+}

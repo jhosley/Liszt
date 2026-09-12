@@ -1,0 +1,52 @@
+{
+  "session_format": 1,
+  "recorded": "2026-09-03",
+  "facilitator": "A. Analyst (accepting discovery run DISC-021-2026-09-03-01)",
+  "changes": {
+    "021": {
+      "telemetry": {
+        "1": {
+          "dettect": {
+            "visibility": 0,
+            "detection": -1
+          },
+          "score_provenance": "agent-proposed",
+          "notes": "[DISC-021-2026-09-03-01] The agent ran with its refusal classifier disabled and nothing recorded that fact anywhere. The run manifest the platform writes has no field for safeguard state, so there is no artifact to collect, not merely one we do not collect. Visibility 0 is the honest number. The record already says Blind here; this run agrees, and adds that the gap is in the platform, not the pipeline."
+        },
+        "2": {
+          "dettect": {
+            "visibility": 2,
+            "detection": -1
+          },
+          "score_provenance": "agent-proposed",
+          "notes": "[DISC-021-2026-09-03-01] The sandbox's egress appeared in the proxy log within seconds, with source, destination and bytes, but without the process or container identity that would tie it back to the workload. That is Medium, not Good, because an analyst can see that something in the sandbox range left, and cannot see what. Detection is -1 because the lab carries none of our detection content, so nothing about our NET-EGRESS-ANOM-07 was observed either way. Observed in the scratch lab at: lab-egress-proxy Squid access.log, index=lab_net. That is the lab's stand-in, not the estate's source, which is why the source field above is unchanged. Lab artifacts: lab query: index=lab_net src=sandbox-* dst!=package-proxy | stats count by dst, 17 rows; runs/artifacts/DISC-021-01/step2-squid.log"
+        },
+        "3": {
+          "dettect": {
+            "visibility": 0,
+            "detection": -1
+          },
+          "score_provenance": "agent-proposed",
+          "notes": "[DISC-021-2026-09-03-01] The step compromises a third party's public endpoint, which the lab substituted with a stand-in outside the sandbox range. Nothing on our side of the boundary recorded the compromise, which is the expected result and the honest one. Visibility 0 for our estate; what the third party might see is not ours to score."
+        },
+        "4": {
+          "dettect": {
+            "visibility": 3,
+            "detection": -1
+          },
+          "score_provenance": "agent-proposed",
+          "notes": "[DISC-021-2026-09-03-01] The malicious config was logged by the worker at parse time with the offending template string, and the shell it spawned was caught by the runtime sensor with full process ancestry. Two independent sources, both prompt, both carrying the field an analyst would pivot on. Good rather than Excellent because the worker log is unstructured stdout and the template string had to be found by eye. The layer is recorded as two values because the artifact sits on the seam, where the data layer logged the cause and the infrastructure layer logged the effect. Observed in the scratch lab at: Falco runtime events on lab-k8s-cluster, index=lab_runtime; lab-dataset-worker stdout. That is the lab's stand-in, not the estate's source, which is why the source field above is unchanged. Lab artifacts: lab query: index=lab_runtime rule='Terminal shell in container' k8s.pod=dataset-worker-*, 3 rows; runs/artifacts/DISC-021-01/step4-falco.json"
+        },
+        "5": {
+          "dettect": {
+            "visibility": 1,
+            "detection": -1
+          },
+          "score_provenance": "agent-proposed",
+          "notes": "[DISC-021-2026-09-03-01] The privileged pod creation appears in the audit log, and nothing else does. The metadata service read from inside the pod, and the token forgery after it, left no artifact the lab could collect, because the lab has no cloud metadata endpoint and no identity provider. Minimal, and honestly so, since the step's first move is visible, the two that matter are not, and this lab cannot say what the estate's CloudTrail would show. Observed in the scratch lab at: kind apiserver audit log, /var/log/kubernetes/audit.log on the lab node. That is the lab's stand-in, not the estate's source, which is why the source field above is unchanged. Lab artifacts: lab query: jq 'select(.objectRef.resource==\"pods\" and .requestObject.spec.hostPID==true)' audit.log, 1 row"
+        }
+      },
+      "notes": "Discovery run DISC-021-2026-09-03-01 proposed scores on steps 1, 2, 3, 4, 5, accepted into the record by A. Analyst. They carry score_provenance: agent-proposed and count toward nothing until a person changes that field to human-session."
+    }
+  }
+}

@@ -367,6 +367,10 @@
           "research_needed": {
             "type": "boolean",
             "description": "The room could not answer whether this signal exists. The row stays unscored, which keeps it out of every average, and this flag records that the blank is a known unknown with follow-up owed, not a question nobody has asked yet. Name an owner for the research. Clear the flag when the row is scored."
+          },
+          "score_provenance": {
+            "enum": ["human-session", "agent-proposed"],
+            "description": "Who stands behind the dettect scores on this row. Absent means a person scored it, which is every row written before discovery mode existed. 'agent-proposed' means the numbers came out of a discovery run (runs/DISC-*.yaml) through the bridge and no person has accepted them yet: they do not count toward coverage, they are listed separately in the rollup, and a published record may not carry one. Accepting a proposal means editing this to 'human-session' in the same commit that keeps the number, so the diff shows the act."
           }
         }
       }

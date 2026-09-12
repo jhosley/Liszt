@@ -5,6 +5,7 @@ Validate scenario AND use case records against their schemas AND the quality bar
     python tools/validate.py                       # everything
     python tools/validate.py scenarios/021-*.yaml  # one record
     python tools/validate.py use-cases/UC-001*.yaml # one use case record
+    python tools/validate.py runs/DISC-021-*.yaml   # one discovery run record
     python tools/validate.py --strict               # warnings become errors (use in CI)
     python tools/validate.py --publishable          # only check records with status: published
 
@@ -20,6 +21,7 @@ Exit codes: 0 clean, 1 errors present, 2 warnings present under --strict.
 from __future__ import annotations
 
 import argparse
+import collections
 import glob
 import pathlib
 import re
@@ -34,6 +36,8 @@ except ImportError:
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCHEMA = ROOT / "schema" / "scenario.schema.json"
 UC_SCHEMA = ROOT / "schema" / "use-case.schema.json"
+DISC_SCHEMA = ROOT / "schema" / "discovery-run.schema.json"
+RUN_SCHEMA = ROOT / "schema" / "run-record.schema.json"
 
 # Slide geometry limits, measured against the rendered template. Exceeding these
 # does not corrupt the deck -- it produces text that overflows its shape, which is
@@ -214,6 +218,21 @@ def check_quality_bar(rec: dict, f: Findings, incidents: set[str],
                   f"coverage is '{r.get('coverage')}' but DeTT&CT scores derive '{d}' "
                   f"(visibility={r['dettect'].get('visibility')}, "
                   f"detection={r['dettect'].get('detection')})")
+
+        # --- score provenance -----------------------------------------------
+        # A score proposed by an agent in discovery mode is a proposal, not a
+        # measurement. It rides into the record with score_provenance so it can never
+        # be mistaken for a number a person stood behind. Absent means a person.
+        sp = r.get("score_provenance")
+        if sp and d is None:
+            f.warn(f"telemetry[{r['step']}]",
+                   f"score_provenance is '{sp}' but the row has no scores, provenance "
+                   "describes a score and there is none here to describe")
+        if sp == "agent-proposed" and published:
+            f.err(f"telemetry[{r['step']}]",
+                  "agent-proposed scores on a published record. Publication is the moment a "
+                  "person stands behind every number: accept the proposal by setting "
+                  "score_provenance to human-session, or remove the scores, before publishing")
 
         if r.get("coverage") in ("Have", "Collectable") and not r.get("source"):
             (f.err if published else f.warn)(
@@ -447,6 +466,153 @@ def validate_use_case_file(path: pathlib.Path, validator,
     return f
 
 
+def validate_discovery_run_file(path: pathlib.Path, validator,
+                                scenario_steps: dict[str, list[int]]) -> Findings:
+    """A discovery run record: what an agent saw, and the scores it PROPOSES. There is
+    no prediction and no scorecard, so the checks here are about the run pointing at
+    real steps, and about what was observed and what is proposed telling the same
+    story. The numbers themselves are opinions until a person accepts them, and the
+    validator has no view on whether they are right."""
+    f = Findings()
+    try:
+        rec = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        f.err("yaml", f"unparseable: {e}")
+        return f
+    if not isinstance(rec, dict):
+        f.err("yaml", "top level is not a mapping")
+        return f
+
+    for e in sorted(validator.iter_errors(rec), key=lambda e: list(e.path)):
+        f.err("/".join(str(p) for p in e.path) or "(root)", e.message)
+    if f.errors:
+        return f              # structural errors make the rest unreliable
+
+    if path.stem != rec["run_id"]:
+        f.err("filename", f"should be {rec['run_id']}.yaml")
+    if rec["spec_id"] != f"DISC-{rec['scenario']}":
+        f.err("spec_id", f"should be DISC-{rec['scenario']} for scenario {rec['scenario']}")
+
+    sid = rec["scenario"]
+    if sid not in scenario_steps:
+        f.err("scenario", f"scenario '{sid}' does not exist in scenarios/")
+        return f
+    steps = scenario_steps[sid]
+
+    # --- observation and proposal must agree ----------------------------------
+    # The agent reports what it saw in one field and what it proposes in two others.
+    # These are the combinations that contradict each other. Each is an error, not a
+    # warning, because a proposal that disagrees with its own observation is not a
+    # judgment call, it is a record that says two things.
+    seen: list[int] = []
+    scratch = rec["environment"]["telemetry_pipeline"] == "scratch"
+    for i, o in enumerate(rec.get("observations", [])):
+        where = f"observations[{i}]"
+        n = o["step"]
+        if n in seen:
+            f.err(where, f"step {n} observed twice, one observation per step per run")
+        seen.append(n)
+        if n not in steps:
+            f.err(where, f"step {n} is not in scenario {sid}'s attack path, which has "
+                         f"steps {steps}")
+            continue
+        obs = o["observed"]
+        vis, det = o.get("proposed_visibility"), o.get("proposed_detection")
+        has_proposal = vis is not None or det is not None
+
+        if not o["executed"]:
+            if has_proposal:
+                f.err(where, "not executed but carries a proposal, a step that did not run "
+                             "produced no evidence to propose from")
+            if obs != "unscoreable":
+                f.warn(where, f"not executed but observed is '{obs}', a step that did not "
+                              "run is unscoreable, not a finding about the estate")
+            continue
+
+        if obs == "unscoreable" and has_proposal:
+            f.err(where, "unscoreable but carries a proposal. If the venue for this claim "
+                         "did not exist then a number here is a guess, and keeping guesses "
+                         "out is what this record is for")
+        if obs == "absent" and vis not in (None, 0):
+            f.err(where, f"observed absent but proposed_visibility is {vis}, nothing appeared "
+                         "so visibility is 0 by definition")
+        if obs in ("logged-only", "detected") and vis == 0:
+            f.err(where, f"observed {obs} but proposed_visibility is 0, an artifact appeared "
+                         "so visibility cannot be none")
+        if obs == "logged-only" and det is not None and det >= 1:
+            f.err(where, f"observed logged-only but proposed_detection is {det}, nothing "
+                         "alerted so detection maturity is at most 0")
+        if obs == "detected" and det is not None and det < 1:
+            f.err(where, f"observed detected but proposed_detection is {det}, a detection "
+                         "fired so maturity is at least 1")
+        if obs == "detected" and o.get("detection_fired") is False:
+            f.err(where, "observed detected but detection_fired is false, these say "
+                         "opposite things")
+        if scratch and det is not None and det >= 1:
+            f.err(where, f"proposed_detection {det} from a scratch pipeline. Our detection "
+                         "content was not in the path, so nothing about its maturity was "
+                         "observed; propose -1 and say so in proposal_rationale")
+        if obs in ("detected", "logged-only") and not o.get("artifacts"):
+            f.warn(where, "an artifact was observed but no pointer to it is recorded, so a "
+                          "third party cannot re-run this and the proposal rests on the "
+                          "agent's word")
+
+    missing = sorted(set(steps) - set(seen))
+    if missing:
+        f.warn("observations", f"attack steps {missing} have no observation. A partial run "
+                               "is fine, but say why in notes so nobody reads a missing "
+                               "step as an absent artifact")
+
+    # --- language ------------------------------------------------------------
+    blob = yaml.safe_dump(rec, allow_unicode=True)
+    for pattern, why in BANNED:
+        if pattern.search(blob):
+            f.warn("language", why)
+    return f
+
+
+def validate_run_file(path: pathlib.Path, validator,
+                      scenario_steps: dict[str, list[int]]) -> Findings:
+    """A scored run record. Schema and joins only: the consistency between a run and
+    its prediction is score_run.py's job, and the scorecard is computed there."""
+    f = Findings()
+    try:
+        rec = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        f.err("yaml", f"unparseable: {e}")
+        return f
+    if not isinstance(rec, dict):
+        f.err("yaml", "top level is not a mapping")
+        return f
+    for e in sorted(validator.iter_errors(rec), key=lambda e: list(e.path)):
+        f.err("/".join(str(p) for p in e.path) or "(root)", e.message)
+    if f.errors:
+        return f
+    if path.stem != rec["run_id"]:
+        f.err("filename", f"should be {rec['run_id']}.yaml")
+    sid = rec["scenario"]
+    if sid not in scenario_steps:
+        f.err("scenario", f"scenario '{sid}' does not exist in scenarios/")
+        return f
+    bad = sorted({o["step"] for o in rec.get("observations", [])} - set(scenario_steps[sid]))
+    if bad:
+        f.err("observations", f"steps {bad} are not in scenario {sid}'s attack path")
+    return f
+
+
+def record_kind(path: pathlib.Path) -> str:
+    """Which record type a file is, from where it lives and what it is called. One
+    table, so a new record type is one row here and one validate_*_file above."""
+    parent = path.resolve().parent.name
+    if parent == "use-cases":
+        return "use-case"
+    if parent == "runs" and path.name.startswith("DISC-"):
+        return "discovery-run"
+    if parent == "runs" and path.name.startswith("RUN-"):
+        return "run"
+    return "scenario"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -455,15 +621,26 @@ def main() -> int:
     ap.add_argument("--publishable", action="store_true", help="only records with status: published")
     args = ap.parse_args()
 
-    validator = Draft202012Validator(yaml.safe_load(SCHEMA.read_text()))
-    uc_validator = Draft202012Validator(yaml.safe_load(UC_SCHEMA.read_text()))
+    schemas = {"scenario": yaml.safe_load(SCHEMA.read_text()),
+               "use-case": yaml.safe_load(UC_SCHEMA.read_text()),
+               "discovery-run": yaml.safe_load(DISC_SCHEMA.read_text()),
+               "run": yaml.safe_load(RUN_SCHEMA.read_text())}
+    # One layer vocabulary. The discovery schema carries its own copy of aiLayer so it
+    # stands alone as a document, and this is what stops the copy drifting.
+    if schemas["discovery-run"]["$defs"]["aiLayer"]["enum"] != \
+            schemas["scenario"]["$defs"]["aiLayer"]["enum"]:
+        sys.exit("schema/discovery-run.schema.json aiLayer differs from scenario.schema.json. "
+                 "There is one layer vocabulary; fix the copy before validating anything.")
+    validators = {k: Draft202012Validator(v) for k, v in schemas.items()}
     incidents = {p.stem for p in (ROOT / "incidents").glob("*.yaml")}
     scenario_steps = load_scenario_steps()
     uc_covered = load_use_case_covers()
 
     paths = [pathlib.Path(p) for pat in args.paths for p in glob.glob(pat)] or \
             sorted((ROOT / "scenarios").glob("*.yaml")) + \
-            sorted((ROOT / "use-cases").glob("*.yaml"))
+            sorted((ROOT / "use-cases").glob("*.yaml")) + \
+            sorted((ROOT / "runs").glob("RUN-*.yaml")) + \
+            sorted((ROOT / "runs").glob("DISC-*.yaml"))
     paths = [p for p in paths if not p.name.startswith("_")]
 
     if args.publishable:
@@ -476,11 +653,19 @@ def main() -> int:
                 keep.append(p)
         paths = keep
 
-    is_uc = lambda p: p.resolve().parent.name == "use-cases"
     n_err = n_warn = 0
+    counts: collections.Counter = collections.Counter()
     for path in paths:
-        f = (validate_use_case_file(path, uc_validator, scenario_steps) if is_uc(path)
-             else validate_file(path, validator, incidents, uc_covered))
+        kind = record_kind(path)
+        counts[kind] += 1
+        if kind == "use-case":
+            f = validate_use_case_file(path, validators[kind], scenario_steps)
+        elif kind == "discovery-run":
+            f = validate_discovery_run_file(path, validators[kind], scenario_steps)
+        elif kind == "run":
+            f = validate_run_file(path, validators[kind], scenario_steps)
+        else:
+            f = validate_file(path, validators[kind], incidents, uc_covered)
         n_err += len(f.errors)
         n_warn += len(f.warns)
         if f.errors or f.warns:
@@ -491,8 +676,8 @@ def main() -> int:
             for where, msg in f.warns:
                 print(f"  warn   {where}: {msg}")
 
-    n_uc = sum(1 for p in paths if is_uc(p))
-    print(f"\n{len(paths) - n_uc} scenario record(s) · {n_uc} use case record(s) · "
+    print(f"\n{counts['scenario']} scenario record(s) · {counts['use-case']} use case "
+          f"record(s) · {counts['run']} run(s) · {counts['discovery-run']} discovery run(s) · "
           f"{n_err} error(s) · {n_warn} warning(s)")
     if n_err:
         return 1
