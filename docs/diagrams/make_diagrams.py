@@ -81,7 +81,7 @@ DEFS = f'''<defs>
 # ═════════════════════════════════════════════════════════════════════════════
 
 def architecture() -> str:
-    W, H = 1680, 1000
+    W, H = 1680, 1210
     s = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
          f'viewBox="0 0 {W} {H}"><rect width="{W}" height="{H}" fill="{WHITE}"/>',
          DEFS]
@@ -98,7 +98,6 @@ def architecture() -> str:
         (1300, "4", "IT GOES HERE"),
     ]
     for x, n, label in cols:
-        s.append(text(x, 152, n, 13, WHITE, "bold", anchor="middle"))
         s.append(f'<circle cx="{x+10}" cy="147" r="11" fill="{BLUE}"/>')
         s.append(text(x + 10, 152, n, 13, WHITE, "bold", anchor="middle"))
         s.append(text(x + 32, 153, label, 14, BLUE, "bold", spacing=1.6))
@@ -106,16 +105,22 @@ def architecture() -> str:
     # ── column 1: inputs ────────────────────────────────────────────────────
     inputs = [
         (PALEB, BLUE, "An analyst", [
-            "Writes the scenario record:", "the attack path, the signals,",
+            "Writes the scenario record:", "the attack path, the evidence rows,",
             "the framework mapping."]),
         (PALEB, BLUE, "A working group session", [
-            "Adds the coverage scores,", "a named owner for every gap,",
-            "and a ticket number."]),
+            "Adds the coverage scores,", "the exact source in this estate,",
+            "an owner and a ticket per gap."]),
+        (PALEB, BLUE, "A detection engineer", [
+            "Writes the use case: what fires,", "what it pulls in, who receives it,",
+            "how much it may do on its own."]),
         (PALE, GRAY, "Real incidents and research", [
             "One file per incident, cited", "by the scenarios it grounds."]),
         (PALE, GRAY, "Frozen framework files", [
             "MITRE ATT&CK, MITRE ATLAS,", "OWASP, DeTT&CT. Downloaded",
-            "once and checksummed."]),
+            "once, checksummed, indexed."]),
+        (PALEA, AMBER, "The agentic platform", [
+            "An orchestrator dispatches one", "sub agent per scenario. It runs the",
+            "steps, collects traces, and hands", "over one JSON document per run."]),
     ]
     y = 190
     for fill, stroke, title, body in inputs:
@@ -124,70 +129,89 @@ def architecture() -> str:
         s.append(text(78, y + 26, title, 15, INK, "bold"))
         s.append(lines(78, y + 47, body, 13, GRAY, 19))
         s.append(arrow(408, y + h / 2, 462, y + h / 2, GRAY))
-        y += h + 22
+        y += h + 18
 
     # ── column 2: the library ───────────────────────────────────────────────
-    s.append(box(470, 190, 360, 470, WHITE, INK, sw=2.5))
+    store = [
+        ("scenarios/", "One record per scenario: chain, rows, scores."),
+        ("use-cases/", "One record per decision made from the evidence."),
+        ("incidents/", "One file per real incident, cited by scenarios."),
+        ("infrastructure/", "The shapes of estate: layers, seams, what each emits."),
+        ("frameworks/", "The pinned baseline, the vendored files, the id index."),
+        ("coverage/<org>/", "Each organization's own scores. Stays theirs."),
+        ("environments/", "Where a test runs, versioned, cited by every run."),
+        ("specs/", "Generated specs, and predictions sealed before a run."),
+        ("runs/", "What a run observed, scored. Immutable."),
+    ]
+    lib_h = 46 + 12 + len(store) * 62 + 6
+    s.append(box(470, 190, 360, lib_h, WHITE, INK, sw=2.5))
     s.append(f'<rect x="470" y="190" width="360" height="46" rx="6" fill="{INK}"/>')
     s.append(f'<rect x="470" y="222" width="360" height="14" fill="{INK}"/>')
     s.append(text(490, 220, "THE LIBRARY", 15, WHITE, "bold", spacing=1.5))
     s.append(text(690, 220, "one git repository", 12, "#9FB3C0"))
-
-    store = [
-        ("scenarios/", "One YAML file per scenario.", "This is the record. Edit this."),
-        ("incidents/", "One file per real incident,", "cited by the scenarios."),
-        ("coverage/<org>/", "Each organization's own view.", "Optional, and stays theirs."),
-        ("frameworks/", "The frozen framework files", "plus their checksums."),
-    ]
-    y = 256
-    for name, l1, l2 in store:
-        s.append(box(492, y, 316, 74, PALE, RULE, rx=5, sw=1))
-        s.append(text(510, y + 24, name, 14, BLUE, "bold", font=MONO))
-        s.append(lines(510, y + 44, [l1, l2], 12.5, GRAY, 17))
-        y += 84
+    y = 248
+    for name, l1 in store:
+        s.append(box(492, y, 316, 54, PALE, RULE, rx=5, sw=1))
+        s.append(text(510, y + 21, name, 13.5, BLUE, "bold", font=MONO))
+        s.append(text(510, y + 41, l1, 11.5, GRAY))
+        y += 62
+    lib_bottom = 190 + lib_h
 
     # the gate
-    s.append(f'<line x1="650" y1="660" x2="650" y2="686" stroke="{RED}" stroke-width="2"/>')
-    s.append(box(470, 686, 360, 118, PALER, RED, sw=2))
-    s.append(text(492, 716, "THE GATE", 14, RED, "bold", spacing=1.4))
-    s.append(lines(492, 740, [
-        "schema/ says what a record may contain.",
-        "tools/validate.py checks every record against it",
-        "and against the quality bar. Nothing is published",
+    gate_y = lib_bottom + 26
+    s.append(f'<line x1="650" y1="{lib_bottom}" x2="650" y2="{gate_y}" stroke="{RED}" stroke-width="2"/>')
+    s.append(box(470, gate_y, 360, 142, PALER, RED, sw=2))
+    s.append(text(492, gate_y + 30, "THE GATE", 14, RED, "bold", spacing=1.4))
+    s.append(lines(492, gate_y + 54, [
+        "schema/ says what every record may contain.",
+        "tools/validate.py checks every record of every type,",
+        "recomputes every derived value, and verifies every",
+        "framework id against the pins. Nothing publishes",
         "until it passes with zero errors and zero warnings.",
     ], 12.5, INK, 17))
 
     # ── column 3: tools ─────────────────────────────────────────────────────
     tools = [
-        (GREEN, PALEG, "tools/render_slides.py", ["Rebuilds the PowerPoint deck",
-                                                  "from the records, using your",
-                                                  "template for the styling."]),
-        (BLUE, PALEB, "tools/coverage.py", ["Computes coverage, exposure",
-                                            "and maturity. Never guesses:",
-                                            "unscored is absent, not zero."]),
-        (AMBER, PALEA, "tools/publish_library.py", ["Writes one readable page per",
-                                                    "scenario for search and",
-                                                    "wide-audience browsing."]),
+        (GREEN, PALEG, "tools/render_slides.py", ["Rebuilds the deck from the",
+                                                  "records, in your template."]),
+        (BLUE, PALEB, "tools/coverage.py", ["Coverage, exposure, maturity.",
+                                            "One org, one shape, one immutable",
+                                            "snapshot. Unscored is absent."]),
+        (AMBER, PALEA, "tools/emit_testspec.py · score_run.py", [
+            "Generates the spec, seals the",
+            "prediction, scores the run against it,",
+            "proposes rescores. Never writes back."]),
+        (AMBER, PALEA, "tools/import_agent_run.py", ["Turns the platform's JSON into an",
+                                                     "immutable run record. Refuses a",
+                                                     "moved digest. Writes nothing else."]),
+        (BLUE, PALEB, "tools/build_viewer.py", ["The reference page and",
+                                                "liszt-data.json, the read model",
+                                                "any application consumes."]),
+        (AMBER, PALEA, "tools/publish_library.py", ["One readable page per record",
+                                                    "for search and browsing."]),
     ]
     y = 200
+    tool_mid = {}
     for stroke, fill, name, body in tools:
         h = 44 + len(body) * 19
         s.append(arrow(838, y + h / 2, 892, y + h / 2, GRAY))
         s.append(box(900, y, 350, h, fill, stroke))
-        s.append(text(920, y + 27, name, 14, INK, "bold", font=MONO))
+        s.append(text(920, y + 27, name, 13, INK, "bold", font=MONO))
         s.append(lines(920, y + 48, body, 12.5, GRAY, 19))
-        s.append(arrow(1258, y + h / 2, 1294, y + h / 2, GRAY))
-        y += h + 34
+        tool_mid[name] = y + h / 2
+        y += h + 22
+    tools_bottom = y
 
     # ── column 4: destinations ──────────────────────────────────────────────
     dests = [
-        (GREEN, "The deck", ["Working group, leadership,",
-                             "tabletop material."]),
-        (BLUE, "The numbers", ["Risk reporting, the",
-                               "instrumentation backlog,",
-                               "year over year trend."]),
-        (AMBER, "Search pages", ["SharePoint, Copilot, anyone",
-                                 "who asks whether we cover X."]),
+        (GREEN, "The deck", ["Working group, leadership,", "tabletop material."]),
+        (BLUE, "The numbers", ["Risk reporting, the backlog,", "the year over year trend,",
+                               "one snapshot per shape."]),
+        (AMBER, "The calibration", ["Does the library describe the", "estate or its authors' optimism.",
+                                    "The optimism index, per run."]),
+        (BLUE, "The application", ["Reads liszt-data.json.", "Writes through the records,",
+                                   "never around them."]),
+        (AMBER, "Search pages", ["SharePoint, Copilot, anyone", "who asks whether we cover X."]),
     ]
     y = 200
     for color, title, body in dests:
@@ -195,26 +219,44 @@ def architecture() -> str:
         s.append(box(1300, y, 320, h, WHITE, color, sw=2))
         s.append(text(1320, y + 27, title, 15, color, "bold"))
         s.append(lines(1320, y + 48, body, 12.5, GRAY, 19))
-        y += h + 34
+        y += h + 22
+    # tool to destination arrows, matched by order
+    for i, (name, _) in enumerate(zip([t[2] for t in tools], dests)):
+        pass
+    d_y = 200
+    d_mids = []
+    for color, title, body in dests:
+        h = 44 + len(body) * 19
+        d_mids.append(d_y + h / 2)
+        d_y += h + 22
+    pairs = [("tools/render_slides.py", 0), ("tools/coverage.py", 1),
+             ("tools/emit_testspec.py · score_run.py", 2), ("tools/build_viewer.py", 3),
+             ("tools/publish_library.py", 4)]
+    for name, di in pairs:
+        s.append(arrow(1258, tool_mid[name], 1294, d_mids[di], GRAY))
 
     # tickets: the output that actually closes a gap
-    s.append(box(1300, 572, 320, 100, WHITE, RED, sw=2))
-    s.append(text(1320, 601, "Tickets", 15, RED, "bold"))
-    s.append(lines(1320, 623, [
+    t_y = d_y + 60
+    s.append(box(1300, t_y, 320, 100, WHITE, RED, sw=2))
+    s.append(text(1320, t_y + 29, "Tickets", 15, RED, "bold"))
+    s.append(lines(1320, t_y + 51, [
         "Every gap leaves the session", "with an owner and a ticket.",
         "This is the point of the work."], 12.5, GRAY, 19))
-    s.append(arrow(842, 712, 1294, 646, GRAY))
-    s.append(text(866, 748, "owners and ticket numbers are typed", 12, GRAY))
-    s.append(text(866, 766, "straight into the record", 12, GRAY))
+    s.append(arrow(842, gate_y + 122, 1294, t_y + 50, GRAY))
+    s.append(text(866, gate_y + 150, "owners and ticket numbers are typed", 12, GRAY))
+    s.append(text(866, gate_y + 168, "straight into the record", 12, GRAY))
 
     # ── footer band ─────────────────────────────────────────────────────────
-    s.append(box(60, 840, 1560, 108, PALE, RULE, rx=8))
-    s.append(text(84, 872, "THE ONE RULE", 14, INK, "bold", spacing=1.5))
-    s.append(text(84, 902, "The record is the truth. The deck, the numbers and the search pages "
-                           "are printed from it and can be deleted and rebuilt at any time.",
+    f_y = H - 160
+    s.append(box(60, f_y, 1560, 126, PALE, RULE, rx=8))
+    s.append(text(84, f_y + 32, "THE ONE RULE", 14, INK, "bold", spacing=1.5))
+    s.append(text(84, f_y + 62, "The record is the truth. The deck, the numbers, the pages, the viewer and the "
+                                "scorecards are printed from it and can be deleted and rebuilt at any time.",
                   17, INK))
-    s.append(text(84, 928, "Editing a slide does not change anything. The next rebuild "
-                           "overwrites it.", 15, RED))
+    s.append(text(84, f_y + 88, "Editing a slide does not change anything. The next rebuild overwrites it.",
+                  15, RED))
+    s.append(text(84, f_y + 110, "Nothing writes itself back: the scorer, the importer and the agents propose; "
+                                 "a person applies every change to a record, with a reason.", 13.5, GRAY))
 
     s.append("</svg>")
     return "".join(s)
