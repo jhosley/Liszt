@@ -8,6 +8,7 @@ Coverage, exposure and maturity rollup. Implements docs/04-measurement.md.
     python tools/coverage.py --json out/snap.json   # immutable snapshot for trend reporting
     python tools/coverage.py --json out/snap.json --prior out/last.json   # fill the period ledgers
     python tools/coverage.py --gaming               # run the anti-gaming checks only
+    python tools/coverage.py --shape SHAPE-AI       # one infrastructure shape per run (the default)
 
 Three metric families, deliberately kept apart because they answer different
 questions for different audiences:
@@ -58,7 +59,17 @@ ORG_FIELDS = ("dettect", "coverage", "source", "owner", "evidence", "backlog_ref
               "notes", "research_needed", "score_provenance")
 
 
-def load_records(include_drafts: bool) -> list[dict]:
+DEFAULT_SHAPE = "SHAPE-AI"
+
+
+def scenario_shape(rec: dict) -> str:
+    return (rec.get("classification") or {}).get("stack") or DEFAULT_SHAPE
+
+
+def load_records(include_drafts: bool, shape: str = DEFAULT_SHAPE) -> list[dict]:
+    """The reporting population: one infrastructure shape at a time. Coverage is never
+    blended across shapes; a scenario classified against another shape is not in this
+    population at all, the same way an unscored row is not zero."""
     out = []
     for p in sorted((ROOT / "scenarios").glob("*.yaml")):
         if p.name.startswith("_"):
@@ -67,6 +78,8 @@ def load_records(include_drafts: bool) -> list[dict]:
         if rec.get("status") == "retired":
             continue
         if rec.get("status") != "published" and not include_drafts:
+            continue
+        if shape and scenario_shape(rec) != shape:
             continue
         out.append(rec)
     return out
@@ -348,7 +361,8 @@ def period_ledgers(records: list[dict], prior: dict | None) -> dict:
     return {"ids_added_this_period": added, "ids_rescored_this_period": rescored}
 
 
-def snapshot(records, metrics, org, include_drafts, prior=None, supersedes=None) -> dict:
+def snapshot(records, metrics, org, include_drafts, prior=None, supersedes=None,
+             shape=DEFAULT_SHAPE) -> dict:
     baselines = sorted((ROOT / "frameworks").glob("baseline-*.yaml"))
     base = yaml.safe_load(baselines[-1].read_text())
     today = datetime.date.today().isoformat()
@@ -362,10 +376,11 @@ def snapshot(records, metrics, org, include_drafts, prior=None, supersedes=None)
                              for r in rec.get("telemetry", [])
                              if r.get("kind", "attack-step") == "attack-step"]
     snap = {
-        "snapshot_id": f"{today}-{org_id}-{base['baseline']}",
+        "snapshot_id": f"{today}-{org_id}-{shape}-{base['baseline']}",
         "generated": today,
         "generated_by": {"tool": "tools/coverage.py", "repo_commit": commit, "dirty": dirty},
         "org": org_id,
+        "shape": shape,
         "baseline": base["baseline"],
         "frameworks": framework_tuple(base),
         "library": {
@@ -406,6 +421,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--org")
+    ap.add_argument("--shape", default=DEFAULT_SHAPE,
+                    help="the infrastructure shape to report on; one per run, never blended")
     ap.add_argument("--include-drafts", action="store_true")
     ap.add_argument("--json", type=pathlib.Path)
     ap.add_argument("--prior", type=pathlib.Path,
@@ -414,10 +431,10 @@ def main():
     ap.add_argument("--gaming", action="store_true")
     args = ap.parse_args()
 
-    records = load_records(args.include_drafts)
+    records = load_records(args.include_drafts, args.shape)
     if not records:
-        sys.exit("no records. Only 'published' records count by default, "
-                 "pass --include-drafts to see work in progress.")
+        sys.exit(f"no records for shape {args.shape}. Only 'published' records count by "
+                 "default, pass --include-drafts to see work in progress.")
     if args.org:
         records = [apply_overlay(r, args.org) for r in records]
         if not any(r.get("_overlay_present") for r in records):
@@ -431,7 +448,7 @@ def main():
         print("\n".join(f"  {i}" for i in issues) if issues else "  no gaming signals")
         return 0
 
-    print(f"\nSCENARIO LIBRARY · {args.org or 'reference assessment'}"
+    print(f"\nSCENARIO LIBRARY · {args.org or 'reference assessment'} · {args.shape}"
           f" · {len(records)} record(s)\n")
     print(f"{'id':>4}  {'pri':<9} {'cmp':>5} {'prop':>4} {'have':>5} {'coll':>5} {'blind':>5} "
           f"{'qual':>5} {'mat':>5}  coverage")
@@ -489,7 +506,8 @@ def main():
 
     if args.json:
         prior = json.loads(args.prior.read_text()) if args.prior else None
-        snap = snapshot(records, metrics, args.org, args.include_drafts, prior, args.supersedes)
+        snap = snapshot(records, metrics, args.org, args.include_drafts, prior, args.supersedes,
+                        args.shape)
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(snap, indent=2))
         print(f"\nsnapshot {snap['snapshot_id']} written to {args.json}")

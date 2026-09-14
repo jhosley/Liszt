@@ -2,107 +2,472 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.internal/liszt/schema/snapshot.schema.json",
   "title": "Metrics Snapshot",
-  "description": "The immutable record of one metrics run, as specified in docs/04-measurement.md section 5. Every trend line is drawn between snapshots and nowhere else. A snapshot carries the full framework version tuple it was computed against, the library state, the three metric families with their completeness companions, and the anti-drift ledgers. Snapshots are kept forever; a correction is a new snapshot with `supersedes` set. During a baseline migration two are emitted per cycle, one against each pin. Written by tools/coverage.py --json.",
+  "description": "The immutable record of one metrics run, as specified in docs/04-measurement.md section 5. Every trend line is drawn between snapshots and nowhere else. A snapshot is scoped to one organization and one infrastructure shape; no figure is ever blended across shapes. A snapshot carries the full framework version tuple it was computed against, the library state, the three metric families with their completeness companions, and the anti-drift ledgers. Snapshots are kept forever; a correction is a new snapshot with `supersedes` set. During a baseline migration two are emitted per cycle, one against each pin. Written by tools/coverage.py --json.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["snapshot_id", "generated", "generated_by", "org", "baseline", "frameworks", "library", "metrics", "scenarios", "gaming", "non_comparable_with"],
+  "required": [
+    "snapshot_id",
+    "generated",
+    "generated_by",
+    "org",
+    "shape",
+    "baseline",
+    "frameworks",
+    "library",
+    "metrics",
+    "scenarios",
+    "gaming",
+    "non_comparable_with"
+  ],
   "properties": {
     "snapshot_id": {
       "type": "string",
-      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9_-]+-[0-9]{4}\\.[0-9]{2}$",
-      "description": "<date>-<org>-<baseline>. Unique per org per baseline per day; a second run the same day supersedes the first."
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9_-]+-SHAPE-[A-Z0-9-]+-[0-9]{4}\\.[0-9]{2}$",
+      "description": "<date>-<org>-<shape>-<baseline>. Unique per org per shape per baseline per day; a second run the same day supersedes the first."
     },
-    "generated": { "type": "string", "format": "date" },
+    "generated": {
+      "type": "string",
+      "format": "date"
+    },
     "generated_by": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["tool", "repo_commit"],
+      "required": [
+        "tool",
+        "repo_commit"
+      ],
       "properties": {
-        "tool": { "type": "string" },
-        "repo_commit": { "type": ["string", "null"], "description": "The git commit the library was at. The library state is the commit; do not summarize it. Null only when the tool ran outside a git checkout." },
-        "dirty": { "type": "boolean", "description": "True when uncommitted changes were present. A dirty snapshot is not reproducible from its commit." }
+        "tool": {
+          "type": "string"
+        },
+        "repo_commit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The git commit the library was at. The library state is the commit; do not summarize it. Null only when the tool ran outside a git checkout."
+        },
+        "dirty": {
+          "type": "boolean",
+          "description": "True when uncommitted changes were present. A dirty snapshot is not reproducible from its commit."
+        }
       }
     },
-    "supersedes": { "type": "string", "description": "The snapshot_id this one corrects. Editing a snapshot destroys the only evidence of what a past claim was based on, so corrections are new snapshots." },
-    "org": { "type": "string", "description": "Exactly one org per snapshot. 'reference' means the scenario records' own assessment." },
-    "baseline": { "type": "string", "pattern": "^[0-9]{4}\\.[0-9]{2}$" },
+    "supersedes": {
+      "type": "string",
+      "description": "The snapshot_id this one corrects. Editing a snapshot destroys the only evidence of what a past claim was based on, so corrections are new snapshots."
+    },
+    "org": {
+      "type": "string",
+      "description": "Exactly one org per snapshot. 'reference' means the scenario records' own assessment."
+    },
+    "shape": {
+      "type": "string",
+      "pattern": "^SHAPE-[A-Z0-9]+(-[A-Z0-9]+)*$",
+      "description": "Exactly one infrastructure shape per snapshot. Coverage, exposure and maturity are computed over the scenarios classified against this shape and never blended across shapes. There is no cross shape figure; comparison across shapes is a table of per shape snapshots side by side."
+    },
+    "baseline": {
+      "type": "string",
+      "pattern": "^[0-9]{4}\\.[0-9]{2}$"
+    },
     "frameworks": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["attack", "atlas", "owasp_llm", "owasp_agentic", "dettect"],
+      "required": [
+        "attack",
+        "atlas",
+        "owasp_llm",
+        "owasp_agentic",
+        "dettect"
+      ],
       "description": "The full version tuple. Where the pinned artifact has been vendored, its sha256 is read from frameworks/pinned/<baseline>/CHECKSUMS.json; until then it is null and the version comes from the baseline file, which is recorded in `tuple_source`.",
       "properties": {
-        "tuple_source": { "enum": ["pinned-artifacts", "baseline-file"], "description": "Where the versions below were read from. The pinned artifacts are the authority; the baseline file is the fallback." },
-        "attack": { "type": "object", "required": ["version", "spec_version", "pinned_artifact", "sha256"], "properties": { "version": { "type": "string" }, "spec_version": { "type": "string" }, "pinned_artifact": { "type": "string" }, "sha256": { "type": ["string", "null"] } } },
-        "atlas": { "type": "object", "required": ["content_version", "format_version", "pinned_artifact", "sha256"], "properties": { "content_version": { "type": "string" }, "format_version": { "type": "string" }, "pinned_artifact": { "type": "string" }, "sha256": { "type": ["string", "null"] } } },
-        "owasp_llm": { "type": "object", "required": ["edition"], "properties": { "edition": { "type": "string" }, "sha256": { "type": ["string", "null"] } } },
-        "owasp_agentic": { "type": "object", "required": ["edition"], "properties": { "edition": { "type": "string" }, "sha256": { "type": ["string", "null"] } } },
-        "dettect": { "type": "object", "required": ["version", "targets_attack"], "properties": { "version": { "type": "string" }, "targets_attack": { "type": "string" } } }
+        "tuple_source": {
+          "enum": [
+            "pinned-artifacts",
+            "baseline-file"
+          ],
+          "description": "Where the versions below were read from. The pinned artifacts are the authority; the baseline file is the fallback."
+        },
+        "attack": {
+          "type": "object",
+          "required": [
+            "version",
+            "spec_version",
+            "pinned_artifact",
+            "sha256"
+          ],
+          "properties": {
+            "version": {
+              "type": "string"
+            },
+            "spec_version": {
+              "type": "string"
+            },
+            "pinned_artifact": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "atlas": {
+          "type": "object",
+          "required": [
+            "content_version",
+            "format_version",
+            "pinned_artifact",
+            "sha256"
+          ],
+          "properties": {
+            "content_version": {
+              "type": "string"
+            },
+            "format_version": {
+              "type": "string"
+            },
+            "pinned_artifact": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "owasp_llm": {
+          "type": "object",
+          "required": [
+            "edition"
+          ],
+          "properties": {
+            "edition": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "owasp_agentic": {
+          "type": "object",
+          "required": [
+            "edition"
+          ],
+          "properties": {
+            "edition": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "dettect": {
+          "type": "object",
+          "required": [
+            "version",
+            "targets_attack"
+          ],
+          "properties": {
+            "version": {
+              "type": "string"
+            },
+            "targets_attack": {
+              "type": "string"
+            }
+          }
+        }
       }
     },
     "library": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["scenarios_total", "by_status", "published_ids", "includes_drafts", "retired_this_period", "ids_added_this_period", "ids_rescored_this_period"],
+      "required": [
+        "scenarios_total",
+        "by_status",
+        "published_ids",
+        "includes_drafts",
+        "retired_this_period",
+        "ids_added_this_period",
+        "ids_rescored_this_period"
+      ],
       "properties": {
-        "scenarios_total": { "type": "integer", "description": "Records in the reporting population of this snapshot." },
-        "by_status": { "type": "object", "additionalProperties": { "type": "integer" } },
-        "published_ids": { "type": "array", "items": { "type": "string" } },
-        "includes_drafts": { "type": "boolean", "description": "True when the run included unpublished records. A figure that silently includes drafts is a number people will act on incorrectly." },
+        "scenarios_total": {
+          "type": "integer",
+          "description": "Records in the reporting population of this snapshot."
+        },
+        "by_status": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "published_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "includes_drafts": {
+          "type": "boolean",
+          "description": "True when the run included unpublished records. A figure that silently includes drafts is a number people will act on incorrectly."
+        },
         "retired_this_period": {
           "type": "array",
           "description": "Never silently absent. Retiring a NOW scenario with Blind steps is its own reportable line, not a quiet denominator change.",
-          "items": { "type": "object", "required": ["id", "reason"], "properties": { "id": { "type": "string" }, "reason": { "type": "string" }, "superseded_by": { "type": "string" } } }
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "reason"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "superseded_by": {
+                "type": "string"
+              }
+            }
+          }
         },
-        "ids_added_this_period": { "type": "array", "items": { "type": "string" }, "description": "Scenario ids present now and absent from the prior snapshot." },
+        "ids_added_this_period": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Scenario ids present now and absent from the prior snapshot."
+        },
         "ids_rescored_this_period": {
           "type": "array",
           "description": "The anti-drift ledger. A row whose coverage changed since the prior snapshot with no backlog_ref behind it is a rescore, not an improvement, and it is listed here.",
-          "items": { "type": "object", "required": ["id", "step", "from", "to"], "properties": { "id": { "type": "string" }, "step": { "type": "integer" }, "from": { "type": ["string", "null"] }, "to": { "type": ["string", "null"] }, "backlog_ref": { "type": ["string", "null"] } } }
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "step",
+              "from",
+              "to"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "step": {
+                "type": "integer"
+              },
+              "from": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "to": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "backlog_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
         }
       }
     },
     "metrics": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["coverage", "exposure", "maturity"],
+      "required": [
+        "coverage",
+        "exposure",
+        "maturity"
+      ],
       "description": "The three families, side by side, never combined. Every proportion travels with its completeness companion.",
       "properties": {
         "coverage": {
-          "type": "object", "additionalProperties": false,
-          "required": ["have", "collectable", "blind", "completeness", "rows_scored", "rows_total"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "have",
+            "collectable",
+            "blind",
+            "completeness",
+            "rows_scored",
+            "rows_total"
+          ],
           "properties": {
-            "have": { "type": ["number", "null"], "description": "Step weighted over the scored rows of the library. Null when nothing is scored; never zero." },
-            "collectable": { "type": ["number", "null"] },
-            "blind": { "type": ["number", "null"] },
-            "completeness": { "type": ["number", "null"], "description": "rows_scored / rows_total. Mandatory companion to every coverage figure." },
-            "rows_scored": { "type": "integer" },
-            "rows_total": { "type": "integer" }
+            "have": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Step weighted over the scored rows of the library. Null when nothing is scored; never zero."
+            },
+            "collectable": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "blind": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "completeness": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "rows_scored / rows_total. Mandatory companion to every coverage figure."
+            },
+            "rows_scored": {
+              "type": "integer"
+            },
+            "rows_total": {
+              "type": "integer"
+            }
           }
         },
         "exposure": {
-          "type": "object", "additionalProperties": false,
-          "required": ["now_total", "now_exposed", "exposure_rate", "orphaned_steps", "unfunded_steps"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "now_total",
+            "now_exposed",
+            "exposure_rate",
+            "orphaned_steps",
+            "unfunded_steps"
+          ],
           "properties": {
-            "now_total": { "type": "integer" },
-            "now_exposed": { "type": "integer" },
-            "exposure_rate": { "type": ["number", "null"] },
-            "orphaned_steps": { "type": "integer", "description": "Blind steps with no owner across the library. The escalation list." },
-            "unfunded_steps": { "type": "integer" }
+            "now_total": {
+              "type": "integer"
+            },
+            "now_exposed": {
+              "type": "integer"
+            },
+            "exposure_rate": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "orphaned_steps": {
+              "type": "integer",
+              "description": "Blind steps with no owner across the library. The escalation list."
+            },
+            "unfunded_steps": {
+              "type": "integer"
+            }
           }
         },
         "maturity": {
-          "type": "object", "additionalProperties": false,
-          "required": ["mean", "eligible", "assessed", "gates"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mean",
+            "eligible",
+            "assessed",
+            "gates"
+          ],
           "properties": {
-            "mean": { "type": ["number", "null"], "description": "Mean gates passed over the eligible population. Null when nothing is eligible." },
-            "eligible": { "type": "integer", "description": "Scenarios with every attack step row scored. Only these enter maturity." },
-            "assessed": { "type": ["number", "null"], "description": "eligible / scenarios_total. Always reported alongside mean." },
+            "mean": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Mean gates passed over the eligible population. Null when nothing is eligible."
+            },
+            "eligible": {
+              "type": "integer",
+              "description": "Scenarios with every attack step row scored. Only these enter maturity."
+            },
+            "assessed": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "eligible / scenarios_total. Always reported alongside mean."
+            },
             "gates": {
-              "type": "object", "additionalProperties": false,
-              "required": ["M1", "M2", "M3", "M4", "M5", "M6", "M7"],
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "M1",
+                "M2",
+                "M3",
+                "M4",
+                "M5",
+                "M6",
+                "M7"
+              ],
               "description": "Per gate pass rate across the eligible population. M1 reviewed, M2 scored in depth, M3 evidenced, M4 owned, M5 closed loop, M6 remediable, M7 sourced.",
-              "properties": { "M1": { "type": ["number", "null"] }, "M2": { "type": ["number", "null"] }, "M3": { "type": ["number", "null"] }, "M4": { "type": ["number", "null"] }, "M5": { "type": ["number", "null"] }, "M6": { "type": ["number", "null"] }, "M7": { "type": ["number", "null"] } }
+              "properties": {
+                "M1": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "M2": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "M3": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "M4": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "M5": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "M6": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "M7": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
             }
           }
         }
@@ -111,13 +476,40 @@
     "scenarios": {
       "type": "array",
       "description": "Per scenario metrics, the same objects the viewer carries. Kept in the snapshot so a library level number can always be decomposed.",
-      "items": { "type": "object", "required": ["id", "completeness", "maturity"] }
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "completeness",
+          "maturity"
+        ]
+      }
     },
-    "gaming": { "type": "array", "items": { "type": "string" }, "description": "Output of the anti-gaming checks at the time of the run. Empty is the goal; absent is not allowed." },
+    "gaming": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Output of the anti-gaming checks at the time of the run. Empty is the goal; absent is not allowed."
+    },
     "non_comparable_with": {
       "type": "array",
       "description": "Populated at every migration from the new baseline's breaking_changes_since_prior_baseline, and by hand when a comparison is known to be invalid.",
-      "items": { "type": "object", "required": ["snapshot_id", "reason"], "properties": { "snapshot_id": { "type": "string" }, "reason": { "type": "string" } } }
+      "items": {
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "reason"
+        ],
+        "properties": {
+          "snapshot_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
     }
   }
 }

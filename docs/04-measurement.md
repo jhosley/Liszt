@@ -224,12 +224,13 @@ Every metric run emits an immutable snapshot. Without it, a year-over-year delta
 The baseline's migration rules already require this: *"Record the FULL version tuple with every metric snapshot."* This is that tuple, plus the library state needed to make the delta attributable.
 
 ```yaml
-snapshot_id: 2026-08-01-acme-2026.07
+snapshot_id: 2026-08-01-acme-SHAPE-AI-2026.07
 generated: 2026-08-01
 generated_by:
   tool: tools/coverage.py           # the rollup tool; `--json` emits this snapshot
   repo_commit: <git sha>            # the library state is the commit; do not summarize it
 org: acme                           # exactly one org per snapshot (section 6)
+shape: SHAPE-AI                     # exactly one infrastructure shape per snapshot (section 6)
 baseline: '2026.07'                 # frameworks/baseline-2026.07.yaml
 
 frameworks:                         # the full version tuple. tools/coverage.py reads the sha256
@@ -332,6 +333,7 @@ telemetry:
 4. **The same derivation rule applies to overlays.** `derive_coverage()` is not org-configurable. This is the one thing that must not be negotiable, because it is what makes two orgs' numbers mean the same thing.
 5. **The overlay may not change anything outside the org-scoped fields.** An overlay that redefines `attack_path` is a fork, not an overlay, split the scenario in the library instead.
 6. **One snapshot per org.** There is no cross-org aggregate coverage number, because there is no such estate. Cross-org comparison is a table of per-org figures with their completeness values, side by side.
+7. **One snapshot per infrastructure shape.** Every scenario is classified against a shape (`classification.stack`, the AI stack by default), and a snapshot reports one shape. There is no cross-shape figure, decided 2026-09-14: blending an AI population with, say, an endpoint population makes the AI picture look better than it is. Comparison across shapes is a table of per-shape snapshots side by side.
 
 ### Why this matters politically
 
