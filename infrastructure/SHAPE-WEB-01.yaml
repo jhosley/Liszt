@@ -1,0 +1,53 @@
+# Infrastructure shape. Reference data: the layers, seams and emitted categories of one kind
+# of estate. schema/infrastructure-shape.schema.json defines it. The viewer's environment
+# pages read this file; edit it here, never on the page.
+
+shape_version: 1
+id: SHAPE-WEB-01
+family: web-application
+name: Public web app behind an API gateway
+status: proposed
+lede: A web application estate shape from the parked beyond-AI proposal.
+where: Public cloud
+owners:
+- Platform engineering
+- Application team
+- Cloud team
+layers:
+- code: W0
+  name: Edge
+- code: W1
+  name: Gateway
+- code: W2
+  name: Application
+- code: W3
+  name: Data
+- code: W4
+  name: Control plane
+seams:
+- tag: Edge / net
+  layer: W0
+- tag: Gateway / auth
+  layer: W1
+- tag: Gateway -> App
+  layer: W1
+- tag: App / session
+  layer: W2
+- tag: App -> Data
+  layer: W2
+- tag: Data / store
+  layer: W3
+- tag: Control plane
+  layer: W4
+emits:
+- category: API gateway access and authorizer logs
+- category: Application logs
+- category: Managed database audit log
+- category: Cloud control plane audit trail
+gap: No edge inspection in front of the gateway.
+note: Proposed, not in the catalog. No scenario is classified against it. Carrying it as a record means
+  the model already holds the answer to whether coverage is one number or one per stack.
+provenance:
+  authored_by: Program lead
+  created: '2026-09-14'
+  last_updated: '2026-09-14'

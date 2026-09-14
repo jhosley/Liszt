@@ -45,8 +45,10 @@ INC_SCHEMA = ROOT / "schema" / "incident.schema.json"
 BASE_SCHEMA = ROOT / "schema" / "framework-baseline.schema.json"
 OV_SCHEMA = ROOT / "schema" / "coverage-overlay.schema.json"
 ENV_SCHEMA = ROOT / "schema" / "environment.schema.json"
+SHAPE_SCHEMA = ROOT / "schema" / "infrastructure-shape.schema.json"
 FRAMEWORK_INDEXES: dict[str, dict | None] = {}   # baseline -> index, loaded once per run
 ENVIRONMENTS: dict[tuple[str, int], dict] = {}   # (id, version) -> record, loaded once per run
+SHAPES: dict[str, dict] = {}                     # shape id -> record, loaded once per run
 
 # Slide geometry limits, measured against the rendered template. Exceeding these
 # does not corrupt the deck -- it produces text that overflows its shape, which is
@@ -489,7 +491,33 @@ def validate_file(path: pathlib.Path, validator, incidents: set[str],
     check_lengths(rec, f)
     check_quality_bar(rec, f, incidents, uc_covered)
     check_framework_ids(rec, f, FRAMEWORK_INDEXES)
+    check_stack(rec, f)
     return f
+
+
+def check_stack(rec: dict, f: Findings) -> None:
+    """The scenario's shape must exist, and on a published record every step's seam tag
+    should be one the shape knows, so the tag to layer consistency check has something
+    to read. Drafts carry free text freely; that is what draft means."""
+    if not SHAPES:
+        SHAPES.update(load_shapes())
+    sid = (rec.get("classification") or {}).get("stack") or "SHAPE-AI"
+    shape = SHAPES.get(sid)
+    if shape is None:
+        f.err("classification.stack", f"{sid} has no record in infrastructure/")
+        return
+    if shape.get("status") != "catalog":
+        f.err("classification.stack", f"{sid} is {shape.get('status')}, not a catalog shape; "
+                                      "nothing may be classified against it yet")
+    if rec.get("status") != "published":
+        return
+    norm = lambda t: str(t or "").strip().replace("\u2192", "->").lower()
+    known = {norm(sm["tag"]) for sm in shape.get("seams", [])}
+    for step in rec.get("attack_path", []) or []:
+        if norm(step.get("layer")) not in known:
+            f.warn(f"attack_path[{step.get('step')}].layer",
+                   f"seam tag {step.get('layer')!r} is not in {sid}'s seam vocabulary; add it "
+                   "to the shape or rewrite the tag")
 
 
 def validate_use_case_file(path: pathlib.Path, validator,
@@ -773,6 +801,11 @@ def validate_environment_file(path: pathlib.Path, validator) -> Findings:
         if c.get("fidelity") == "exact" and not c.get("product_version"):
             f.warn(f"components[{i}]", "fidelity exact with no product_version recorded; exact "
                                        "is a claim about a specific product and version")
+    if rec.get("shape"):
+        if not SHAPES:
+            SHAPES.update(load_shapes())
+        if rec["shape"] not in SHAPES:
+            f.err("shape", f"{rec['shape']} has no record in infrastructure/")
     if rec.get("status") == "current" and not rec.get("review_due"):
         f.warn("review_due", "current environment with no review date")
     if rec.get("status") == "superseded" and not rec.get("supersedes") and rec["version"] > 1:
@@ -780,6 +813,59 @@ def validate_environment_file(path: pathlib.Path, validator) -> Findings:
     if not (rec.get("provenance") or {}).get("illustrative") and \
             "worked example" in path.read_text(encoding="utf-8")[:600].lower():
         f.warn("provenance", "the header says worked example but illustrative is not set")
+    return f
+
+
+def load_shapes() -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for p in sorted((ROOT / "infrastructure").glob("*.yaml")):
+        if p.name.startswith("_"):
+            continue
+        try:
+            rec = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            continue
+        if rec.get("id"):
+            out[rec["id"]] = rec
+    return out
+
+
+def validate_shape_file(path: pathlib.Path, validator, ai_layer_enum: list[str]) -> Findings:
+    """An infrastructure shape: the layers, seams and emitted categories of one kind of
+    estate. The AI stack's canonical layer strings must equal the scenario schema's enum,
+    because there is one layer vocabulary and this is where its prose lives."""
+    f = Findings()
+    rec = _load(path, f)
+    if rec is None:
+        return f
+    for e in sorted(validator.iter_errors(rec), key=lambda e: list(e.path)):
+        f.err("/".join(str(p) for p in e.path) or "(root)", e.message)
+    if f.errors:
+        return f
+    if path.stem != rec["id"]:
+        f.err("filename", f"should be {rec['id']}.yaml")
+    codes = [l["code"] for l in rec["layers"]]
+    if len(codes) != len(set(codes)):
+        f.err("layers", "duplicate layer codes")
+    for i, seam in enumerate(rec.get("seams", [])):
+        if seam.get("layer") and seam["layer"] not in codes:
+            f.err(f"seams[{i}]", f"layer {seam['layer']} is not a layer of this shape")
+    for i, e in enumerate(rec.get("emits", [])):
+        if e.get("layer") and e["layer"] not in codes:
+            f.err(f"emits[{i}]", f"layer {e['layer']} is not a layer of this shape")
+    if rec["family"] == "ai-stack":
+        canon = [l.get("canonical") for l in rec["layers"]]
+        if sorted(c for c in canon if c) != sorted(ai_layer_enum):
+            f.err("layers", "the AI stack's canonical layer strings differ from the scenario "
+                            "schema's aiLayer enum; there is one layer vocabulary, fix the copy")
+        if rec["status"] != "catalog":
+            f.err("status", "the AI stack is the catalog's shape and must be status catalog")
+    if rec["status"] == "catalog":
+        for i, l in enumerate(rec["layers"]):
+            for k in ("covers", "components", "matters"):
+                if not l.get(k):
+                    f.warn(f"layers[{i}]", f"catalog shape layer {l['code']} has no {k}; the "
+                                           "viewer's layer page will be thin")
     return f
 
 
@@ -955,6 +1041,8 @@ def record_kind(path: pathlib.Path) -> str:
         return "incident"
     if parent == "environments":
         return "environment"
+    if parent == "infrastructure":
+        return "shape"
     if parent == "frameworks":
         return "baseline"
     if resolved.parent.parent.name == "coverage":
@@ -977,7 +1065,8 @@ def main() -> int:
                "incident": yaml.safe_load(INC_SCHEMA.read_text()),
                "baseline": yaml.safe_load(BASE_SCHEMA.read_text()),
                "overlay": yaml.safe_load(OV_SCHEMA.read_text()),
-               "environment": yaml.safe_load(ENV_SCHEMA.read_text())}
+               "environment": yaml.safe_load(ENV_SCHEMA.read_text()),
+               "shape": yaml.safe_load(SHAPE_SCHEMA.read_text())}
     # One layer vocabulary. The discovery schema carries its own copy of aiLayer so it
     # stands alone as a document, and this is what stops the copy drifting.
     if schemas["discovery-run"]["$defs"]["aiLayer"]["enum"] != \
@@ -998,6 +1087,7 @@ def main() -> int:
             sorted((ROOT / "frameworks").glob("baseline-*.yaml")) + \
             sorted((ROOT / "coverage").glob("*/*.yaml")) + \
             sorted((ROOT / "environments").glob("*.yaml")) + \
+            sorted((ROOT / "infrastructure").glob("*.yaml")) + \
             sorted((ROOT / "runs").glob("RUN-*.yaml")) + \
             sorted((ROOT / "runs").glob("DISC-*.yaml"))
     paths = [p for p in paths if not p.name.startswith("_")]
@@ -1031,6 +1121,9 @@ def main() -> int:
             f = validate_overlay_file(path, validators[kind], scenario_rows)
         elif kind == "environment":
             f = validate_environment_file(path, validators[kind])
+        elif kind == "shape":
+            f = validate_shape_file(path, validators[kind],
+                                    schemas["scenario"]["$defs"]["aiLayer"]["enum"])
         else:
             f = validate_file(path, validators[kind], incidents, uc_covered)
         n_err += len(f.errors)

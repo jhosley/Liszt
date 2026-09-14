@@ -114,6 +114,12 @@ def build_data(include_drafts: bool, org: str | None) -> dict:
     baseline = yaml.safe_load(baselines[-1].read_text(encoding="utf-8")) if baselines else {}
     fw = baseline.get("frameworks", {})
 
+    # Infrastructure shapes: the layer cards, seam vocabulary and emitted categories of each
+    # kind of estate, read from records so the page cannot drift from the library.
+    shapes = [sh for p in sorted((ROOT / "infrastructure").glob("*.yaml"))
+              if not p.name.startswith("_")
+              and (sh := yaml.safe_load(p.read_text(encoding="utf-8")))]
+
     scenarios, framework_index = [], collections.defaultdict(lambda: collections.defaultdict(list))
     for rec in records:
         m = scenario_metrics(rec)
@@ -186,6 +192,7 @@ def build_data(include_drafts: bool, org: str | None) -> dict:
         # from this rather than restating it, so the page cannot claim a pin the repository
         # does not hold, and cutting a new baseline updates the docs with it.
         "frameworks_detail": fw,
+        "infrastructure": shapes,
         "baseline_meta": {k: baseline.get(k) for k in
                           ("baseline", "status", "declared", "owner", "review_due")},
         "scenarios": scenarios,
@@ -2655,20 +2662,10 @@ const STEP_LAYER_CAP = 18;
    so anything outside this list is kept but flagged: the reviewer decides whether it is a
    real seam we should add or a slip we should correct. The component prefix is what the
    layer cross-check below reads, which is why the vocabulary is closed rather than free. */
-const SEAM_TAGS = ["Data / inbound", "Data -> Host", "Data / store", "Host / net",
-                   "Host / Cloud", "Cluster / net", "Model / infer", "Model / Agent",
-                   "Model / store", "Agent / tools", "Agent / memory", "Agent / eval",
-                   "App / net", "App / session", "Identity", "Supply chain", "External"];
-/* Which of the five layers each seam tag belongs to, for the consistency check.
-   Model / store is the model artifact at rest, weights on disk or in a bucket, as opposed
-   to Model / infer, the live call. Without it, model-weight theft, an L2 objective by
-   asset ownership, had no step tag that landed on L2 and always tripped the cross-check. */
-const SEAM_LAYER = { "Data / inbound":"L1", "Data -> Host":"L1", "Data / store":"L1",
-                     "Host / net":"L0", "Host / Cloud":"L0", "Cluster / net":"L0",
-                     "Model / infer":"L2", "Model / Agent":"L2", "Model / store":"L2",
-                     "Agent / tools":"L3", "Agent / memory":"L3", "Agent / eval":"L3",
-                     "App / net":"L4", "App / session":"L4",
-                     "Identity":"L0", "Supply chain":"L0", "External":"" };
+const SEAM_TAGS = SHAPE_AI.seams.map(sm => sm.tag.replace(/\u2192/g, "->"));
+/* Which of the five layers each seam tag belongs to, for the consistency check. Read from
+   the shape record; a seam with no layer (External) maps to the empty string. */
+const SEAM_LAYER = Object.fromEntries(SHAPE_AI.seams.map(sm => [sm.tag.replace(/\u2192/g, "->"), sm.layer || ""]));
 
 function canonSeam(raw) {
   const k = String(raw || "").trim().replace(/→/g, "->").replace(/\s+/g, " ");
@@ -3882,78 +3879,26 @@ let docStep = "overview";
 let docSel = null;
 const openProc = {};
 
-const AI_LAYERS_DOC = [
-  { id: "L0", name: "Infrastructure",
-    lede: "The machinery AI runs on, not the AI itself.",
-    covers: "Compute, nodes, containers, the network, storage, the cloud control plane, CI and build systems. Two things sit here that people routinely misfile: identity, but only the control plane IAM of the infrastructure itself rather than product accounts, and the supply chain.",
-    components: "GPU and CPU nodes, Kubernetes clusters and node pools, container runtimes and agent sandboxes, east west network, object storage and buckets, the cloud control plane and its IAM, CI and build systems, package registries and artifact repositories.",
-    seams: ["Host / net", "Host / Cloud", "Cluster / net", "Identity", "Supply chain"],
-    matters: "This is the only layer where classic ATT&CK Enterprise answers the question, so your existing detection engineering transfers unchanged. Two warnings. An unexplained L0 is the most common defect in this field, because it is where people put a scenario they have not thought hard about. And the actor is not the layer: an agent escalating privilege on a node is an L0 move, because the node is what the attacker reached." },
-  { id: "L1", name: "Data",
-    lede: "The corpus and everything that feeds it.",
-    covers: "Training sets, fine tuning data, retrieval corpora, vector stores, and the documents or content the system ingests. The question is whether the asset corrupted or carried away is data the system will later consume.",
-    components: "Document inboxes and ingestion pipelines, chunking and embedding jobs, the vector database, retrieval knowledge bases, labeled training sets, fine tune datasets, and the untrusted third party content that lands in any of them.",
-    seams: ["Data / inbound", "Data -> Host", "Data / store"],
-    matters: "L1 teaches the whole classification discipline. A poisoned document reaches the model, the model follows it, and the layer is still L1, because the corpus is the asset that was corrupted and the model behaved as designed on poisoned retrieval. For an engineer that is an ownership fact: an L1 finding is a data pipeline and corpus hygiene problem, provenance on ingest and write controls on the store, not something the model team fixes by tuning a guardrail." },
-  { id: "L2", name: "Model",
-    lede: "The artifact, the call, and the decision.",
-    covers: "The model artifact and its weights, the inference call, the system prompt, the guardrails, and the decision the model makes. The schema splits the artifact at rest from the live call deliberately, because they are different assets with different owners.",
-    components: "Weights files and checkpoints, model hub and registry artifacts, the serving endpoint, the system prompt and its configuration, guardrails, safety classifiers and output filters.",
-    seams: ["Model / infer", "Model / Agent", "Model / store"],
-    matters: "The trap here is tagging L2 because a model appears in the chain, and nearly every scenario has one. L2 is where the model is the asset corrupted or stolen, or where the model's decision is the damage. ATT&CK is close to silent at this layer, so these records are carried by ATLAS and the OWASP LLM list instead, and the mapping is editorial more often than it is authoritative." },
-  { id: "L3", name: "Orchestration and Agent",
-    lede: "The loop, the tools, and the handoffs.",
-    covers: "Agent loops, tool and function calling, planning, memory, handoffs between agents, and connector and MCP plumbing.",
-    components: "Agent runtimes and orchestrators, tool and function gateways, MCP servers and connectors, planner and reasoning traces, agent memory stores, evaluation harnesses, and the workload identities agents act under.",
-    seams: ["Agent / tools", "Agent / memory", "Agent / eval"],
-    matters: "This is where the least instrumentation exists today and where the most is being built. The characteristic gap is the handoff: an agent passing work to a sub agent or an external tool often crosses a seam that emits nothing at all, so the chain goes dark in the middle. The characteristic mistake is the mirror of the L2 one, tagging L3 because an agent is the actor when the damage lands somewhere else." },
-  { id: "L4", name: "Application",
-    lede: "The product surface a customer touches.",
-    covers: "The user interface, the API the business exposes, session and account handling, and output rendering.",
-    components: "Web and mobile front ends, the public API, session and token handling, account management, the rendering path that turns model output into something a browser or a downstream system executes.",
-    seams: ["App / net", "App / session"],
-    matters: "L4 is where AI risk turns back into ordinary application security, which is good news: the controls and the people already exist. The distinction worth holding is the identity one. Credential abuse whose damage is takeover of the product account is L4, and identity at L0 is for the control plane of the infrastructure itself." },
-];
+/* The layer cards are read from the AI stack's infrastructure record (infrastructure/
+   SHAPE-AI.yaml), not written here. The seam list per layer is derived from the shape's
+   seam vocabulary. Edit the record; this page follows. */
+const SHAPE_AI = (DATA.infrastructure || []).find(sh => sh.family === "ai-stack") || { layers: [], seams: [] };
+const AI_LAYERS_DOC = SHAPE_AI.layers.map(L => ({
+  id: L.code, name: L.name, lede: L.lede || "", covers: L.covers || "",
+  components: L.components || "", matters: L.matters || "",
+  seams: SHAPE_AI.seams.filter(sm => sm.layer === L.code).map(sm => sm.tag) }));
 
-const BEYOND_ENVS = [
-  { id: "ENV-WEB-01", fam: "Web application", name: "Public web app behind an API gateway",
-    where: "Public cloud", owners: "Platform engineering, application team, cloud team",
-    layers: ["W0 Edge", "W1 Gateway", "W2 Application", "W3 Data", "W4 Control plane"],
-    seams: ["Edge / net", "Gateway / auth", "Gateway -> App", "App / session", "App -> Data", "Data / store", "Control plane"],
-    emits: ["API gateway access and authorizer logs", "Application logs", "Managed database audit log", "Cloud control plane audit trail"],
-    gap: "No edge inspection in front of the gateway." },
-  { id: "ENV-WEB-02", fam: "Web application", name: "Internally hosted web app behind a WAF",
-    where: "Corporate data center", owners: "Network security, platform engineering, application team",
-    layers: ["W0 Edge", "W1 Proxy", "W2 Application", "W3 Data", "W4 Directory"],
-    seams: ["Edge / net", "WAF / rule", "Proxy -> App", "App / session", "App -> Data", "Data / store", "Identity"],
-    emits: ["WAF rule hits and blocks", "Reverse proxy access logs", "Web server and application logs", "Database audit log"],
-    gap: "The WAF sees HTTP only. Anything the app does after the request is invisible to it." },
-  { id: "ENV-WEB-03", fam: "Web application", name: "Web app published through a CDN",
-    where: "Public cloud origin, third party edge", owners: "CDN owner, platform engineering, application team",
-    layers: ["W0 CDN edge", "W1 Origin shield", "W2 Application", "W3 Data", "W4 CDN config"],
-    seams: ["Edge / net", "Edge / cache", "Origin / net", "App / session", "App -> Data", "Data / store", "Control plane"],
-    emits: ["CDN access logs and edge rule hits", "Origin access logs", "Application logs", "CDN configuration change log"],
-    gap: "If the origin is reachable directly, the entire edge is optional for an attacker." },
-  { id: "ENV-WEB-04", fam: "Web application", name: "Public cloud web app behind a web application firewall",
-    where: "Public cloud", owners: "Network security, platform engineering, cloud team",
-    layers: ["W0 Edge", "W1 Filtering tier", "W2 Application", "W3 Data", "W4 Control plane"],
-    seams: ["Edge / net", "WAF / rule", "Host / Cloud", "App / session", "App -> Data", "Data / store", "Control plane"],
-    emits: ["Web application firewall rule hits", "Filtering tier host and access logs", "Application logs", "Cloud control plane audit trail", "Storage access logs, if enabled"],
-    gap: "The filtering tier is a request relaying device by design, and anything it is trusted to reach it can be made to reach on somebody else's behalf.",
-    note: "Added because a real incident arrived that did not fit any of the other shapes." },
-  { id: "ENV-EP-01", fam: "Endpoint population", name: "Managed hosts missing EDR and configuration management",
-    where: "Corporate estate", owners: "Endpoint engineering, IT operations",
-    layers: ["E0 Firmware", "E1 Operating system", "E2 Security agents", "E3 Applications", "E4 Identity"],
-    seams: ["Host / boot", "Host / OS", "Host / process", "Host / app", "Host / net", "Identity"],
-    emits: ["Network telemetry only", "Identity sign in events", "Nothing from the host itself"],
-    gap: "The defining property is an absence. There is no agent to ask, so almost every step of any chain scores Blind by construction." },
-  { id: "ENV-EP-02", fam: "Endpoint population", name: "Managed hosts with patches over 30 days out of date",
-    where: "Corporate estate", owners: "Endpoint engineering, vulnerability management",
-    layers: ["E0 Firmware", "E1 Operating system", "E2 Security agents", "E3 Applications", "E4 Identity"],
-    seams: ["Host / boot", "Host / OS", "Host / process", "Host / app", "Host / net", "Identity"],
-    emits: ["Patch management state", "Vulnerability scanner findings", "Endpoint agent telemetry", "Identity sign in events"],
-    gap: "Instrumentation is present. The exposure is the window between a fix existing and it being applied." },
-];
+/* The environment shapes beyond the AI stack, read from infrastructure/ records with a
+   status other than catalog. Proposed shapes are shown as reference, not as part of the
+   catalog; nothing in the library is classified against them. */
+const FAMILY_NAME = { "web-application": "Web application", "endpoint-population": "Endpoint population", "other": "Other" };
+const BEYOND_ENVS = (DATA.infrastructure || []).filter(sh => sh.family !== "ai-stack").map(sh => ({
+  id: sh.id, fam: FAMILY_NAME[sh.family] || sh.family, name: sh.name, status: sh.status,
+  where: sh.where || "", owners: (sh.owners || []).join(", "),
+  layers: sh.layers.map(L => `${L.code} ${L.name}`),
+  seams: sh.seams.map(sm => sm.tag),
+  emits: sh.emits.map(e => e.category),
+  gap: sh.gap || "", note: sh.note || "" }));
 
 const PROCEDURES = [
   { key: "session", title: "Session mode, and when not to use it",
@@ -4403,10 +4348,10 @@ function docEnvs() {
     <div class="dgrid">${layerCards}</div>
 
     <h4 class="dh" style="margin-top:22px">Beyond the AI stack</h4>
-    <p class="dp">Six environment shapes from the parked proposal for cataloging things other
-      than AI: four web application shapes and two endpoint populations. They are here as
-      reference, not as part of the catalog. Nothing in the library is classified against them,
-      and adopting them would mean answering the open questions on the
+    <p class="dp">Environment shapes beyond the AI stack, read from the records under
+      <code>infrastructure/</code>: four web application shapes and two endpoint populations.
+      They are reference, not part of the catalog. Nothing in the library is classified against
+      them, and adopting one would mean answering the open questions on the
       <strong>New scenarios, beyond AI</strong> tab first.</p>
     <div class="dgrid">${envCards}</div>`;
 }

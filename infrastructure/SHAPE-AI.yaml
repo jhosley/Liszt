@@ -1,0 +1,216 @@
+# Infrastructure shape. Reference data: the layers, seams and emitted categories of one kind
+# of estate. schema/infrastructure-shape.schema.json defines it. The viewer's environment
+# pages read this file; edit it here, never on the page.
+
+shape_version: 1
+id: SHAPE-AI
+family: ai-stack
+name: The AI stack
+status: catalog
+lede: Five layers from the machinery AI runs on to the product surface a customer touches.
+description: The shape every scenario in the library is classified against. A scenario's objective layer
+  is where the attacker achieves the objective, which is not the same as where they got in and not the
+  same as who performed the move. Each attack step carries a seam tag saying where that one move operates;
+  the seam maps to a layer, and the validator checks that at least one step lands on the scenario's objective
+  layer.
+where: Any estate that trains, serves, or orchestrates models
+owners:
+- AI platform
+- Data platform
+- Cloud platform
+- Application teams
+- Security operations
+layers:
+- code: L0
+  name: Infrastructure
+  canonical: L0 · Infrastructure
+  lede: The machinery AI runs on, not the AI itself.
+  covers: 'Compute, nodes, containers, the network, storage, the cloud control plane, CI and build systems.
+    Two things sit here that people routinely misfile: identity, but only the control plane IAM of the
+    infrastructure itself rather than product accounts, and the supply chain.'
+  components: GPU and CPU nodes, Kubernetes clusters and node pools, container runtimes and agent sandboxes,
+    east west network, object storage and buckets, the cloud control plane and its IAM, CI and build systems,
+    package registries and artifact repositories.
+  matters: 'This is the only layer where classic ATT&CK Enterprise answers the question, so existing detection
+    engineering transfers unchanged. Two warnings. An unexplained L0 is the most common defect in this
+    field, because it is where people put a scenario they have not thought hard about. And the actor is
+    not the layer: an agent escalating privilege on a node is an L0 move, because the node is what the
+    attacker reached.'
+- code: L1
+  name: Data
+  canonical: L1 · Data
+  lede: The corpus and everything that feeds it.
+  covers: Training sets, fine tuning data, retrieval corpora, vector stores, and the documents or content
+    the system ingests. The question is whether the asset corrupted or carried away is data the system
+    will later consume.
+  components: Document inboxes and ingestion pipelines, chunking and embedding jobs, the vector database,
+    retrieval knowledge bases, labeled training sets, fine tune datasets, and the untrusted third party
+    content that lands in any of them.
+  matters: 'L1 teaches the whole classification discipline. A poisoned document reaches the model, the
+    model follows it, and the layer is still L1, because the corpus is the asset that was corrupted and
+    the model behaved as designed on poisoned retrieval. For an engineer that is an ownership fact: an
+    L1 finding is a data pipeline and corpus hygiene problem, provenance on ingest and write controls
+    on the store, not something the model team fixes by tuning a guardrail.'
+- code: L2
+  name: Model
+  canonical: L2 · Model
+  lede: The artifact, the call, and the decision.
+  covers: The model artifact and its weights, the inference call, the system prompt, the guardrails, and
+    the decision the model makes. The artifact at rest and the live call are split deliberately, because
+    they are different assets with different owners.
+  components: Weights files and checkpoints, model hub and registry artifacts, the serving endpoint, the
+    system prompt and its configuration, guardrails, safety classifiers and output filters.
+  matters: The trap here is tagging L2 because a model appears in the chain, and nearly every scenario
+    has one. L2 is where the model is the asset corrupted or stolen, or where the model's decision is
+    the damage. ATT&CK is close to silent at this layer, so these records are carried by ATLAS and the
+    OWASP LLM list instead, and the mapping is editorial more often than it is authoritative.
+- code: L3
+  name: Orchestration & Agent
+  canonical: L3 · Orchestration & Agent
+  lede: The loop, the tools, and the handoffs.
+  covers: Agent loops, tool and function calling, planning, memory, handoffs between agents, and connector
+    and MCP plumbing.
+  components: Agent runtimes and orchestrators, tool and function gateways, MCP servers and connectors,
+    planner and reasoning traces, agent memory stores, evaluation harnesses, and the workload identities
+    agents act under.
+  matters: 'This is where the least instrumentation exists today and where the most is being built. The
+    characteristic gap is the handoff: an agent passing work to a sub agent or an external tool often
+    crosses a seam that emits nothing at all, so the chain goes dark in the middle. The characteristic
+    mistake is the mirror of the L2 one, tagging L3 because an agent is the actor when the damage lands
+    somewhere else.'
+- code: L4
+  name: Application
+  canonical: L4 · Application
+  lede: The product surface a customer touches.
+  covers: The user interface, the API the business exposes, session and account handling, and output rendering.
+  components: Web and mobile front ends, the public API, session and token handling, account management,
+    the rendering path that turns model output into something a browser or a downstream system executes.
+  matters: 'L4 is where AI risk turns back into ordinary application security, which is good news: the
+    controls and the people already exist. The distinction worth holding is the identity one. Credential
+    abuse whose damage is takeover of the product account is L4, and identity at L0 is for the control
+    plane of the infrastructure itself.'
+seams:
+- tag: Data / inbound
+  layer: L1
+- tag: Data -> Host
+  layer: L1
+  note: Untrusted data reaching code execution on a host.
+- tag: Data / store
+  layer: L1
+- tag: Host / net
+  layer: L0
+- tag: Host / Cloud
+  layer: L0
+- tag: Cluster / net
+  layer: L0
+- tag: Identity
+  layer: L0
+  note: Control plane identity of the infrastructure itself. Product account identity is App / session.
+- tag: Supply chain
+  layer: L0
+- tag: Model / infer
+  layer: L2
+  note: The live inference call.
+- tag: Model / Agent
+  layer: L2
+- tag: Model / store
+  layer: L2
+  note: 'The model artifact at rest: weights on disk or in a bucket.'
+- tag: Agent / tools
+  layer: L3
+- tag: Agent / memory
+  layer: L3
+- tag: Agent / eval
+  layer: L3
+- tag: App / net
+  layer: L4
+- tag: App / session
+  layer: L4
+- tag: External
+  note: A move outside the estate. Nothing of ours emits; a run substitutes a stand-in.
+emits:
+- category: EDR / endpoint
+  layer: L0
+- category: container runtime
+  layer: L0
+- category: K8s audit
+  layer: L0
+- category: cloud audit
+  layer: L0
+- category: Identity
+  layer: L0
+- category: Egress FW / proxy
+  layer: L0
+- category: NDR
+  layer: L0
+- category: DLP
+  layer: L0
+- category: CI/CD
+  layer: L0
+- category: Source control
+  layer: L0
+- category: package registry
+  layer: L0
+- category: container registry
+  layer: L0
+- category: Secret scanning
+  layer: L0
+- category: Software composition analysis
+  layer: L0
+- category: cloud asset inventory
+  layer: L0
+- category: L1 ingestion
+  layer: L1
+- category: dataset-processing logs
+  layer: L1
+- category: RAG retrieval logs
+  layer: L1
+- category: AI gateway
+  layer: L2
+- category: AI gateway prompt logs
+  layer: L2
+- category: AI gateway output logs
+  layer: L2
+- category: guardrail
+  layer: L2
+- category: Model registry
+  layer: L2
+- category: Model monitoring
+  layer: L2
+- category: model input logs
+  layer: L2
+- category: Usage & cost telemetry
+  layer: L2
+- category: rate limits
+  layer: L2
+- category: Tool-call logs
+  layer: L3
+- category: MCP registry
+  layer: L3
+- category: tool inventory
+  layer: L3
+- category: Agent platform / eval harness
+  layer: L3
+- category: Coding-assistant telemetry
+  layer: L3
+- category: API gateway
+  layer: L4
+- category: WAF
+  layer: L4
+- category: load-balancer logs
+  layer: L4
+- category: SaaS logs
+  layer: L4
+- category: SIEM correlation
+  note: Cross layer.
+- category: Threat intel
+  note: Cross layer.
+- category: External attack-surface scanning
+  note: Cross layer.
+note: Layer cards and seam vocabulary moved here from the viewer page on 2026-09-14 so the page reads
+  them from a record and cannot drift from the library. Emitted categories were harvested from the evidence
+  rows of the twenty-one scenarios.
+provenance:
+  authored_by: Program lead
+  created: '2026-09-14'
+  last_updated: '2026-09-14'

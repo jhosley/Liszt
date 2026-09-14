@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.internal/liszt/schema/infrastructure-shape.schema.json",
+  "title": "Infrastructure Shape",
+  "description": "One kind of estate that scenarios are mapped onto, described as reference data: its layers, the seams between them where an attack move operates, and what it emits. The AI stack is one shape, with the five layers L0 Infrastructure through L4 Application that every scenario in the library is classified against. Other shapes (a web application behind a gateway, an endpoint population) describe estates the catalog may extend to; they are carried as records so the model already holds the answer to whether coverage is one number or one per stack. A shape is the vocabulary behind three fields on every scenario: the layer where the objective is achieved, the seam tag on each step, and the category of system an evidence row is emitted at. Files live in infrastructure/<id>.yaml.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["shape_version", "id", "family", "name", "status", "lede", "layers", "seams", "emits", "provenance"],
+  "properties": {
+    "shape_version": { "type": "integer", "const": 1 },
+    "id": { "type": "string", "pattern": "^SHAPE-[A-Z0-9]+(-[A-Z0-9]+)*$", "description": "Stable identity. SHAPE-AI is the AI stack." },
+    "family": { "enum": ["ai-stack", "web-application", "endpoint-population", "other"], "description": "The broad kind of estate. Coverage is never blended across families without an explicit decision." },
+    "name": { "type": "string", "minLength": 5, "maxLength": 90 },
+    "status": { "enum": ["catalog", "proposed", "retired"], "description": "catalog: scenarios are classified against it. proposed: described, nothing classified against it yet. retired: kept for history." },
+    "lede": { "type": "string", "minLength": 10, "maxLength": 200, "description": "One line on what this shape is." },
+    "description": { "type": "string", "maxLength": 1200 },
+    "where": { "type": "string", "maxLength": 200, "description": "Where an estate of this shape runs: public cloud, corporate data center, corporate estate." },
+    "owners": { "type": "array", "items": { "type": "string", "maxLength": 80 }, "description": "The teams that typically own it, as roles." },
+    "layers": {
+      "type": "array",
+      "minItems": 2,
+      "description": "The layers of this shape, in order from the bottom. A scenario's objective layer and a discovery observation's observed layer are values from this list.",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["code", "name"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^[A-Z][0-9]$", "description": "L0, W2, E4." },
+          "name": { "type": "string", "minLength": 3, "maxLength": 40 },
+          "canonical": { "type": "string", "maxLength": 40, "description": "The exact stored string when records carry one, for the AI stack 'L0 · Infrastructure'. The validator checks this list against the scenario schema's enum so the two cannot drift." },
+          "lede": { "type": "string", "maxLength": 160 },
+          "covers": { "type": "string", "maxLength": 900, "description": "What sits at this layer, and the classification rule that decides borderline cases." },
+          "components": { "type": "string", "maxLength": 900, "description": "The concrete things found at this layer in a typical estate." },
+          "matters": { "type": "string", "maxLength": 1200, "description": "Why the layer matters for detection, and the characteristic mistake made when classifying against it." }
+        }
+      }
+    },
+    "seams": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The seam tag vocabulary for this shape: where a single attack move operates, as a short tag such as Host / net. Each maps to the layer it lands on, which is what the consistency check between a step's tag and a scenario's objective layer reads. A step may carry a tag outside this list; the validator flags it for a reviewer to add or correct.",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["tag"],
+        "properties": {
+          "tag": { "type": "string", "minLength": 2, "maxLength": 18 },
+          "layer": { "type": "string", "pattern": "^[A-Z][0-9]$", "description": "The layer code the seam lands on. Absent for a seam outside the estate, such as External." },
+          "note": { "type": "string", "maxLength": 300 }
+        }
+      }
+    },
+    "emits": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The categories of system an estate of this shape emits evidence from: the vocabulary behind an evidence row's emitted_at. Categories, not products; the product is the per organization source.",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["category"],
+        "properties": {
+          "category": { "type": "string", "minLength": 2, "maxLength": 60 },
+          "layer": { "type": "string", "pattern": "^[A-Z][0-9]$" },
+          "note": { "type": "string", "maxLength": 300 }
+        }
+      }
+    },
+    "gap": { "type": "string", "maxLength": 400, "description": "The defining blind spot of estates of this shape, when there is one." },
+    "note": { "type": "string", "maxLength": 600 },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["authored_by", "created", "last_updated"],
+      "properties": {
+        "authored_by": { "type": "string" },
+        "reviewed_by": { "type": "string" },
+        "created": { "type": "string", "format": "date" },
+        "last_updated": { "type": "string", "format": "date" }
+      }
+    }
+  }
+}

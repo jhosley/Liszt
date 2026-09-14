@@ -1,0 +1,53 @@
+# Infrastructure shape. Reference data: the layers, seams and emitted categories of one kind
+# of estate. schema/infrastructure-shape.schema.json defines it. The viewer's environment
+# pages read this file; edit it here, never on the page.
+
+shape_version: 1
+id: SHAPE-WEB-02
+family: web-application
+name: Internally hosted web app behind a WAF
+status: proposed
+lede: A web application estate shape from the parked beyond-AI proposal.
+where: Corporate data center
+owners:
+- Network security
+- Platform engineering
+- Application team
+layers:
+- code: W0
+  name: Edge
+- code: W1
+  name: Proxy
+- code: W2
+  name: Application
+- code: W3
+  name: Data
+- code: W4
+  name: Directory
+seams:
+- tag: Edge / net
+  layer: W0
+- tag: WAF / rule
+  layer: W1
+- tag: Proxy -> App
+  layer: W1
+- tag: App / session
+  layer: W2
+- tag: App -> Data
+  layer: W2
+- tag: Data / store
+  layer: W3
+- tag: Identity
+  layer: W4
+emits:
+- category: WAF rule hits and blocks
+- category: Reverse proxy access logs
+- category: Web server and application logs
+- category: Database audit log
+gap: The WAF sees HTTP only. Anything the app does after the request is invisible to it.
+note: Proposed, not in the catalog. No scenario is classified against it. Carrying it as a record means
+  the model already holds the answer to whether coverage is one number or one per stack.
+provenance:
+  authored_by: Program lead
+  created: '2026-09-14'
+  last_updated: '2026-09-14'

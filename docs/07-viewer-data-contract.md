@@ -48,9 +48,21 @@ environment.
   "scenarios":  [ .. ],          // the records, plus computed metrics
   "use_cases":  [ .. ],          // operational use case records, as committed
   "incidents":  { "<slug>": { .. } },
-  "frameworks": { "attack": { "T1190": ["021"].. }.. }
+  "frameworks": { "attack": { "T1190": ["021"].. }.. },
+  "infrastructure": [ .. ]       // the infrastructure shape records, as committed
 }
 ```
+
+### `infrastructure`
+
+The infrastructure shape records from `infrastructure/`, in id order, exactly as committed
+(`schema/infrastructure-shape.schema.json`). The AI stack (`family: ai-stack`, `status:
+catalog`) carries the five layer cards, the seam tag vocabulary with the layer each seam
+lands on, and the categories of system the estate emits evidence from. Other shapes are
+`proposed` reference data; nothing is classified against them. The reference page's
+Environments documentation and its seam consistency check read this key rather than
+carrying their own copy. Additive; `data_version` stays 1, and a consumer reading an
+older file should treat a missing key as an empty list.
 
 ### `data_version`
 

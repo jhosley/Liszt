@@ -112,6 +112,12 @@
           },
           "description": "Why this priority. Each item must fit one line on the slide (<=130 chars). At least one must reference our own exposure, not just the threat."
         },
+        "stack": {
+          "type": "string",
+          "pattern": "^SHAPE-[A-Z0-9]+(-[A-Z0-9]+)*$",
+          "default": "SHAPE-AI",
+          "description": "The infrastructure shape this scenario is classified against (infrastructure/<id>.yaml). Absent means SHAPE-AI, the AI stack, which is every record in the library today. This is the stack scope: coverage is reported per shape and never blended across shapes without an explicit decision."
+        },
         "mode": {
           "enum": [
             "attack",

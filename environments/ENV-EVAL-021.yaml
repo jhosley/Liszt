@@ -9,6 +9,7 @@ environment_version: 1
 id: ENV-EVAL-021
 version: 1
 name: AI evaluation environment, mirrored telemetry
+shape: SHAPE-AI
 description: >-
   A disposable EKS cluster with a dataset-processing worker, standing in for the agent
   evaluation sandbox in scenario 021. Telemetry ships to the estate's real collectors into

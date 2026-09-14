@@ -40,6 +40,11 @@
       "minLength": 5,
       "maxLength": 90
     },
+    "shape": {
+      "type": "string",
+      "pattern": "^SHAPE-[A-Z0-9]+(-[A-Z0-9]+)*$",
+      "description": "The infrastructure shape this environment instantiates (infrastructure/<id>.yaml). Its targets and components stand in for that shape's layers."
+    },
     "description": {
       "type": "string",
       "maxLength": 1200

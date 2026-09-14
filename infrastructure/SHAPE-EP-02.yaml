@@ -1,0 +1,49 @@
+# Infrastructure shape. Reference data: the layers, seams and emitted categories of one kind
+# of estate. schema/infrastructure-shape.schema.json defines it. The viewer's environment
+# pages read this file; edit it here, never on the page.
+
+shape_version: 1
+id: SHAPE-EP-02
+family: endpoint-population
+name: Managed hosts with patches over 30 days out of date
+status: proposed
+lede: An endpoint population shape from the parked beyond-AI proposal.
+where: Corporate estate
+owners:
+- Endpoint engineering
+- Vulnerability management
+layers:
+- code: E0
+  name: Firmware
+- code: E1
+  name: Operating system
+- code: E2
+  name: Security agents
+- code: E3
+  name: Applications
+- code: E4
+  name: Identity
+seams:
+- tag: Host / boot
+  layer: E0
+- tag: Host / OS
+  layer: E1
+- tag: Host / process
+  layer: E2
+- tag: Host / app
+  layer: E3
+- tag: Host / net
+  layer: E1
+- tag: Identity
+  layer: E4
+emits:
+- category: Patch management state
+- category: Vulnerability scanner findings
+- category: Endpoint agent telemetry
+- category: Identity sign in events
+gap: Instrumentation is present. The exposure is the window between a fix existing and it being applied.
+note: Proposed, not in the catalog. No scenario is classified against it.
+provenance:
+  authored_by: Program lead
+  created: '2026-09-14'
+  last_updated: '2026-09-14'

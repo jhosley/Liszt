@@ -1,0 +1,53 @@
+# Infrastructure shape. Reference data: the layers, seams and emitted categories of one kind
+# of estate. schema/infrastructure-shape.schema.json defines it. The viewer's environment
+# pages read this file; edit it here, never on the page.
+
+shape_version: 1
+id: SHAPE-WEB-03
+family: web-application
+name: Web app published through a CDN
+status: proposed
+lede: A web application estate shape from the parked beyond-AI proposal.
+where: Public cloud origin, third party edge
+owners:
+- CDN owner
+- Platform engineering
+- Application team
+layers:
+- code: W0
+  name: CDN edge
+- code: W1
+  name: Origin shield
+- code: W2
+  name: Application
+- code: W3
+  name: Data
+- code: W4
+  name: CDN config
+seams:
+- tag: Edge / net
+  layer: W0
+- tag: Edge / cache
+  layer: W0
+- tag: Origin / net
+  layer: W1
+- tag: App / session
+  layer: W2
+- tag: App -> Data
+  layer: W2
+- tag: Data / store
+  layer: W3
+- tag: Control plane
+  layer: W4
+emits:
+- category: CDN access logs and edge rule hits
+- category: Origin access logs
+- category: Application logs
+- category: CDN configuration change log
+gap: If the origin is reachable directly, the entire edge is optional for an attacker.
+note: Proposed, not in the catalog. No scenario is classified against it. Carrying it as a record means
+  the model already holds the answer to whether coverage is one number or one per stack.
+provenance:
+  authored_by: Program lead
+  created: '2026-09-14'
+  last_updated: '2026-09-14'
