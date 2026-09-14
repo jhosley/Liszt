@@ -2662,6 +2662,9 @@ const STEP_LAYER_CAP = 18;
    so anything outside this list is kept but flagged: the reviewer decides whether it is a
    real seam we should add or a slip we should correct. The component prefix is what the
    layer cross-check below reads, which is why the vocabulary is closed rather than free. */
+/* The AI stack shape record, the vocabulary behind the seam tags, the layer cards and the
+   step to layer consistency check. Defined here because the intake checks below run first. */
+const SHAPE_AI = (DATA.infrastructure || []).find(sh => sh.family === "ai-stack") || { layers: [], seams: [] };
 const SEAM_TAGS = SHAPE_AI.seams.map(sm => sm.tag.replace(/\u2192/g, "->"));
 /* Which of the five layers each seam tag belongs to, for the consistency check. Read from
    the shape record; a seam with no layer (External) maps to the empty string. */
@@ -3882,7 +3885,6 @@ const openProc = {};
 /* The layer cards are read from the AI stack's infrastructure record (infrastructure/
    SHAPE-AI.yaml), not written here. The seam list per layer is derived from the shape's
    seam vocabulary. Edit the record; this page follows. */
-const SHAPE_AI = (DATA.infrastructure || []).find(sh => sh.family === "ai-stack") || { layers: [], seams: [] };
 const AI_LAYERS_DOC = SHAPE_AI.layers.map(L => ({
   id: L.code, name: L.name, lede: L.lede || "", covers: L.covers || "",
   components: L.components || "", matters: L.matters || "",
