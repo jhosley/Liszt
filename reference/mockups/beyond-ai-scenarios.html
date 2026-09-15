@@ -115,7 +115,7 @@ pre{background:#1b2340;color:#dfe5f5;border-radius:6px;padding:14px 16px;overflo
 .recbar{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 12px}
 .pill{font-size:11px;font-weight:700;letter-spacing:.6px;border-radius:3px;padding:3px 9px;color:#fff}
 .p-navy{background:var(--navy)} .p-teal{background:var(--teal)} .p-amber{background:var(--amber)}
-.p-grey{background:#8C8C96}
+.p-gray{background:#8C8C96}
 .rec h2{font-size:19px} .rec .one{font-size:14px;margin-bottom:12px}
 .foot{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}
 </style>
@@ -240,7 +240,7 @@ pre{background:#1b2340;color:#dfe5f5;border-radius:6px;padding:14px 16px;overflo
   <div class="card">
     <p class="kick">STEP FIVE</p>
     <h2>The converter runs on a reviewed answer</h2>
-    <p>By this point the layer, the chain and the framework tags have all been chosen by a person from a closed list. The converter is doing a mechanical translation rather than a judgement call, which is the whole reason to put a review step in front of it.</p>
+    <p>By this point the layer, the chain and the framework tags have all been chosen by a person from a closed list. The converter is doing a mechanical translation rather than a judgment call, which is the whole reason to put a review step in front of it.</p>
     <div class="flag ok"><b>Validation</b>All step tags are in the environment vocabulary. The chosen layer appears in the chain. Every framework identifier is well formed. Source tiers are 1, 2 or 3.</div>
   </div>
   <div class="card"><p class="kick">DRAFT RECORD</p><pre id="json"></pre></div>
@@ -609,7 +609,7 @@ const REAL = {
       ["The exploit becomes public","14 April 2017, 31 days after the fix, when a leaked toolkit was dumped publicly."],
       ["The outbreak","12 May 2017, first infections around 07:44 UTC. Fifty-nine days after the fix was available."],
       ["What was actually hit","Over 98 percent of infections were one supported desktop operating system, unpatched. The much-repeated claim that end-of-life systems were the main victim is wrong twice over: they were under a tenth of a percent of infections, and where the exploit did reach them it mostly crashed them rather than encrypting them."],
-      ["One national health system","At least 80 of 236 trusts affected, 34 infected and locked out, 595 general practices infected, 6,912 appointments cancelled in the documented count and an estimated 19,494 including knock-on effects. Around 92 million pounds in total cost."],
+      ["One national health system","At least 80 of 236 trusts affected, 34 infected and locked out, 595 general practices infected, 6,912 appointments canceled in the documented count and an estimated 19,494 including knock-on effects. Around 92 million pounds in total cost."],
       ["What the attackers collected","About 130,000 dollars. With three hardcoded wallets and no per-victim payment tracking, paying largely did not produce a decryption."],
       ["Attribution","Formally attributed by the United States in December 2017, with a criminal complaint unsealed in September 2018."]
     ]},
@@ -878,8 +878,8 @@ function renderRecord(){
       '<span class="pill p-navy">'+env.id+'</span>'+
       '<span class="pill p-teal">STACK MODEL '+(env.fam==="web"?"WEB":"ENDPOINT")+'</span>'+
       '<span class="pill p-amber">SEEN IN RESEARCH</span>'+
-      '<span class="pill p-grey">PRIORITY NEAR-TERM</span>'+
-      '<span class="pill p-grey">DRAFT</span>'+
+      '<span class="pill p-gray">PRIORITY NEAR-TERM</span>'+
+      '<span class="pill p-gray">DRAFT</span>'+
     '</div>'+
     '<p class="one">'+one+'</p>'+
 
@@ -927,7 +927,7 @@ function renderRealRecord(){
       '<span class="pill p-navy">'+r.env+'</span>'+
       '<span class="pill p-teal">STACK MODEL '+(env.fam==="web"?"WEB":"ENDPOINT")+'</span>'+
       '<span class="pill p-amber">SEEN IN THE WILD</span>'+
-      '<span class="pill p-grey">PRIORITY '+r.priority+'</span>'+
+      '<span class="pill p-gray">PRIORITY '+r.priority+'</span>'+
     '</div>'+
     '<p class="one">'+r.one_liner+'</p>'+
 
